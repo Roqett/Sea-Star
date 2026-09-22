@@ -246,5 +246,5 @@ called **Up Periscope** to bump up Diverse projects. Learned in public.*
 
 *On the advice of Hunter S. Thompson — who said he hated recommending drugs, alcohol,
  or insanity to anyone... but admitted they'd always worked for him — we took the
-parts worth keeping: **no dangerous drugs, only high-quality alcohol, no guns.** Mostly
-Python, sometimes Rust, mainly Swift.*
+parts worth keeping: **no dangerous drugs, only high-quality alcohol, no propellant weapons.** Mostly
+Swift, Python, sometimes Rust, mainly Swift.*
