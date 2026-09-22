@@ -15,6 +15,7 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from . import __version__
 from .agent import build_agent
@@ -32,7 +33,7 @@ console = Console()
 
 
 def _die(message: str) -> None:
-    console.print(f"[bold red]Error:[/bold red] {message}")
+    console.print(f"[bold red]Error:[/bold red] {escape(message)}")
     raise typer.Exit(code=1)
 
 
