@@ -5,8 +5,7 @@
 # ⭐ SeaStar
 
 **A private, local-first AI agent that lives in your Obsidian vault.**
-
-Goose's power. One-click's ease. Nothing leaves your house.
+One-click's ease. Nothing leaves your house.
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -16,11 +15,12 @@ Goose's power. One-click's ease. Nothing leaves your house.
 
 ---
 
-> *"Booze your own adventure to fair winds and following seas."*
+> *"Your own adventure to fair winds and following seas."*
 > — The Sea Star, 2289 3rd Street, Dogpatch, San Francisco
+> This cute snack also thanks Tom's dry dock around the corner. As it was.
 
-A sea star has no brain and clings to its rock.
-SeaStar is the agent that clings to your notes — and never leaves your rock.
+A sea star has an astal brain and clings to its rock.
+SeaStar is the agent that clings to your notes — and helps your roq find the Right spot
 
 ---
 
