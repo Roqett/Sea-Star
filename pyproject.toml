@@ -1,0 +1,53 @@
+[project]
+name = "seastar-mcp"
+version = "0.1.0"
+description = "A private, local-first AI agent that lives in your Obsidian vault. Zero-config, runtime-agnostic, sovereign."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Roqett", email = "Roqett@users.noreply.github.com" }]
+keywords = ["mcp", "model-context-protocol", "obsidian", "local-first", "llm", "agent", "privacy", "sovereign", "ollama", "llama.cpp", "mlx"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "mcp>=2.0",
+  "httpx>=0.27",
+  "typer>=0.12",
+  "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+seastar = "seastar.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/Roqett/theSeaStar"
+Issues = "https://github.com/Roqett/theSeaStar/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/seastar"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
