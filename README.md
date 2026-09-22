@@ -222,12 +222,12 @@ src/seastar/
 
 ## The name
 
-There is a dive bar called **The Sea Star** at 2289 3rd Street, in the Dogpatch
-neighbourhood of San Francisco. Its sign is an orange octopus holding a martini glass.
+There's a bar called **The Sea Star** at 2289 3rd Street, in the Dogpatch
+ of San Francisco. Its sign was an orange octopus .
 Its own words: *"House Octopus overseeing the antics? We've got one of those too!"*
 
-That's the spirit. A sea star has no brain and clings to its rock — SeaStar is the
-agent that clings to your notes and never leaves your rock. The octopus is the house
+That's the spirit. A sea star has an astral brain and clings to its rock — SeaStar is the
+agent that clings to your notes and never leaves your roq. The octopus is the house
 mascot. Fair winds and following seas.
 
 ## Contributing
@@ -241,10 +241,10 @@ MIT © Roqett / Up Periscope
 
 ---
 
-*Built by a winemaker who bought an M4 Pro, got curious, and started a small software factory
-called **Up Periscope**. Learned in public.*
+*Built by a Oz winemaker who bought an M4 Pro 64GB,  got curious, and started a small software factory
+called **Up Periscope** to bump up Diverse projects. Learned in public.*
 
 *On the advice of Hunter S. Thompson — who said he hated recommending drugs, alcohol,
-violence, or insanity to anyone but admitted they'd always worked for him — we took the
+ or insanity to anyone... but admitted they'd always worked for him — we took the
 parts worth keeping: **no dangerous drugs, only high-quality alcohol, no guns.** Mostly
-Python, sometimes Rust, sometimes Swift.*
+Python, sometimes Rust, mainly Swift.*
