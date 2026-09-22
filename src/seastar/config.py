@@ -13,6 +13,7 @@ Contract:
 
 from __future__ import annotations
 
+import json
 import os
 import tomllib
 from dataclasses import dataclass, field
@@ -33,6 +34,8 @@ KNOWN_RUNTIMES: tuple[tuple[str, str], ...] = (
     ("vllm", "http://127.0.0.1:8000/v1"),
     ("unsloth", "http://127.0.0.1:8000/v1"),
 )
+
+OBSIDIAN_CONFIG_NAME = "obsidian.json"
 
 PROBE_TIMEOUT_SECONDS = 1.5
 
@@ -141,6 +144,52 @@ async def detect_runtime() -> tuple[str, str, str]:
     )
 
 
+def _obsidian_config_paths(home: Path) -> tuple[Path, ...]:
+    """Places Obsidian keeps its own config, per platform."""
+
+    paths = [
+        home / "Library" / "Application Support" / "obsidian" / OBSIDIAN_CONFIG_NAME,
+        home / ".config" / "obsidian" / OBSIDIAN_CONFIG_NAME,
+    ]
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        paths.append(Path(appdata) / "obsidian" / OBSIDIAN_CONFIG_NAME)
+    return tuple(paths)
+
+
+def detect_vault(home: Path | None = None) -> Path | None:
+    """Find the user's Obsidian vault from Obsidian's own config, or ``None``.
+
+    Obsidian records every vault it knows in ``obsidian.json``; the entry flagged
+    ``open`` is the one the user last used. Reading it means SeaStar can be truly
+    zero-config for anyone who already has Obsidian installed.
+    """
+
+    base = (home or Path.home()).expanduser()
+    for candidate in _obsidian_config_paths(base):
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        vaults = data.get("vaults")
+        if not isinstance(vaults, dict):
+            continue
+        entries = [
+            entry
+            for entry in vaults.values()
+            if isinstance(entry, dict) and entry.get("path")
+        ]
+        if not entries:
+            continue
+        opened = [entry for entry in entries if entry.get("open")]
+        entries = opened or entries
+        entries.sort(key=lambda entry: entry.get("ts", 0), reverse=True)
+        path = Path(str(entries[0]["path"])).expanduser()
+        if path.is_dir():
+            return path.resolve()
+    return None
+
+
 async def load_config(path: Path | None = None, *, autodetect: bool = True) -> Config:
     """Resolve a complete :class:`Config`, failing loud on anything missing."""
 
@@ -151,11 +200,16 @@ async def load_config(path: Path | None = None, *, autodetect: bool = True) -> C
             data = tomllib.load(handle)
 
     vault_raw = os.environ.get("SEASTAR_VAULT") or data.get("vault")
-    if not vault_raw:
-        raise ConfigError(
-            f"No vault configured. Run `seastar init --vault <path>` or set [vault] in {CONFIG_FILENAME}."
-        )
-    vault_path = Path(str(vault_raw)).expanduser().resolve()
+    if vault_raw:
+        vault_path = Path(str(vault_raw)).expanduser().resolve()
+    else:
+        detected_vault = detect_vault() if autodetect else None
+        if detected_vault is None:
+            raise ConfigError(
+                f"No vault configured and no Obsidian vault found. Run "
+                f"`seastar init --vault <path>` or set [vault] in {CONFIG_FILENAME}."
+            )
+        vault_path = detected_vault
     if not vault_path.is_dir():
         raise ConfigError(f"Vault path is not a directory: {vault_path}")
 

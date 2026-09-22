@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
-from seastar.config import ConfigError, load_config, write_default_config
+from seastar.config import ConfigError, detect_vault, load_config, write_default_config
 
 
 @pytest.fixture(autouse=True)
@@ -58,3 +60,28 @@ async def test_servers_are_parsed(tmp_path):
     assert spec.command == "npx"
     assert spec.args == ("-y", "obsidian-mcp")
     assert spec.env_dict()["VAULT"] == "/tmp/v"
+
+
+def test_detect_vault_prefers_open_vault(tmp_path):
+    open_vault = tmp_path / "MyVault"
+    other_vault = tmp_path / "Other"
+    open_vault.mkdir()
+    other_vault.mkdir()
+    obsidian = tmp_path / "Library" / "Application Support" / "obsidian"
+    obsidian.mkdir(parents=True)
+    (obsidian / "obsidian.json").write_text(
+        json.dumps(
+            {
+                "vaults": {
+                    "a": {"path": str(other_vault), "ts": 99999999},
+                    "b": {"path": str(open_vault), "ts": 1, "open": True},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert detect_vault(home=tmp_path) == open_vault.resolve()
+
+
+def test_detect_vault_returns_none_without_obsidian(tmp_path):
+    assert detect_vault(home=tmp_path) is None

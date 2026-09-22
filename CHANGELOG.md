@@ -13,6 +13,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   MLX, vLLM and Unsloth Studio all work without a vendor lock-in.
 - **Zero-config autodetection** (`config.py`): probes the six common local ports
   and adopts the first runtime that answers; fails loud when none do.
+- **Obsidian vault autodetection** (`config.detect_vault`): reads Obsidian's own
+  `obsidian.json` (macOS, Linux and Windows locations), prefers the currently-open
+  vault, and falls back to the most recently used one — so `seastar serve` works
+  with no configuration at all.
 - **Obsidian vault memory** (`vault.py`): scan, ranked search, read, write and
   append, with traversal-safe paths and `[[wikilink]]` citations.
 - **Bounded agent loop** (`agent.py`): model turn → tool calls → observations →
@@ -25,6 +29,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Factory protocol** (`AGENTS.md`): Tier 1/Tier 2 tripwires and core invariants.
 - Test suite covering the vault, config resolution, tool registry, agent loop and
   MCP server surface.
+
+### Changed
+
+- **README focus** — added the "Osaurus + Unsloth Studio" setup recipe: Osaurus as
+  the agent harness, Unsloth Studio as the OpenAI-compatible model server, SeaStar
+  as the shared private memory. The runtime-agnostic contract is unchanged.
+- **Brand** — the octopus sign from The Sea Star (2289 3rd Street, Dogpatch, San
+  Francisco) is now the repo's front image, with a short note on where the name
+  comes from.
+- Aligned the README's config file name, vault key and `[[mcp.servers]]` shape with
+  the actual implementation.
 
 ### Fixed
 
