@@ -10,6 +10,9 @@ Goose's power. One-click's ease. Nothing leaves your house.
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
 
+
+<img width="109" height="166" alt="seaStar_SF" src="https://github.com/user-attachments/assets/c2a055c3-cdea-4ecc-a177-45dc0b0184df" />
+
 </div>
 
 ---
