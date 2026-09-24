@@ -25,3 +25,8 @@ INBOX/
 # Design reference images — third-party photos (Carpet Sea Star) used only for
 # moodboarding the app look. Kept local so a public push never redistributes them.
 assets/reference/
+
+# Agent scratch space — anything the editor drops under .trae/ stays local,
+# EXCEPT the mac-app spec set, which is a tracked design document (the lodestone).
+.trae/*
+!.trae/specs/

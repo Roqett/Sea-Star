@@ -81,8 +81,8 @@ No parallel agents active. Single-writer.
   does. Least-complicated fix: **transfer** the repo to the org
   (`gh repo transfer Roqett/Sea-Star UpPeriscope`) — GitHub keeps the old URL redirecting,
   and history/issues/stars carry over. Until then the org links 404 (harmless while private).
-- `.trae/specs/mac-app/` (the spec set) is **untracked** — decide whether to ship it under
-  `docs/` or keep it local.
+- **Spec set is now tracked.** `.trae/specs/mac-app/` (`spec.md`, `tasks.md`,
+  `checklist.md`) is committed; `.trae/*` is gitignored except `specs/`.
 - Bridge tests for `--json` and `allows()` (spec T1.5/T1.6/T1.8) not yet written.
 
 **Single next step**

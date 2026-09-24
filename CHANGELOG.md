@@ -22,9 +22,12 @@ Summary of Changes:
 - **README rewritten as two equal tracks.** A terminal-first path (available now) and a
   GUI-first path (coming), with a "Two ways to run it" parity table; dropped the marketing
   pull-quote and the `## The name` section; documented `include` / `exclude`.
-- **mac-app spec → Revision 2.** Folded in the two-track instruction model (D9), the
-  identity/naming decision (D10), the corrected Xcode toolchain (native `xcrun mcpbridge`
-  path, §9.1), and the planned Omarchy (Arch Linux + Hyprland) port.
+- **mac-app spec → Revision 2, and now tracked.** Folded in the two-track
+  instruction model (D9), the identity/naming decision (D10), the corrected Xcode toolchain
+  (native `xcrun mcpbridge` path, §9.1), and the planned Omarchy (Arch Linux + Hyprland)
+  port. The spec set (`spec.md`, `tasks.md`, `checklist.md`) is now committed under
+  `.trae/specs/mac-app/` so it is versioned alongside the code; `.trae/*` is gitignored
+  except `specs/`.
 - **Added `docs/README_DRY.md`** — a spin-free reference doc (IS / DOES / SOLVES /
   DE-COMPLICATES) for cross-checking the Omarchy port with other models.
 
