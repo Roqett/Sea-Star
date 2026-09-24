@@ -53,9 +53,23 @@ class MCPServerSpec:
     command: str
     args: tuple[str, ...] = ()
     env: tuple[tuple[str, str], ...] = ()
+    include: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ()
 
     def env_dict(self) -> dict[str, str]:
         return dict(self.env)
+
+    def allows(self, tool_name: str) -> bool:
+        """Whether this server's ``tool_name`` should be exposed to the agent.
+
+        An empty ``include`` means "everything not excluded"; a non-empty one is
+        an allowlist. ``exclude`` always wins. Curating here — at connect time —
+        is what keeps the agent's tool menu small enough to choose well.
+        """
+
+        if self.include and tool_name not in self.include:
+            return False
+        return tool_name not in self.exclude
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +117,8 @@ def _parse_servers(raw: object) -> tuple[MCPServerSpec, ...]:
                 command=str(entry["command"]),
                 args=tuple(str(a) for a in entry.get("args", ())),
                 env=tuple((str(k), str(v)) for k, v in entry.get("env", {}).items()),
+                include=tuple(str(t) for t in entry.get("include", ())),
+                exclude=tuple(str(t) for t in entry.get("exclude", ())),
             )
         )
     return tuple(specs)
@@ -275,6 +291,8 @@ def write_default_config(vault_path: Path, *, model: str = "", base_url: str = "
         '# name = "obsidian"',
         '# command = "npx"',
         '# args = ["-y", "obsidian-mcp", "/absolute/path/to/your/vault"]',
+        '# include = ["search_notes"]  # optional allowlist; empty = every tool',
+        '# exclude = []                 # optional denylist; always wins',
         "",
     ]
     destination = vault_path / CONFIG_FILENAME

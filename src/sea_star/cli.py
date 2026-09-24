@@ -10,6 +10,7 @@ Contract:
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -62,30 +63,68 @@ def init(
 
 
 @app.command()
-def doctor() -> None:
-    """Check the vault, the inference runtime, and the available models."""
+def doctor(
+    as_json: Annotated[
+        bool, typer.Option("--json", help="Emit a machine-readable status report.")
+    ] = False,
+) -> None:
+    """Check the vault, the inference runtime, and the available models.
 
-    async def _run() -> None:
+    With ``--json`` this prints a single JSON object to stdout and is the bridge
+    contract a host app (the macOS app, an Obsidian plugin) can poll: it always
+    emits JSON, even on failure, so the caller never has to parse prose.
+    """
+
+    async def _report() -> dict:
         config = await load_config()
-        console.print(f"Vault:    [green]{config.vault_path}[/green]")
-        console.print(f"Notes:    {len(Vault(config.vault_path).scan())}")
-        console.print(f"Runtime:  {config.runtime_name} -> {config.base_url}")
-        console.print(f"Model:    {config.model}")
         models = await probe_base_url(config.base_url)
-        if not models:
-            _die(f"Runtime at {config.base_url} did not answer. Start it and retry.")
-        console.print(f"Available: {', '.join(models[:8])}")
-        if config.servers:
-            names = ", ".join(spec.name for spec in config.servers)
-            console.print(f"Bridged MCP servers: {names}")
-        else:
-            console.print("Bridged MCP servers: none")
-        console.print("[green]Ready.[/green]")
+        return {
+            "ready": bool(models),
+            "version": __version__,
+            "vault": str(config.vault_path),
+            "notes": len(Vault(config.vault_path).scan()),
+            "runtime": config.runtime_name,
+            "base_url": config.base_url,
+            "model": config.model,
+            "models": models or [],
+            "servers": [
+                {
+                    "name": spec.name,
+                    "command": spec.command,
+                    "include": list(spec.include),
+                    "exclude": list(spec.exclude),
+                }
+                for spec in config.servers
+            ],
+        }
 
     try:
-        asyncio.run(_run())
+        report = asyncio.run(_report())
     except ConfigError as error:
+        if as_json:
+            print(json.dumps({"ready": False, "error": str(error)}))
+            raise typer.Exit(code=1)
         _die(str(error))
+
+    if as_json:
+        print(json.dumps(report))
+        if not report["ready"]:
+            raise typer.Exit(code=1)
+        return
+
+    console.print(f"Vault:    [green]{report['vault']}[/green]")
+    console.print(f"Notes:    {report['notes']}")
+    console.print(f"Runtime:  {report['runtime']} -> {report['base_url']}")
+    console.print(f"Model:    {report['model']}")
+    if not report["ready"]:
+        _die(f"Runtime at {report['base_url']} did not answer. Start it and retry.")
+    console.print(f"Available: {', '.join(report['models'][:8])}")
+    if report["servers"]:
+        names = ", ".join(server["name"] for server in report["servers"])
+        console.print(f"Bridged MCP servers: {names}")
+    else:
+        console.print("Bridged MCP servers: none")
+    console.print("[green]Ready.[/green]")
 
 
 @app.command()
