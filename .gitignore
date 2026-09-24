@@ -21,3 +21,7 @@ seastar.toml
 
 # Staging folder — documents dropped here for review never ship or commit
 INBOX/
+
+# Design reference images — third-party photos (Carpet Sea Star) used only for
+# moodboarding the app look. Kept local so a public push never redistributes them.
+assets/reference/
