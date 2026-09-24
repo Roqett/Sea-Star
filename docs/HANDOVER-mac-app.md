@@ -7,14 +7,17 @@ is about building a native macOS front end on top of it.
 ## 1. Where we are
 
 - **Product:** Sea-Star — a free (MIT), local-first, runtime-agnostic MCP server that
-  turns an Obsidian vault into a private AI agent. Repo `Roqett/Sea-Star`
-  (dist package `seastar-mcp`). Public goal: "one-click, just works" for everyone.
-- **Founder:** "Lono" (GitHub `Roqett`), ex-winemaker in McLaren Vale, South Australia.
+  turns an Obsidian vault into a private AI agent. Repo `Roqett/Sea-Star` — **moving to the
+  `UpPeriscope` org** (dist package `seastar-mcp`). Public goal: "one-click, just works" for
+  everyone.
+- **Founder:** "Lono" (GitHub `Roqett`, org `UpPeriscope`), ex-winemaker in McLaren Vale,
+  South Australia.
   Comfortable with Swift basics only — **allergic to the terminal**. This is the whole
   reason the GUI exists.
 - **Engine state:** `uv run ruff check .` clean; `uv run pytest` → 27 passing. Version
-  `0.1.0`, unreleased. Renamed to Sea-Star, oMLX added to the runtime autodetect, and
-  everything committed + pushed — HEAD `ab3b158` on `main`.
+  `0.1.0`, unreleased. The **app bridge (`sea-star doctor --json`) and `include`/`exclude`
+  tool curation are now in** — the engine surface the app needs already exists. Latest
+  committed HEAD is `f4d21b3` on `main`; the bridge work sits on top of it.
 - **Local folder:** `/Users/lono/Random_MCP/theSeaStar` (folder name still the old
   spelling; the repo and package are already `Sea-Star` / `sea_star`).
 
@@ -41,12 +44,12 @@ Three layers. Only the third is new code.
 
 1. **Engine (unchanged):** `src/sea_star/`. Already handles vault detection, runtime +
    model autodetect, and the MCP server.
-2. **Bridge:** the app runs `sea-star ...` and parses the result. **Gap to close first:**
-   `doctor` currently prints human-formatted rich text only
-   ([cli.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/cli.py#L64-L88)) — there is
-   **no `--json`**. The first coding task is a machine-readable surface, e.g.
-   `sea-star doctor --json` (or a new `status --json`) returning vault path, note count,
-   runtime name, base URL, model, model list. Keep the human output as the default.
+2. **Bridge:** the app runs `sea-star ...` and parses the result. **Gap closed:**
+   `sea-star doctor --json` now emits one JSON object (vault path, note count, runtime name,
+   base URL, model, model list, bridged servers) and always emits JSON, even on failure —
+   see [cli.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/cli.py#L64-L131). The
+   human output stays the default. Still worth a test (spec T1.5); the app should decode
+   this object rather than scrape rich text.
 3. **Cockpit (new):** a SwiftUI app. Start with `MenuBarExtra`; keep the scene explicit
    and files split by responsibility (`App/`, `Views/`, `Models/`, `Services/`, `Support/`).
 
@@ -116,7 +119,8 @@ Menu-bar item text stays short (≤ ~30 chars); push detail into a window or pop
 
 ## 8. Suggested first steps
 
-1. Add the machine-readable bridge: `sea-star doctor --json` (or `status --json`); test it.
+1. ~~Add the machine-readable bridge~~ — **done**: `sea-star doctor --json` ships. Add a
+   test for it (spec T1.5), then move on to the app itself.
 2. Scaffold the SwiftUI menu-bar app (own folder or sibling repo — decide this first):
    `MenuBarExtra` scene + a `Services/` CLI client that runs the command and decodes JSON.
 3. Static first pass: popover showing vault / harness / model from the JSON, with a

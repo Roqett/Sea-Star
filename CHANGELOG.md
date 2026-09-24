@@ -8,6 +8,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Harness: TRAE
 
+Date: 2026-09-25
+
+Summary of Changes:
+- **`doctor --json` — the app bridge contract.** `sea-star doctor` now takes `--json` and
+  always emits one JSON object (vault, notes, runtime, base_url, model, models, bridged
+  servers), even on failure, so a host app can poll it instead of scraping rich text. The
+  human output is unchanged and still the default.
+- **Curated bridged tools with `include` / `exclude`.** Each `[[mcp.servers]]` entry can
+  carry `include` (allowlist; empty = every tool) and `exclude` (denylist; always wins).
+  Filtering happens at connect time in `mcp_client.list_external_tools`, so the agent only
+  ever sees a short, intentional tool menu.
+- **README rewritten as two equal tracks.** A terminal-first path (available now) and a
+  GUI-first path (coming), with a "Two ways to run it" parity table; dropped the marketing
+  pull-quote and the `## The name` section; documented `include` / `exclude`.
+- **mac-app spec → Revision 2.** Folded in the two-track instruction model (D9), the
+  identity/naming decision (D10), the corrected Xcode toolchain (native `xcrun mcpbridge`
+  path, §9.1), and the planned Omarchy (Arch Linux + Hyprland) port.
+- **Added `docs/README_DRY.md`** — a spin-free reference doc (IS / DOES / SOLVES /
+  DE-COMPLICATES) for cross-checking the Omarchy port with other models.
+
+Harness: TRAE
+
 Date: 2026-09-24
 
 Summary of Changes:
