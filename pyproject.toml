@@ -34,8 +34,8 @@ dev = [
 sea-star = "sea_star.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/UpPeriscope/Sea-Star"
-Issues = "https://github.com/UpPeriscope/Sea-Star/issues"
+Homepage = "https://github.com/Roqett/Sea-Star"
+Issues = "https://github.com/Roqett/Sea-Star/issues"
 
 [build-system]
 requires = ["hatchling"]

@@ -127,10 +127,10 @@ Two ways in. Pick whichever suits you — neither one is the "advanced" one.
 
 ```bash
 # Zero-install from source, if you have uv (recommended):
-uvx --from git+https://github.com/UpPeriscope/Sea-Star sea-star serve
+uvx --from git+https://github.com/Roqett/Sea-Star sea-star serve
 
 # Or clone and run it locally:
-git clone https://github.com/UpPeriscope/Sea-Star
+git clone https://github.com/Roqett/Sea-Star
 cd Sea-Star
 uv sync
 uv run sea-star serve
@@ -181,7 +181,7 @@ Then add it to your MCP host of choice:
   "mcpServers": {
     "sea-star": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/UpPeriscope/Sea-Star", "sea-star", "serve"]
+      "args": ["--from", "git+https://github.com/Roqett/Sea-Star", "sea-star", "serve"]
     }
   }
 }
@@ -252,7 +252,7 @@ This is the "Osaurus gets your memory" move. Register Sea-Star as an MCP server:
   "mcpServers": {
     "sea-star": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/UpPeriscope/Sea-Star", "sea-star", "serve"]
+      "args": ["--from", "git+https://github.com/Roqett/Sea-Star", "sea-star", "serve"]
     }
   }
 }

@@ -98,7 +98,7 @@ Engine internals the app leans on:
 | D7 | Bridge name | `sea-star doctor --json`; human output stays the default *(was P2; confirmed)* |
 | D8 | Tool surface | Per-server `include`/`exclude` allowlist/denylist, applied at connect time *(B; implemented)* |
 | D9 | Instruction tracks | **Two first-class tracks** — GUI-first (zero terminal, the default) and terminal-first (CLI parity); neither is "advanced" *(founder directive)* |
-| D10 | Identity & naming | GitHub org **`UpPeriscope`**, maintainer **`Roqett`**; licence name **Up Periscope**; bundle id **`UpPeriscope.Sea-Star`** |
+| D10 | Identity & naming | Repo **`Roqett/Sea-Star`** (personal — keeps history on the founder's profile; *not* a GitHub org); licence name **Up Periscope**; bundle id **`UpPeriscope.Sea-Star`** (Apple Developer account, independent of GitHub) |
 
 **Proposed (in this spec; confirm before scaffolding):**
 

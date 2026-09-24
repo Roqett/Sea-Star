@@ -10,9 +10,9 @@ note at the end of every session.
 - **Bridge:** `sea-star doctor --json` now exists (the machine-readable contract the app
   polls). `include` / `exclude` tool curation is wired through `config.py` →
   `mcp_client.py`.
-- **Naming:** the docs now point at the **`UpPeriscope`** org. The GitHub repo still lives
-  at `Roqett/Sea-Star`; transferring it to the org is the one open account action (see the
-  handoff note below). Codeberg remote is `Touretro/theSeaStar`.
+- **Naming:** repo is **`Roqett/Sea-Star`** (personal — keeps the history on the founder's
+  profile). "Up Periscope" is the **product identity** (licence + bundle id), not a GitHub
+  org. Codeberg remote is `Touretro/theSeaStar`.
 - **Runtime on this machine:** Osaurus running on `http://127.0.0.1:1337/v1`, model
   `foundation` (Apple on-device, zero downloads, macOS 26+). `sea-star doctor` prints
   **Ready**.
@@ -76,16 +76,15 @@ No parallel agents active. Single-writer.
 
 **Half-finished / open**
 
-- **Naming (one account action).** Docs now point at the `UpPeriscope` org, but
-  `github.com/UpPeriscope/Sea-Star` does not resolve while `github.com/Roqett/Sea-Star`
-  does. Least-complicated fix: **transfer** the repo to the org
-  (`gh repo transfer Roqett/Sea-Star UpPeriscope`) — GitHub keeps the old URL redirecting,
-  and history/issues/stars carry over. Until then the org links 404 (harmless while private).
+- **Naming resolved — stays personal.** The repo stays at `Roqett/Sea-Star` so the history
+  shows on the founder's profile. Notarisation and the bundle id depend on the **Apple
+  Developer account, not GitHub**, so no org is needed. All links were repointed from
+  `UpPeriscope/Sea-Star` back to `Roqett/Sea-Star`.
 - **Spec set is now tracked.** `.trae/specs/mac-app/` (`spec.md`, `tasks.md`,
   `checklist.md`) is committed; `.trae/*` is gitignored except `specs/`.
 - Bridge tests for `--json` and `allows()` (spec T1.5/T1.6/T1.8) not yet written.
 
 **Single next step**
 
-- Founder reviews the rewritten `README.md` + the spec Revision 2, then decides the repo
-  naming (transfer to `UpPeriscope`), then the repo can go public.
+- Founder reviews the rewritten `README.md` + the spec Revision 2, then the repo can go
+  public (naming settled: stays at `Roqett/Sea-Star`).

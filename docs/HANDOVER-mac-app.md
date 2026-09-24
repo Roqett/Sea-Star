@@ -7,10 +7,11 @@ is about building a native macOS front end on top of it.
 ## 1. Where we are
 
 - **Product:** Sea-Star — a free (MIT), local-first, runtime-agnostic MCP server that
-  turns an Obsidian vault into a private AI agent. Repo `Roqett/Sea-Star` — **moving to the
-  `UpPeriscope` org** (dist package `seastar-mcp`). Public goal: "one-click, just works" for
-  everyone.
-- **Founder:** "Lono" (GitHub `Roqett`, org `UpPeriscope`), ex-winemaker in McLaren Vale,
+  turns an Obsidian vault into a private AI agent. Repo **`Roqett/Sea-Star`** — stays under
+  the founder's personal account (keeps the history on his profile); "Up Periscope" is the
+  **product identity** (licence + bundle id), not a GitHub org (dist package `seastar-mcp`).
+  Public goal: "one-click, just works" for everyone.
+- **Founder:** "Lono" (GitHub `Roqett`), ex-winemaker in McLaren Vale,
   South Australia.
   Comfortable with Swift basics only — **allergic to the terminal**. This is the whole
   reason the GUI exists.

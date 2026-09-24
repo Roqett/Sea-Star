@@ -30,7 +30,7 @@ Status auto-updates as work proceeds. `[ ]` = pending, `[~]` = in progress, `[x]
 ## Phase 2 — Scaffold the cockpit
 
 - [ ] **T2.1** Create the SwiftUI project (Swift Package or `.xcodeproj`) under `macapp/`
-      (D6). Bundle id `UpPeriscope.Sea-Star`, org `UpPeriscope` (D10); Interface SwiftUI,
+      (D6). Bundle id `UpPeriscope.Sea-Star` (D10); Interface SwiftUI,
       Language Swift, Testing System **Swift Testing** (plain — not XCTest UI Tests).
 - [ ] **T2.2** Structure folders: `App/`, `Views/`, `Models/`, `Services/`, `Support/`.
 - [ ] **T2.3** `MenuBarExtra` scene with a compact popover; short label (≤ ~30 chars).

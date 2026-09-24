@@ -30,6 +30,10 @@ Summary of Changes:
   except `specs/`.
 - **Added `docs/README_DRY.md`** — a spin-free reference doc (IS / DOES / SOLVES /
   DE-COMPLICATES) for cross-checking the Omarchy port with other models.
+- **Naming settled: the repo stays at `Roqett/Sea-Star`.** Notarisation and the bundle id
+  depend on the Apple Developer account, not on GitHub, so no org is required. All links
+  were repointed from `UpPeriscope/Sea-Star` back to `Roqett/Sea-Star`; "Up Periscope"
+  remains the product identity (licence + bundle id).
 
 Harness: TRAE
 
