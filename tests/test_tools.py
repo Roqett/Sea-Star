@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from seastar.tools import ToolRegistry, build_vault_tools
-from seastar.vault import Vault
+from sea_star.tools import ToolRegistry, build_vault_tools
+from sea_star.vault import Vault
 
 
 @pytest.fixture()

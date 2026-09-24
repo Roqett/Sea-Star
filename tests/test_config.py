@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from seastar.config import ConfigError, detect_vault, load_config, write_default_config
+from sea_star.config import ConfigError, detect_vault, load_config, write_default_config
 
 
 @pytest.fixture(autouse=True)

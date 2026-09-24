@@ -18,3 +18,6 @@ htmlcov/
 # SeaStar local state — never commit someone's vault index or config
 .seastar/
 seastar.toml
+
+# Staging folder — documents dropped here for review never ship or commit
+INBOX/

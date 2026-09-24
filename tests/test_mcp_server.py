@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from seastar.agent import Agent
-from seastar.mcp_server import create_server
-from seastar.tools import ToolRegistry
-from seastar.vault import Vault
+from sea_star.agent import Agent
+from sea_star.mcp_server import create_server
+from sea_star.tools import ToolRegistry
+from sea_star.vault import Vault
 
 
 class _FakeClient:

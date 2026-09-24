@@ -1,4 +1,4 @@
-# Agent Onboarding — SeaStar
+# Agent Onboarding — Sea-Star
 
 ## Who you are working with
 
@@ -37,7 +37,7 @@ Never close, resolve, or implement any of these without the founder's explicit w
 
 Every project has a single foundation document in `docs/`. Read the sections you are about to touch before any non-trivial change. The onboarding file is a tripwire list, not a substitute for it. Amendments, `DECISIONS.md` (ADRs), and `docs/PROGRESS.md` (live state, parallel-agent file ownership) are also binding.
 
-For SeaStar, until `docs/` exists, `README.md` is the foundation document.
+For Sea-Star, until `docs/` exists, `README.md` is the foundation document.
 
 ## Locked paths — and how they bend
 
@@ -160,15 +160,15 @@ Never edit this file unless the founder explicitly asks for a lasting rule. In t
 
 ## Project Tripwires (fill in per build)
 
-- **App name & one-line purpose:** SeaStar — a private, local-first AI agent that lives in your Obsidian vault. It is an MCP server that is also an MCP client: hosts call `ask_seastar`, and SeaStar consumes other MCP servers (including Obsidian ones) as its own tools.
+- **App name & one-line purpose:** Sea-Star — a private, local-first AI agent that lives in your Obsidian vault. It is an MCP server that is also an MCP client: hosts call `ask_seastar`, and Sea-Star consumes other MCP servers (including Obsidian ones) as its own tools.
 - **Foundation document:** `README.md` (moves to `docs/` once that directory exists).
 - **Language & build commands:** Python 3.11+ managed by `uv`.
   - Install/sync: `uv sync --extra dev`
   - Lint: `uv run ruff check .`
   - Test: `uv run pytest`
-  - Run doctor: `uv run seastar doctor`
-  - Run server: `uv run seastar serve`
-- **Architecture style:** Async Python. MCP Python SDK v2 (`MCPServer` — NOT `FastMCP`, which no longer exists in mcp 2.x). Inference is runtime-agnostic: every call goes through one OpenAI-compatible adapter, so Ollama / LM Studio / llama.cpp / MLX / vLLM / Unsloth Studio are all just base URLs. Forbidden approaches: hardcoding a single inference vendor; any non-local network egress that the founder has not explicitly configured.
+  - Run doctor: `uv run sea-star doctor`
+  - Run server: `uv run sea-star serve`
+- **Architecture style:** Async Python. MCP Python SDK v2 (`MCPServer` — NOT `FastMCP`, which no longer exists in mcp 2.x). Inference is runtime-agnostic: every call goes through one OpenAI-compatible adapter, so Ollama / LM Studio / llama.cpp / MLX / oMLX / vLLM / Unsloth Studio are all just base URLs. Forbidden approaches: hardcoding a single inference vendor; any non-local network egress that the founder has not explicitly configured.
 - **Locked paths & tiers:**
   - **Tier 1 (values, never bend):** nothing leaves the machine unless the founder explicitly configured that endpoint and approved it; no telemetry; MIT licence stays.
   - **Tier 2 (architecture bets):** the module boundaries (`config.py`, `inference.py`, `vault.py`, `tools.py`, `agent.py`, `mcp_server.py`, `mcp_client.py`, `cli.py`); the `ask_seastar` tool contract; the `seastar.toml` schema. Adding methods is fine; changing these shapes needs approval.

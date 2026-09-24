@@ -63,7 +63,7 @@ async def list_external_tools(specs: tuple[MCPServerSpec, ...]) -> tuple[Tool, .
                 Tool(
                     name=f"{spec.name}{TOOL_NAME_SEPARATOR}{remote.name}",
                     description=remote.description or f"{spec.name} tool {remote.name}",
-                    parameters=remote.inputSchema or {"type": "object", "properties": {}},
+                    parameters=remote.input_schema or {"type": "object", "properties": {}},
                     handler=_make_handler(spec, remote.name),
                 )
             )

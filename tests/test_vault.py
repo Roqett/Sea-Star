@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from seastar.vault import Vault, VaultError
+from sea_star.vault import Vault, VaultError
 
 
 @pytest.fixture()

@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/seastar_sf.png" alt="The Sea Star — the octopus with the martini glass" width="300">
+<img src="assets/sea-star.png" alt="The Sea Star — the octopus with the martini glass" width="300">
 
-# ⭐ SeaStar
+# ⭐ Sea-Star
 
 **A private, local-first AI agent that lives in your Obsidian vault.**
 One-click's ease. Nothing leaves your house.
@@ -13,66 +13,85 @@ One-click's ease. Nothing leaves your house.
 
 </div>
 
----
+***
 
 > *"Your own adventure to fair winds and following seas."*
 > — The Sea Star, 2289 3rd Street, Dogpatch, San Francisco
 > This cute snack also thanks Tom's dry dock around the corner. As it was.
 
-A sea star has an astal brain and clings to its rock.
-SeaStar is the agent that clings to your notes — and helps your roq find the Right spot
+A sea star holds on tight to its rock and doesn't let go.
+Sea-Star does the same with your notes — and helps you find the right one.
 
----
+***
+
+## Documentation
+
+Four pages, one for wherever you're starting from. Start at the
+**[docs index](docs/README.md)** if you're unsure.
+
+| I want to…                                                   | Read                                               |
+| ------------------------------------------------------------ | -------------------------------------------------- |
+| Understand what this is, in plain English (no jargon)        | [docs/start-here.md](docs/start-here.md)           |
+| Connect Sea-Star to Osaurus / Claude Desktop / Cursor / TRAE | [docs/connect.md](docs/connect.md)                 |
+| See every command, tool, setting and runtime                 | [docs/reference.md](docs/reference.md)             |
+| Fix something that's broken                                  | [docs/troubleshooting.md](docs/troubleshooting.md) |
+
+***
 
 ## The problem
 
 Right now you get to pick two of three:
 
 - **Powerful local agents** (Goose, Aider, custom stacks) — but configuring them is a weekend of YAML and silent failures.
+
 - **One-click agents** (the frontier products) — but they're cloud, proprietary, and they read your notes.
+
 - **Your Obsidian vault as the brain** — but wiring Obsidian + a local model + an agent loop together is left as an exercise for the reader.
 
-**SeaStar is the missing third option:** the zero-config, fully-local agent that treats your Obsidian vault as first-class memory, runs on whatever local model you already have, and plugs into whatever MCP host you already use.
+**Sea-Star is the missing third option:** the zero-config, fully-local agent that treats your Obsidian vault as first-class memory, runs on whatever local model you already have, and plugs into whatever MCP host you already use.
 
 ## What it is
 
-SeaStar is an **MCP server that is also an MCP client** — a slightly unusual beast, on purpose:
+Sea-Star is an **MCP server that is also an MCP client**. That sounds odd, but it's deliberate:
 
 - As an **MCP server**, it exposes one simple tool (`ask_seastar`) to any host — Claude Desktop, Cursor, TRAE, whatever. That tool runs a full local agent loop.
+
 - As an **MCP client**, it *consumes* other MCP servers — including the existing Obsidian ones — as its own tools.
 
 The reasoning happens on **your** machine, against **your** model. The host is just a window.
 
 ## Why it stays sovereign
 
-SeaStar talks to any **OpenAI-compatible** local inference endpoint. That means it works, unchanged, with:
+Sea-Star talks to any **OpenAI-compatible** local inference endpoint. That means it works, unchanged, with:
 
-| Runtime | Default endpoint |
-| --- | --- |
-| Ollama | `http://localhost:11434/v1` |
-| LM Studio | `http://localhost:1234/v1` |
-| llama.cpp (`llama-server`) | `http://localhost:8080/v1` |
-| MLX (`mlx_lm.server`) | `http://localhost:8080/v1` |
-| vLLM | `http://localhost:8000/v1` |
-| Unsloth Studio | its OpenAI-compatible port |
+| Runtime                    | Default endpoint            |
+| -------------------------- | --------------------------- |
+| Osaurus                    | `http://localhost:1337/v1`  |
+| Ollama                     | `http://localhost:11434/v1` |
+| LM Studio                  | `http://localhost:1234/v1`  |
+| llama.cpp (`llama-server`) | `http://localhost:8080/v1`  |
+| MLX (`mlx_lm.server`)      | `http://localhost:8080/v1`  |
+| oMLX                       | `http://localhost:8000/v1`  |
+| vLLM                       | `http://localhost:8000/v1`  |
+| Unsloth Studio             | `http://localhost:8888/v1`  |
 
 Runtime-agnostic by contract. You never touch this layer again.
 
 ## The focused setup: Osaurus + Unsloth Studio
 
-SeaStar is runtime-agnostic on purpose — but if you want the *specific* pairing that
+Sea-Star is runtime-agnostic on purpose — but if you want the *specific* pairing that
 inspired it, this is the one: **Osaurus for the agent layer, Unsloth Studio for the
-model-and-skills layer, SeaStar for the memory.**
+model-and-skills layer, Sea-Star for the memory.**
 
 The two are complementary by nature. Osaurus is a Mac-native agent harness — it runs
 agents, loads skills, and speaks MCP both ways. Unsloth Studio is a model workbench —
 it runs and fine-tunes models and exposes an **OpenAI-compatible API**. Osaurus brings
-the *doing*; Unsloth brings the *thinking*; neither one knows about your notes. SeaStar
+the *doing*; Unsloth brings the *thinking*; neither one knows about your notes. Sea-Star
 is the third leg: it gives them a shared, private memory in your Obsidian vault.
 
 ```
 ┌────────────────────┐   MCP    ┌──────────────┐   OpenAI-compatible   ┌──────────────────┐
-│  Osaurus (agents)  │ ───────▶ │   SeaStar    │ ────────────────────▶ │ Unsloth Studio   │
+│  Osaurus (agents)  │ ───────▶ │   Sea-Star   │ ────────────────────▶ │ Unsloth Studio   │
 │  skills, memory    │ ◀─────── │  (memory)    │ ◀──────────────────── │ (local models)   │
 └────────────────────┘          └──────┬───────┘                       └──────────────────┘
                                        │
@@ -86,30 +105,35 @@ is the third leg: it gives them a shared, private memory in your Obsidian vault.
 
 1. **Start the engine.** In Unsloth Studio, launch the local server and copy its
    OpenAI-compatible base URL (the same kind of URL as Ollama's `…:11434/v1`).
-2. **Point SeaStar at it.** Put that URL and the model name in your `seastar.toml`
+2. **Point Sea-Star at it.** Put that URL and the model name in your `seastar.toml`
    under `[inference]` — see Configuration below. That's the whole "Unsloth is the brain" step.
-3. **Point Osaurus at SeaStar.** Add SeaStar as an MCP server in Osaurus (the same
+3. **Point Osaurus at Sea-Star.** Add Sea-Star as an MCP server in Osaurus (the same
    `command` / `args` block you'd add to Claude Desktop). Osaurus now has your vault
-   as memory; its agents can ask SeaStar what you already know.
+   as memory; its agents can ask Sea-Star what you already know.
 
 > Menu labels drift between versions of both apps — the *concept* is what matters:
-> Unsloth serves an OpenAI-compatible endpoint, SeaStar consumes it, Osaurus calls SeaStar.
+> Unsloth serves an OpenAI-compatible endpoint, Sea-Star consumes it, Osaurus calls Sea-Star.
 > If either app exposes a compatible endpoint, this works unchanged.
 
 And if you'd rather use a different harness tomorrow — LM Studio, Ollama, Claude
 Desktop — **nothing above changes.** That flexibility is the point.
 
+> **Zero-download shortcut (macOS 26+).** Osaurus ships an Apple on-device model called
+> `foundation`. Run `osaurus serve`, and you can skip Unsloth entirely: Sea-Star
+> autodetects Osaurus on `http://127.0.0.1:1337/v1` and uses `foundation` as the brain.
+> Two legs instead of three, and nothing to download.
+
 ## Install
 
 ```bash
 # Zero-install from source, if you have uv (recommended):
-uvx --from git+https://github.com/Roqett/theSeaStar seastar serve
+uvx --from git+https://github.com/Roqett/Sea-Star sea-star serve
 
 # Or clone and run it locally:
-git clone https://github.com/Roqett/theSeaStar
-cd theSeaStar
+git clone https://github.com/Roqett/Sea-Star
+cd Sea-Star
 uv sync
-uv run seastar serve
+uv run sea-star serve
 ```
 
 > `pip install seastar-mcp` lands with the first PyPI release. Until then, the
@@ -118,14 +142,14 @@ uv run seastar serve
 ## Quickstart
 
 ```bash
-# 1. Point SeaStar at your Obsidian vault
-seastar init --vault "~/Documents/MyVault"
+# 1. Point Sea-Star at your Obsidian vault
+sea-star init --vault "~/Documents/MyVault"
 
 # 2. Check that it can see a local model
-seastar doctor
+sea-star doctor
 
 # 3. Run it as an MCP server (stdio)
-seastar serve
+sea-star serve
 ```
 
 Then add it to your MCP host of choice:
@@ -133,25 +157,124 @@ Then add it to your MCP host of choice:
 ```json
 {
   "mcpServers": {
-    "seastar": {
+    "sea-star": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/Roqett/theSeaStar", "seastar", "serve"]
+      "args": ["--from", "git+https://github.com/Roqett/Sea-Star", "sea-star", "serve"]
     }
   }
 }
 ```
 
-Ask your host: *"Ask SeaStar what I decided about the vineyard irrigation project."*
-SeaStar searches your vault, reasons locally, and answers **with citations to your own notes**.
+Ask your host: *"Ask Sea-Star what I decided about the vineyard irrigation project."*
+Sea-Star searches your vault, reasons locally, and answers **with citations to your own notes**.
+
+## How you use it
+
+Sea-Star has three ways to use it. Use any one on its own; they compose.
+
+### Way 1 — Ask your folder of notes from the terminal (the fastest way to *feel* it)
+
+No host, no config file, no JSON. If a local model is running, this works:
+
+```bash
+sea-star ask "What did I decide about the vineyard irrigation project?"
+```
+
+Sea-Star searches your vault, reads the matching notes, asks your local model, and
+prints the answer with `[[wikilinks]]` back to the notes it used:
+
+```
+The Grenache bottling run is booked for the second week of February, and you should
+order more corks before the McLaren Vale crush starts.
+
+Sources: [[Cellar Notes]]
+```
+
+That citation is the whole point. It isn't a chatbot guessing — it's your notes
+answering, and you can click straight through to the source.
+
+### The 60-second smoke test
+
+```bash
+# 1. Is a vault and a model in reach?
+sea-star doctor
+```
+
+```
+Vault:    /Users/you/Documents/MyVault
+Notes:    128
+Runtime:  osaurus -> http://127.0.0.1:1337/v1
+Model:    foundation
+Available: foundation
+Bridged MCP servers: none
+Ready.
+```
+
+If it says **Ready**, you're done. If it says `No local inference server answered`,
+start your runtime (see the recipe above) or point Sea-Star at one in `seastar.toml`.
+
+```bash
+# 2. Ask something only your notes know
+sea-star ask "Summarise what I wrote about <a real thing in your vault>"
+```
+
+If step 2 returns a cited answer, the vault, the model, and the agent loop are all
+proven. That's the test.
+
+### Way 2 — Put Sea-Star behind your agent harness (MCP server)
+
+This is the "Osaurus gets your memory" move. Register Sea-Star as an MCP server:
+
+```json
+{
+  "mcpServers": {
+    "sea-star": {
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/Roqett/Sea-Star", "sea-star", "serve"]
+    }
+  }
+}
+```
+
+- **Osaurus** — Settings › Tools › Connections › add the block above. Osaurus then
+  exposes one tool, `ask_seastar`, to its agents.
+
+- **Claude Desktop / Cursor / TRAE** — the same block, in the app's `mcpServers` config.
+
+Now any agent in the host can ask *"what do I already know about X?"* and get your
+vault's answer, locally.
+
+> The full walkthrough — exact menu paths, config file locations, and the instruction to
+> give the host's agents — lives in **[docs/connect.md](docs/connect.md)**.
+
+### Way 3 — Let Sea-Star borrow other MCP servers (MCP client)
+
+Sea-Star can consume other MCP servers and offer their tools to your model. In
+`seastar.toml`:
+
+```toml
+[[mcp.servers]]
+name = "obsidian"
+command = "npx"
+args = ["-y", "obsidian-mcp", "/Users/you/Documents/MyVault"]
+```
+
+Restart, and Sea-Star's agent loop can call `obsidian__*` tools alongside its own vault
+tools. That's how you give the agent more to work with.
+
+### Which do I start with?
+
+Start with **Way 1** (`sea-star ask`) — it's the honest test. Then wire **Way 2** into
+Osaurus, and add **Way 3** only when you want a second tool source.
 
 ## Configuration
 
-SeaStar is zero-config by default: it auto-detects common local runtimes **and**
+Sea-Star is zero-config by default: it auto-detects common local runtimes **and**
 finds your Obsidian vault straight from Obsidian's own `obsidian.json`, so for most
-people `seastar serve` just works with no setup at all.
+people `sea-star serve` just works with no setup at all.
 
-If you want to pin things down, `seastar init --vault <path>` writes a `seastar.toml`
-**into your vault**. SeaStar also reads `./seastar.toml` from the working directory and
+If you want to pin things down, `sea-star init --vault <path>` writes a `seastar.toml`
+**into your vault**. Sea-Star also reads `./seastar.toml` from the working directory and
 `~/.config/seastar/config.toml`. Resolution order is: explicit path → `SEASTAR_*`
 environment variables → config file → autodetection → a loud failure.
 
@@ -160,25 +283,29 @@ environment variables → config file → autodetection → a loud failure.
 vault = "/Users/you/Documents/MyVault"
 
 [inference]
-# Leave base_url empty to let SeaStar autodetect a local runtime on startup.
+# Leave base_url empty to let Sea-Star autodetect a local runtime on startup.
 base_url = "http://127.0.0.1:11434/v1"   # any OpenAI-compatible endpoint
 model = "qwen2.5:7b-instruct"
 api_key = "seastar-local"                # local runtimes ignore this
 max_steps = 8
 temperature = 0.2
 
-# Consume other MCP servers (e.g. an Obsidian MCP) as SeaStar's own tools.
+# Consume other MCP servers (e.g. an Obsidian MCP) as Sea-Star's own tools.
 [[mcp.servers]]
 name = "obsidian"
 command = "npx"
 args = ["-y", "obsidian-mcp", "/Users/you/Documents/MyVault"]
 ```
 
+> **Heads up:** a `seastar.toml` can hold a real `api_key`. If your vault is under
+> version control or cloud sync, add `seastar.toml` to your `.gitignore` so it doesn't
+> get committed or shared.
+
 ## How it works
 
 ```
 ┌──────────────────┐        MCP (stdio)         ┌─────────────────────────────┐
-│  Your MCP host   │  ───────────────────────▶  │           SEASTAR           │
+│  Your MCP host   │  ───────────────────────▶  │           SEA-STAR          │
 │ (Claude/Cursor)  │   ask_seastar(question)    │  ┌───────────────────────┐  │
 └──────────────────┘  ◀───────────────────────  │  │     agent loop        │  │
                                                  │  │  plan → tool → answer │  │
@@ -200,8 +327,8 @@ args = ["-y", "obsidian-mcp", "/Users/you/Documents/MyVault"]
 ## Project layout
 
 ```
-src/seastar/
-  cli.py         # `seastar init | doctor | serve | ask`
+src/sea_star/
+  cli.py         # `sea-star init | doctor | serve | ask`
   config.py      # config + runtime/vault autodetection
   inference.py   # runtime-agnostic OpenAI-compatible adapter
   vault.py       # Obsidian vault index, search, read/write, citation
@@ -214,37 +341,41 @@ src/seastar/
 ## Roadmap
 
 - [x] Runtime-agnostic inference adapter
+
 - [x] Vault search / read / write with citations
+
 - [x] Agent loop + MCP server + MCP client
+
 - [ ] Semantic (embedding) recall over the vault
+
 - [ ] `.mcpb` one-click Desktop Extension
+
 - [ ] "Which local models actually work with MCP" conformance table
 
 ## The name
 
 There's a bar called **The Sea Star** at 2289 3rd Street, in the Dogpatch
- of San Francisco. Its sign was an orange octopus .
-Its own words: *"House Octopus overseeing the antics? We've got one of those too!"*
+district of San Francisco. Its sign was an orange octopus.
+In its own words: *"House Octopus overseeing the antics? We've got one of those too!"*
 
-That's the spirit. A sea star has an astral brain and clings to its rock — SeaStar is the
-agent that clings to your notes and never leaves your roq. The octopus is the house
-mascot. Fair winds and following seas.
+That's the spirit. A sea star holds on tight to its rock and doesn't let go. Sea-Star
+does the same with your notes. The octopus is the house mascot.
 
 ## Contributing
 
-Issues and PRs welcome — especially **conformance reports** ("SeaStar worked with model X on runtime Y").
+Issues and PRs welcome — especially **conformance reports** ("Sea-Star worked with model X on runtime Y").
 This project is designed to be *maintained*.
 
 ## License
 
 MIT © Roqett / Up Periscope
 
----
+***
 
-*Built by a Oz winemaker who bought an M4 Pro 64GB,  got curious, and started a small software factory
-called **Up Periscope** to bump up Diverse projects. Learned in public.*
+*Built by an Oz winemaker who bought an M4 Pro 64GB, got curious, and started a small
+software factory called* ***Up Periscope*** *to bump up diverse projects. Learned in public.*
 
-*On the advice of Hunter S. Thompson — who said he hated recommending drugs, alcohol,
- or insanity to anyone... but admitted they'd always worked for him — we took the
-parts worth keeping: **no dangerous drugs, only high-quality alcohol, no propellant weapons.** Mostly
+*On the advice of the late Hunter S. Thompson — who said he hated recommending drugs, alcohol,
+or insanity to anyone... but admitted they'd always worked for him — we took the
+parts worth keeping:* ***no dangerous drugs, only high-quality alcohol, no propellant weapons.*** *Mostly
 Swift, Python, sometimes Rust, mainly Swift.*

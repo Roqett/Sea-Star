@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from seastar.agent import Agent, AgentError, extract_citations
-from seastar.inference import ChatResult, ToolCall
-from seastar.tools import Tool, ToolRegistry
+from sea_star.agent import Agent, AgentError, extract_citations
+from sea_star.inference import ChatResult, ToolCall
+from sea_star.tools import Tool, ToolRegistry
 
 
 class FakeClient:

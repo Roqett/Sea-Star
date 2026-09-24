@@ -1,4 +1,4 @@
-"""The ``seastar`` command line.
+"""The ``sea-star`` command line.
 
 Contract:
 - ``init`` writes a config into a vault; ``doctor`` reports whether the machine is
@@ -24,7 +24,7 @@ from .mcp_server import create_server
 from .vault import Vault
 
 app = typer.Typer(
-    name="seastar",
+    name="sea-star",
     help="A private, local-first AI agent that lives in your Obsidian vault.",
     no_args_is_help=True,
     add_completion=False,
@@ -39,9 +39,9 @@ def _die(message: str) -> None:
 
 @app.command()
 def version() -> None:
-    """Print the SeaStar version."""
+    """Print the Sea-Star version."""
 
-    console.print(f"seastar {__version__}")
+    console.print(f"sea-star {__version__}")
 
 
 @app.command()
@@ -58,7 +58,7 @@ def init(
     path = write_default_config(vault, model=model, base_url=base_url)
     (vault / ".seastar").mkdir(exist_ok=True)
     console.print(f"[green]Configured[/green] {path}")
-    console.print("Next: [bold]seastar doctor[/bold]")
+    console.print("Next: [bold]sea-star doctor[/bold]")
 
 
 @app.command()
@@ -110,7 +110,7 @@ def ask(
 
 @app.command()
 def serve() -> None:
-    """Run SeaStar as an MCP server over stdio (for Claude Desktop, Cursor, Trae...)."""
+    """Run Sea-Star as an MCP server over stdio (for Claude Desktop, Cursor, Trae...)."""
 
     try:
         config = asyncio.run(load_config())
