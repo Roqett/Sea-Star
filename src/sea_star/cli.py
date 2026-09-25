@@ -20,7 +20,16 @@ from rich.markup import escape
 
 from . import __version__
 from .agent import build_agent
-from .config import ConfigError, load_config, probe_base_url, write_default_config
+from .config import (
+    ConfigError,
+    detect_vault_candidates,
+    load_config,
+    probe_base_url,
+    probe_runtimes,
+    read_config_file,
+    resolve_vault,
+    write_default_config,
+)
 from .mcp_server import create_server
 from .vault import Vault
 
@@ -32,10 +41,55 @@ app = typer.Typer(
 )
 console = Console()
 
+BRIDGE_SCHEMA_VERSION = 1
+
 
 def _die(message: str) -> None:
     console.print(f"[bold red]Error:[/bold red] {escape(message)}")
     raise typer.Exit(code=1)
+
+
+async def _build_report() -> dict:
+    """Assemble the §6 bridge object the host app decodes."""
+
+    vault_path, vault_source = resolve_vault(read_config_file())
+    probes = await probe_runtimes()
+    config = await load_config(probes=probes)
+    models = await probe_base_url(config.base_url)
+    return {
+        "schema_version": BRIDGE_SCHEMA_VERSION,
+        "ready": bool(models),
+        "version": __version__,
+        "vault": {
+            "path": str(vault_path),
+            "source": vault_source,
+            "note_count": len(Vault(vault_path).scan()),
+            "candidates": [str(path) for path in detect_vault_candidates()],
+        },
+        "runtime": config.runtime_name,
+        "base_url": config.base_url,
+        "model": config.model,
+        "models": models or [],
+        "runtimes": [
+            {
+                "name": probe.name,
+                "base_url": probe.base_url,
+                "model": probe.model,
+                "models": list(probe.models),
+            }
+            for probe in probes
+        ],
+        "server": {"state": "running" if models else "stopped"},
+        "servers": [
+            {
+                "name": spec.name,
+                "command": spec.command,
+                "include": list(spec.include),
+                "exclude": list(spec.exclude),
+            }
+            for spec in config.servers
+        ],
+    }
 
 
 @app.command()
@@ -75,31 +129,8 @@ def doctor(
     emits JSON, even on failure, so the caller never has to parse prose.
     """
 
-    async def _report() -> dict:
-        config = await load_config()
-        models = await probe_base_url(config.base_url)
-        return {
-            "ready": bool(models),
-            "version": __version__,
-            "vault": str(config.vault_path),
-            "notes": len(Vault(config.vault_path).scan()),
-            "runtime": config.runtime_name,
-            "base_url": config.base_url,
-            "model": config.model,
-            "models": models or [],
-            "servers": [
-                {
-                    "name": spec.name,
-                    "command": spec.command,
-                    "include": list(spec.include),
-                    "exclude": list(spec.exclude),
-                }
-                for spec in config.servers
-            ],
-        }
-
     try:
-        report = asyncio.run(_report())
+        report = asyncio.run(_build_report())
     except ConfigError as error:
         if as_json:
             print(json.dumps({"ready": False, "error": str(error)}))
@@ -112,10 +143,13 @@ def doctor(
             raise typer.Exit(code=1)
         return
 
-    console.print(f"Vault:    [green]{report['vault']}[/green]")
-    console.print(f"Notes:    {report['notes']}")
+    console.print(f"Vault:    [green]{report['vault']['path']}[/green] ({report['vault']['source']})")
+    console.print(f"Notes:    {report['vault']['note_count']}")
     console.print(f"Runtime:  {report['runtime']} -> {report['base_url']}")
     console.print(f"Model:    {report['model']}")
+    if len(report["runtimes"]) > 1:
+        harnesses = ", ".join(f"{probe['name']} ({probe['base_url']})" for probe in report["runtimes"])
+        console.print(f"Harnesses: {harnesses}")
     if not report["ready"]:
         _die(f"Runtime at {report['base_url']} did not answer. Start it and retry.")
     console.print(f"Available: {', '.join(report['models'][:8])}")

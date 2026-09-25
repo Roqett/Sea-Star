@@ -13,6 +13,7 @@ Contract:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import tomllib
@@ -39,6 +40,10 @@ KNOWN_RUNTIMES: tuple[tuple[str, str], ...] = (
 OBSIDIAN_CONFIG_NAME = "obsidian.json"
 
 PROBE_TIMEOUT_SECONDS = 1.5
+
+VAULT_SOURCE_ENV = "env"
+VAULT_SOURCE_CONFIG = "toml"
+VAULT_SOURCE_OBSIDIAN = "obsidian"
 
 
 class ConfigError(RuntimeError):
@@ -142,17 +147,58 @@ async def probe_base_url(base_url: str, *, timeout: float = PROBE_TIMEOUT_SECOND
     return models or None
 
 
-async def detect_runtime() -> tuple[str, str, str]:
-    """Probe known local runtimes and return ``(name, base_url, model)``.
+@dataclass(frozen=True, slots=True)
+class RuntimeProbe:
+    """One local inference server that answered, with the models it advertises."""
 
-    Raises :class:`ConfigError` when nothing answers — an unconfigured machine
-    should be told to start a runtime, not handed a silent fallback.
+    name: str
+    base_url: str
+    models: tuple[str, ...]
+
+    @property
+    def model(self) -> str:
+        return self.models[0]
+
+
+async def probe_runtimes(*, timeout: float = PROBE_TIMEOUT_SECONDS) -> tuple[RuntimeProbe, ...]:
+    """Every known local runtime that is answering *right now*, in probe order.
+
+    People run more than one harness at once — Osaurus *and* oMLX, say — so this
+    reports all of them rather than stopping at the first that answers. Probes run
+    concurrently to keep the survey inside one timeout. Results are de-duplicated
+    by endpoint, because oMLX and vLLM share a default port (8000); the entry that
+    comes first in :data:`KNOWN_RUNTIMES` names that endpoint.
     """
 
-    for name, base_url in KNOWN_RUNTIMES:
-        models = await probe_base_url(base_url)
-        if models:
-            return name, base_url, models[0]
+    answers = await asyncio.gather(
+        *(probe_base_url(base_url, timeout=timeout) for _, base_url in KNOWN_RUNTIMES)
+    )
+    probes: list[RuntimeProbe] = []
+    seen: set[str] = set()
+    for (name, base_url), models in zip(KNOWN_RUNTIMES, answers):
+        if not models or base_url in seen:
+            continue
+        seen.add(base_url)
+        probes.append(RuntimeProbe(name=name, base_url=base_url, models=tuple(models)))
+    return tuple(probes)
+
+
+async def detect_runtime(*, probes: tuple[RuntimeProbe, ...] | None = None) -> tuple[str, str, str]:
+    """Probe known local runtimes and return ``(name, base_url, model)``.
+
+    Adopts the first runtime that answers, in :data:`KNOWN_RUNTIMES` order, so a
+    single-runtime machine behaves exactly as before. Pass ``probes`` (from
+    :func:`probe_runtimes`) to reuse an existing survey instead of probing the
+    network again. Raises :class:`ConfigError` when nothing answers — an
+    unconfigured machine should be told to start a runtime, not handed a silent
+    fallback.
+    """
+
+    if probes is None:
+        probes = await probe_runtimes()
+    if probes:
+        first = probes[0]
+        return first.name, first.base_url, first.model
     probed = ", ".join(url for _, url in KNOWN_RUNTIMES)
     raise ConfigError(
         "No local inference server answered. Start Osaurus (osaurus serve), "
@@ -174,15 +220,18 @@ def _obsidian_config_paths(home: Path) -> tuple[Path, ...]:
     return tuple(paths)
 
 
-def detect_vault(home: Path | None = None) -> Path | None:
-    """Find the user's Obsidian vault from Obsidian's own config, or ``None``.
+def detect_vault_candidates(home: Path | None = None) -> tuple[Path, ...]:
+    """Every Obsidian-known vault that still exists, best candidate first.
 
-    Obsidian records every vault it knows in ``obsidian.json``; the entry flagged
-    ``open`` is the one the user last used. Reading it means SeaStar can be truly
-    zero-config for anyone who already has Obsidian installed.
+    Obsidian records each vault it knows in ``obsidian.json``; the entry flagged
+    ``open`` is the one the user last used, and the rest follow most-recently-used
+    first. This is the pick-list the app offers; ``detect_vault`` takes its head.
+    Reading it means SeaStar can be truly zero-config for anyone who already has
+    Obsidian installed.
     """
 
     base = (home or Path.home()).expanduser()
+    entries: list[dict] = []
     for candidate in _obsidian_config_paths(base):
         try:
             data = json.loads(candidate.read_text(encoding="utf-8"))
@@ -191,44 +240,82 @@ def detect_vault(home: Path | None = None) -> Path | None:
         vaults = data.get("vaults")
         if not isinstance(vaults, dict):
             continue
-        entries = [
+        entries.extend(
             entry
             for entry in vaults.values()
             if isinstance(entry, dict) and entry.get("path")
-        ]
-        if not entries:
-            continue
-        opened = [entry for entry in entries if entry.get("open")]
-        entries = opened or entries
-        entries.sort(key=lambda entry: entry.get("ts", 0), reverse=True)
-        path = Path(str(entries[0]["path"])).expanduser()
+        )
+    entries.sort(key=lambda entry: (bool(entry.get("open")), entry.get("ts", 0)), reverse=True)
+    candidates: list[Path] = []
+    for entry in entries:
+        path = Path(str(entry["path"])).expanduser()
         if path.is_dir():
-            return path.resolve()
-    return None
+            resolved = path.resolve()
+            if resolved not in candidates:
+                candidates.append(resolved)
+    return tuple(candidates)
 
 
-async def load_config(path: Path | None = None, *, autodetect: bool = True) -> Config:
-    """Resolve a complete :class:`Config`, failing loud on anything missing."""
+def detect_vault(home: Path | None = None) -> Path | None:
+    """The user's best Obsidian vault, or ``None`` when Obsidian is absent."""
 
-    data: dict = {}
+    candidates = detect_vault_candidates(home)
+    return candidates[0] if candidates else None
+
+
+def read_config_file(path: Path | None = None) -> dict:
+    """Read and parse the active ``seastar.toml``, or ``{}`` when none exists."""
+
     config_file = _find_config_file(path)
-    if config_file is not None:
-        with config_file.open("rb") as handle:
-            data = tomllib.load(handle)
+    if config_file is None:
+        return {}
+    with config_file.open("rb") as handle:
+        return tomllib.load(handle)
 
-    vault_raw = os.environ.get("SEASTAR_VAULT") or data.get("vault")
-    if vault_raw:
-        vault_path = Path(str(vault_raw)).expanduser().resolve()
+
+def resolve_vault(
+    data: dict, *, autodetect: bool = True, home: Path | None = None
+) -> tuple[Path, str]:
+    """Resolve the vault path and how it was chosen.
+
+    Order is explicit ``SEASTAR_VAULT`` > ``[vault]`` in the config file > Obsidian
+    autodetection > fail loud. Returns ``(path, source)`` with ``source`` one of
+    ``env`` / ``toml`` / ``obsidian``, so a caller can explain the choice.
+    """
+
+    env_vault = os.environ.get("SEASTAR_VAULT")
+    toml_vault = data.get("vault")
+    if env_vault:
+        vault_path = Path(env_vault).expanduser().resolve()
+        source = VAULT_SOURCE_ENV
+    elif toml_vault:
+        vault_path = Path(str(toml_vault)).expanduser().resolve()
+        source = VAULT_SOURCE_CONFIG
     else:
-        detected_vault = detect_vault() if autodetect else None
+        detected_vault = detect_vault(home) if autodetect else None
         if detected_vault is None:
             raise ConfigError(
                 f"No vault configured and no Obsidian vault found. Run "
                 f"`sea-star init --vault <path>` or set [vault] in {CONFIG_FILENAME}."
             )
         vault_path = detected_vault
+        source = VAULT_SOURCE_OBSIDIAN
     if not vault_path.is_dir():
         raise ConfigError(f"Vault path is not a directory: {vault_path}")
+    return vault_path, source
+
+
+async def load_config(
+    path: Path | None = None,
+    *,
+    autodetect: bool = True,
+    probes: tuple[RuntimeProbe, ...] | None = None,
+) -> Config:
+    """Resolve a complete :class:`Config`, failing loud on anything missing."""
+
+    data = read_config_file(path)
+
+    vault_path, _vault_source = resolve_vault(data, autodetect=autodetect)
 
     inference = data.get("inference", {})
     if not isinstance(inference, dict):
@@ -242,7 +329,7 @@ async def load_config(path: Path | None = None, *, autodetect: bool = True) -> C
     if not base_url:
         if not autodetect:
             raise ConfigError("No inference endpoint configured and autodetection is disabled.")
-        runtime_name, base_url, detected_model = await detect_runtime()
+        runtime_name, base_url, detected_model = await detect_runtime(probes=probes)
         model = model or detected_model
 
     if not model:
