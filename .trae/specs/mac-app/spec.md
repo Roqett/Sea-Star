@@ -71,9 +71,12 @@ Engine internals the app leans on:
   with the Obsidian reader in
   [detect_vault()](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/config.py#L177-L207).
   The app surfaces the *chosen* vault and offers other known vaults as a pick-list.
-- **Runtime autodetect** — `KNOWN_RUNTIMES` in `config.py`: osaurus 1337, ollama 11434,
-  lmstudio 1234, unsloth 8888, llamacpp 8080, **omlx 8000**, vllm 8000 (oMLX probed
-  first).
+- **Runtime autodetect** — `KNOWN_RUNTIMES` in `config.py` names the known harnesses
+  (osaurus 1337, ollama 11434, lmstudio 1234, unsloth 8888, llamacpp 8080, **omlx 8000**,
+  vllm 8000), but detection does **not** trust one address per harness: `scan_ports()` sweeps
+  those ports plus `EXTRA_SCAN_PORTS` (8009, 5000, 9000, …) on `127.0.0.1`, and each responder
+  is named by its `owned_by` (oMLX says `"omlx"`) → known port → `"local"`. `SEASTAR_SCAN_PORTS`
+  overrides the set.
 - **Bridge** — `doctor --json` emits a machine-readable status object; human output stays
   the default ([cli.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/cli.py#L65-L127)).
   The contract is §6.

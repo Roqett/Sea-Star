@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import httpx
 import pytest
 
 from sea_star.config import (
@@ -18,15 +19,24 @@ from sea_star.config import (
     detect_vault,
     detect_vault_candidates,
     load_config,
+    probe_endpoint,
     probe_runtimes,
     resolve_vault,
+    scan_ports,
     write_default_config,
 )
 
 
 @pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
-    for key in ("SEASTAR_VAULT", "SEASTAR_BASE_URL", "SEASTAR_MODEL", "SEASTAR_API_KEY", "SEASTAR_RUNTIME"):
+    for key in (
+        "SEASTAR_VAULT",
+        "SEASTAR_BASE_URL",
+        "SEASTAR_MODEL",
+        "SEASTAR_API_KEY",
+        "SEASTAR_RUNTIME",
+        "SEASTAR_SCAN_PORTS",
+    ):
         monkeypatch.delenv(key, raising=False)
 
 
@@ -56,51 +66,100 @@ async def test_env_overrides_file(tmp_path, monkeypatch):
     assert config.model == "fromenv"
 
 
+def test_scan_ports_known_first_then_extras():
+    ports = scan_ports()
+    assert ports[0] == 1337
+    assert 8000 in ports and 8009 in ports
+    assert len(ports) == len(set(ports))
+
+
 async def test_probe_runtimes_reports_every_live_server(monkeypatch):
     async def fake(base_url, *, timeout=1.5):
         return {
-            "http://127.0.0.1:1337/v1": ["foundation"],
-            "http://127.0.0.1:8000/v1": ["mlx-community/Qwen3"],
+            "http://127.0.0.1:1337/v1": (["foundation"], None),
+            "http://127.0.0.1:8009/v1": (["mlx-community/Qwen3"], "omlx"),
         }.get(base_url)
 
-    monkeypatch.setattr("sea_star.config.probe_base_url", fake)
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
     probes = await probe_runtimes()
     assert [(probe.name, probe.base_url, probe.model) for probe in probes] == [
         ("osaurus", "http://127.0.0.1:1337/v1", "foundation"),
-        ("omlx", "http://127.0.0.1:8000/v1", "mlx-community/Qwen3"),
+        ("omlx", "http://127.0.0.1:8009/v1", "mlx-community/Qwen3"),
     ]
 
 
-async def test_probe_runtimes_keeps_known_order(monkeypatch):
+async def test_probe_runtimes_keeps_scan_order(monkeypatch):
     async def fake(base_url, *, timeout=1.5):
-        return ["m"] if base_url == "http://127.0.0.1:11434/v1" else None
+        return (["m"], None) if base_url == "http://127.0.0.1:11434/v1" else None
 
-    monkeypatch.setattr("sea_star.config.probe_base_url", fake)
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
     assert [probe.name for probe in await probe_runtimes()] == ["ollama"]
 
 
-async def test_probe_runtimes_dedupes_a_shared_port(monkeypatch):
+async def test_probe_runtimes_falls_back_to_port_name(monkeypatch):
     async def fake(base_url, *, timeout=1.5):
-        return ["m"] if base_url == "http://127.0.0.1:8000/v1" else None
+        return (["m"], None) if base_url == "http://127.0.0.1:8000/v1" else None
 
-    monkeypatch.setattr("sea_star.config.probe_base_url", fake)
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
     assert [probe.name for probe in await probe_runtimes()] == ["omlx"]
+
+
+def _serve_models(monkeypatch, payload: dict) -> None:
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=payload))
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        "sea_star.config.httpx.AsyncClient",
+        lambda *args, **kwargs: real_client(*args, transport=transport, **kwargs),
+    )
+
+
+async def test_probe_endpoint_keeps_specific_owner(monkeypatch):
+    _serve_models(monkeypatch, {"data": [{"id": "m", "owned_by": "omlx"}]})
+    assert await probe_endpoint("http://127.0.0.1:8009/v1") == (["m"], "omlx")
+
+
+async def test_probe_endpoint_drops_generic_owner(monkeypatch):
+    _serve_models(monkeypatch, {"data": [{"id": "m", "owned_by": "library"}]})
+    assert await probe_endpoint("http://127.0.0.1:8000/v1") == (["m"], None)
+
+
+async def test_probe_runtimes_names_unlisted_port_local(monkeypatch):
+    async def fake(base_url, *, timeout=1.5):
+        return (["m"], None) if base_url == "http://127.0.0.1:8009/v1" else None
+
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
+    probes = await probe_runtimes()
+    assert [(probe.name, probe.base_url) for probe in probes] == [
+        ("local", "http://127.0.0.1:8009/v1")
+    ]
+
+
+async def test_probe_runtimes_honours_scan_ports_override(monkeypatch):
+    monkeypatch.setenv("SEASTAR_SCAN_PORTS", "9001, bad, 9001, 0, 70000")
+    seen: list[str] = []
+
+    async def fake(base_url, *, timeout=1.5):
+        seen.append(base_url)
+
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
+    await probe_runtimes()
+    assert seen == ["http://127.0.0.1:9001/v1"]
 
 
 async def test_detect_runtime_reuses_a_survey_without_reprobe(monkeypatch):
     async def exploding(*args, **kwargs):
         raise AssertionError("detect_runtime should not probe when given probes")
 
-    monkeypatch.setattr("sea_star.config.probe_base_url", exploding)
-    probes = (RuntimeProbe("omlx", "http://127.0.0.1:8000/v1", ("m",)),)
-    assert await detect_runtime(probes=probes) == ("omlx", "http://127.0.0.1:8000/v1", "m")
+    monkeypatch.setattr("sea_star.config.probe_endpoint", exploding)
+    probes = (RuntimeProbe("omlx", "http://127.0.0.1:8009/v1", ("m",)),)
+    assert await detect_runtime(probes=probes) == ("omlx", "http://127.0.0.1:8009/v1", "m")
 
 
 async def test_detect_runtime_fails_loud_when_nothing_answers(monkeypatch):
     async def fake(base_url, *, timeout=1.5):
         return None
 
-    monkeypatch.setattr("sea_star.config.probe_base_url", fake)
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
     with pytest.raises(ConfigError):
         await detect_runtime()
 

@@ -63,6 +63,9 @@ Useful existing internals to lean on:
   The app should surface the *chosen* vault, and offer the other known vaults as a pick-list.
 - Runtime autodetect is `KNOWN_RUNTIMES` in `config.py` (osaurus 1337, ollama 11434,
   lmstudio 1234, unsloth 8888, llamacpp 8080, **omlx 8000**, vllm 8000; oMLX probed first).
+  Detection actually sweeps a standard localhost port set (`scan_ports()` + `EXTRA_SCAN_PORTS`)
+  rather than one address per harness, so a harness on a non-default port (oMLX on 8009) is
+  still found; responders self-identify via `owned_by`.
 
 ## 5. The look — Carpet Sea Star
 

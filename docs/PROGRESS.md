@@ -6,7 +6,7 @@ note at the end of every session.
 ## Current state
 
 - **Version:** 0.1.0 (unreleased). Repo is **private** until built and tested.
-- **Health:** `uv run ruff check .` clean; `uv run pytest` — 46 passing. App:
+- **Health:** `uv run ruff check .` clean; `uv run pytest` — 51 passing. App:
   `xcodebuild … test` — 12 Swift Testing cases passing (4 suites).
 - **Bridge:** `sea-star doctor --json` now emits the full §6 contract —
   `schema_version`, nested `vault {path, source, note_count, candidates}`, `server.state`,
@@ -245,19 +245,28 @@ No parallel agents active. Single-writer.
   **adopt the first that answered**, returning a single `(name, base_url, model)`. So if
   Osaurus (1337) was up it always won and shadowed oMLX/Ollama/LM Studio etc. — which is
   exactly why the panel showed `osaurus · foundation` instead of the model the founder was
-  actually loading in oMLX. That is also the real cause of the "Refresh didn't detect my
-  model" report — **not** a cache/network problem. Now `probe_runtimes()` probes every known
-  runtime concurrently (`asyncio.gather`, one `PROBE_TIMEOUT_SECONDS` budget) and returns a
-  `RuntimeProbe` per live responder, de-duplicated by endpoint (`KNOWN_RUNTIMES` lists `omlx`
-  *and* `vllm` on the same port 8000; the first-known name labels it). `detect_runtime(probes=…)`
-  and `load_config(probes=…)` reuse the survey; single-runtime machines are unchanged. The
-  bridge emits `runtimes[]` (optional key; `schema_version` stays `1`), and the cockpit's
-  Harness row is a pick-list when more than one is live.
+  actually loading in oMLX. Now `probe_runtimes()` probes **every** live runtime concurrently
+  (`asyncio.gather`, one `PROBE_TIMEOUT_SECONDS` budget) and returns a `RuntimeProbe` per live
+  responder. `detect_runtime(probes=…)` and `load_config(probes=…)` reuse the survey;
+  single-runtime machines are unchanged. The bridge emits `runtimes[]` (optional key;
+  `schema_version` stays `1`), and the cockpit's Harness row is a pick-list when more than one
+  is live.
+- **Port sweep — done (the *real* cause of "Refresh missed my model").** The first-wins bug
+  above was only half the story: `KNOWN_RUNTIMES` looks at oMLX on **8000**, but the founder
+  runs it on **8009** (confirmed via `lsof` + `~/.omlx/settings.json`), and the same account
+  runs a second copy on 8000 — harness ports are simply not fixed. `config.py` now has
+  `scan_ports()` (known-harness ports first, then `EXTRA_SCAN_PORTS` like 8009/5000/9000) and
+  `probe_runtimes()` sweeps them all, naming each responder by its self-reported `owned_by`
+  when specific (`omlx`), else the port's known harness, else `"local"`; generic owners
+  (`library`, `user` …) are dropped. `SEASTAR_SCAN_PORTS` overrides the set. Still local-only,
+  same timeout. This is **not** a cache/network problem — it never was.
 - Start/stop still does not watch the child's exit (state can go stale if `serve` dies).
 - Graph embedding (T4.2), re-index (T4.1) and operator docs (T6.x) are untouched.
-- Work is staged on `feat/macapp-cockpit` but **not committed**; no draft PR opened yet.
+- Multi-harness + port-sweep work is **committed** on `feat/macapp-cockpit` (two commits) and
+  pushed; **draft PR #2** is open at https://github.com/Roqett/Sea-Star/pull/2.
 
 **Single next step**
 
-- Launch the app and eyeball the four faces on both surfaces plus the header shimmer; tune
-  the shader if needed, then commit the work on `feat/macapp-cockpit` and open the draft PR.
+- Founder's `.icns` export for T4.4 (the app icon is the last unwired piece), or a live
+  run-through of the harness picker against 8009 to confirm the sweep names oMLX correctly;
+  then fold the port-sweep commit into draft PR #2.

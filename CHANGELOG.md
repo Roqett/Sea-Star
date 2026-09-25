@@ -42,12 +42,20 @@ Summary of Changes:
   `detect_runtime()` probed `KNOWN_RUNTIMES` in order and adopted the **first** that
   answered, so if Osaurus (1337) was up it always won and shadowed oMLX/Ollama/LM Studio —
   the panel showed `osaurus · foundation` instead of the model being loaded elsewhere.
-  `config.py` now exposes `probe_runtimes()`, which probes **every** known runtime
+  `config.py` now exposes `probe_runtimes()`, which probes **every** live runtime
   concurrently (one `PROBE_TIMEOUT_SECONDS` budget via `asyncio.gather`) and returns a
-  `RuntimeProbe` per live responder, de-duplicated by endpoint (oMLX and vLLM share port
-  8000; the first-known name labels it). `detect_runtime(probes=…)` and
+  `RuntimeProbe` per live responder. `detect_runtime(probes=…)` and
   `load_config(probes=…)` reuse the survey, so single-runtime machines behave exactly as
   before while multi-harness machines see all of them.
+- **Localhost port sweep (harness ports are not fixed).** oMLX's documented default is 8000,
+  but the same person often runs a second copy on 8009 and other machines pick other ports —
+  probing one address per harness still missed the model actually in use. `probe_runtimes()`
+  now sweeps a standard set of localhost ports (`scan_ports()`: known-harness ports first,
+  then extras like 8009/5000/9000) and names each responder by its self-reported
+  `owned_by` when that is specific (oMLX says `"omlx"`), falling back to the port's known
+  harness and then `"local"`. Generic owners (`library`, `user` …) are dropped so they don't
+  masquerade as a harness. `SEASTAR_SCAN_PORTS` (comma-separated) replaces the set wholesale
+  for an unusual setup. Still local-only and inside the same timeout budget.
 - **The bridge now carries `runtimes[]` (spec §6).** `doctor --json` emits one object per
   live harness (`name`, `base_url`, `model`, `models`); the key is optional and
   `schema_version` stays `1` — the engine only ever adds keys, so an older app still decodes.
@@ -62,9 +70,11 @@ Summary of Changes:
   a reroll with nothing showing still returns a face) plus the cockpit's opening face and
   the new `runtimes[]` decode — `xcodebuild … test` → **12 tests in 4 suites passing**;
   `… build` → **BUILD SUCCEEDED**; `Assets.car` (40 KB) and `default.metallib` (69 KB)
-  confirmed in the bundle; app launches without crashing. Python: `pytest` → **46 passed**
-  (5 new multi-harness cases: every live server reported, known order kept, shared port
-  de-duped, a survey reused without re-probing, fails loud when nothing answers).
+  confirmed in the bundle; app launches without crashing. Python: `pytest` → **51 passed**
+  (multi-harness + sweep cases: every live server reported, scan order kept, a port-name
+  fallback, an unlisted port named `local`, the `SEASTAR_SCAN_PORTS` override, a specific
+  `owned_by` kept / a generic one dropped, a survey reused without re-probing, fails loud
+  when nothing answers).
 
 Harness: TRAE
 

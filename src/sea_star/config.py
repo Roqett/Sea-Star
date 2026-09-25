@@ -19,6 +19,7 @@ import os
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -26,6 +27,8 @@ CONFIG_FILENAME = "seastar.toml"
 LOCAL_STATE_DIRNAME = ".seastar"
 
 DEFAULT_API_KEY = "seastar-local"
+
+LOCAL_HOST = "127.0.0.1"
 
 KNOWN_RUNTIMES: tuple[tuple[str, str], ...] = (
     ("osaurus", "http://127.0.0.1:1337/v1"),
@@ -36,6 +39,53 @@ KNOWN_RUNTIMES: tuple[tuple[str, str], ...] = (
     ("omlx", "http://127.0.0.1:8000/v1"),
     ("vllm", "http://127.0.0.1:8000/v1"),
 )
+
+EXTRA_SCAN_PORTS: tuple[int, ...] = (
+    8009, 8000, 11434, 1234, 1337, 8080, 8888, 5000, 5001, 7860, 4000,
+    8081, 8082, 8088, 8090, 9000, 9001, 10000, 3000, 12345,
+)
+
+GENERIC_OWNERS: frozenset[str] = frozenset(
+    {"library", "user", "system", "openai", "organization_owner"}
+)
+
+
+def _port_of(base_url: str) -> int:
+    return urlsplit(base_url).port or 0
+
+
+NAMED_PORTS: dict[int, str] = {
+    _port_of(base_url): name for name, base_url in reversed(KNOWN_RUNTIMES)
+}
+
+
+def scan_ports() -> tuple[int, ...]:
+    """Every localhost port worth sweeping for an OpenAI-compatible server.
+
+    Harness ports are not fixed — oMLX's documented default is 8000, but the same
+    person often runs a second copy on 8009, and other machines pick other ports.
+    So we sweep a standard set rather than trusting one address per harness.
+    Known-harness ports come first (in :data:`KNOWN_RUNTIMES` order), then the
+    extras. ``SEASTAR_SCAN_PORTS`` (comma-separated) replaces the set wholesale.
+    """
+
+    override = os.environ.get("SEASTAR_SCAN_PORTS")
+    if override:
+        ports: list[int] = []
+        for chunk in override.split(","):
+            chunk = chunk.strip()
+            if chunk.isdigit() and 0 < int(chunk) < 65536 and int(chunk) not in ports:
+                ports.append(int(chunk))
+        return tuple(ports)
+    ports: list[int] = []
+    for _name, base_url in KNOWN_RUNTIMES:
+        port = _port_of(base_url)
+        if port and port not in ports:
+            ports.append(port)
+    for port in EXTRA_SCAN_PORTS:
+        if port not in ports:
+            ports.append(port)
+    return tuple(ports)
 
 OBSIDIAN_CONFIG_NAME = "obsidian.json"
 
@@ -129,11 +179,16 @@ def _parse_servers(raw: object) -> tuple[MCPServerSpec, ...]:
     return tuple(specs)
 
 
-async def probe_base_url(base_url: str, *, timeout: float = PROBE_TIMEOUT_SECONDS) -> list[str] | None:
-    """Return the model ids advertised at ``base_url``, or ``None`` if unreachable.
+async def probe_endpoint(
+    base_url: str, *, timeout: float = PROBE_TIMEOUT_SECONDS
+) -> tuple[list[str], str | None] | None:
+    """Return ``(model_ids, owner)`` at ``base_url``, or ``None`` if unreachable.
 
-    Never raises for connectivity problems — an unreachable endpoint is a signal,
-    not an error, so autodetection can move on to the next candidate.
+    ``owner`` is the server's self-reported ``owned_by`` — oMLX says ``"omlx"``,
+    vLLM says ``"vllm"`` — so a server found on an unexpected port can still name
+    itself. Generic values (``library``, ``user`` …) are dropped so we fall back
+    to the port's known name instead. Never raises for connectivity problems — an
+    unreachable endpoint is a signal, not an error, so a sweep can move on.
     """
 
     try:
@@ -143,8 +198,21 @@ async def probe_base_url(base_url: str, *, timeout: float = PROBE_TIMEOUT_SECOND
             payload = response.json()
     except (httpx.HTTPError, ValueError):
         return None
-    models = [str(item["id"]) for item in payload.get("data", ()) if item.get("id")]
-    return models or None
+    data = payload.get("data", ())
+    models = [str(item["id"]) for item in data if item.get("id")]
+    if not models:
+        return None
+    owner = next((str(item["owned_by"]) for item in data if item.get("owned_by")), None)
+    if owner in GENERIC_OWNERS:
+        owner = None
+    return models, owner
+
+
+async def probe_base_url(base_url: str, *, timeout: float = PROBE_TIMEOUT_SECONDS) -> list[str] | None:
+    """Return the model ids advertised at ``base_url``, or ``None`` if unreachable."""
+
+    answer = await probe_endpoint(base_url, timeout=timeout)
+    return answer[0] if answer else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,32 +229,43 @@ class RuntimeProbe:
 
 
 async def probe_runtimes(*, timeout: float = PROBE_TIMEOUT_SECONDS) -> tuple[RuntimeProbe, ...]:
-    """Every known local runtime that is answering *right now*, in probe order.
+    """Every local runtime answering *right now*, in :func:`scan_ports` order.
 
-    People run more than one harness at once — Osaurus *and* oMLX, say — so this
-    reports all of them rather than stopping at the first that answers. Probes run
-    concurrently to keep the survey inside one timeout. Results are de-duplicated
-    by endpoint, because oMLX and vLLM share a default port (8000); the entry that
-    comes first in :data:`KNOWN_RUNTIMES` names that endpoint.
+    People run more than one harness at once — Osaurus *and* oMLX, say — and each
+    picks its own port (oMLX on 8000 here, 8009 there), so this sweeps the whole
+    standard port set rather than trusting one address per harness. Probes run
+    concurrently to keep the survey inside a single timeout. A responder is named
+    by its self-reported ``owned_by`` when that is specific, else by the port's
+    known harness, else ``"local"``.
     """
 
+    ports = scan_ports()
     answers = await asyncio.gather(
-        *(probe_base_url(base_url, timeout=timeout) for _, base_url in KNOWN_RUNTIMES)
+        *(
+            probe_endpoint(f"http://{LOCAL_HOST}:{port}/v1", timeout=timeout)
+            for port in ports
+        )
     )
     probes: list[RuntimeProbe] = []
-    seen: set[str] = set()
-    for (name, base_url), models in zip(KNOWN_RUNTIMES, answers):
-        if not models or base_url in seen:
+    for port, answer in zip(ports, answers):
+        if answer is None:
             continue
-        seen.add(base_url)
-        probes.append(RuntimeProbe(name=name, base_url=base_url, models=tuple(models)))
+        models, owner = answer
+        name = owner or NAMED_PORTS.get(port) or "local"
+        probes.append(
+            RuntimeProbe(
+                name=name,
+                base_url=f"http://{LOCAL_HOST}:{port}/v1",
+                models=tuple(models),
+            )
+        )
     return tuple(probes)
 
 
 async def detect_runtime(*, probes: tuple[RuntimeProbe, ...] | None = None) -> tuple[str, str, str]:
-    """Probe known local runtimes and return ``(name, base_url, model)``.
+    """Probe local runtimes and return ``(name, base_url, model)``.
 
-    Adopts the first runtime that answers, in :data:`KNOWN_RUNTIMES` order, so a
+    Adopts the first runtime that answers, in :func:`scan_ports` order, so a
     single-runtime machine behaves exactly as before. Pass ``probes`` (from
     :func:`probe_runtimes`) to reuse an existing survey instead of probing the
     network again. Raises :class:`ConfigError` when nothing answers — an
@@ -199,11 +278,11 @@ async def detect_runtime(*, probes: tuple[RuntimeProbe, ...] | None = None) -> t
     if probes:
         first = probes[0]
         return first.name, first.base_url, first.model
-    probed = ", ".join(url for _, url in KNOWN_RUNTIMES)
+    probed = ", ".join(str(port) for port in scan_ports())
     raise ConfigError(
         "No local inference server answered. Start Osaurus (osaurus serve), "
         "Ollama, LM Studio, llama.cpp, MLX (oMLX), vLLM or Unsloth Studio, or set "
-        f"[inference].base_url in {CONFIG_FILENAME}. Probed: {probed}"
+        f"[inference].base_url in {CONFIG_FILENAME}. Swept localhost ports: {probed}"
     )
 
 
