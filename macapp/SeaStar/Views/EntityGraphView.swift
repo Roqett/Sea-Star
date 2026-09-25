@@ -29,6 +29,9 @@ struct EntityGraphView: View {
     /// re-run whenever the active harness changes, so the strip visibly *shoots*
     /// from the vault at the thing it just connected to.
     @State private var connectProgress: CGFloat = 0
+    /// Whether the tip note is open beside the active starfish. Tapping that
+    /// starfish expands and contracts it (spec §8.7).
+    @State private var tipExpanded = true
 
     private let margin: CGFloat = 30
 
@@ -47,7 +50,10 @@ struct EntityGraphView: View {
         .overlay(alignment: .bottomLeading) { readout }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .onAppear { growConnection() }
-        .onChange(of: activeHarnessID) { _, _ in growConnection() }
+        .onChange(of: activeHarnessID) { _, _ in
+            growConnection()
+            tipExpanded = true
+        }
     }
 
     /// The pool at one instant: static geometry plus a slow, per-node drift so the
@@ -62,6 +68,7 @@ struct EntityGraphView: View {
                         nodeView(node, at: point, time: time, animated: animated)
                     }
                 }
+                tipCallout(points)
             }
         }
     }
@@ -209,6 +216,43 @@ struct EntityGraphView: View {
         }
     }
 
+    /// The note that grows out of the active starfish (spec §8.7): a setting-up
+    /// hint for a harness the person has never been on, a wrong-vault nudge, or
+    /// the quiet "connected" line. Tapping that starfish contracts it.
+    @ViewBuilder
+    private func tipCallout(_ points: [String: CGPoint]) -> some View {
+        if let tip = controller.currentTip,
+           let active = activeHarnessID,
+           let point = points[active] {
+            Group {
+                if tipExpanded {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(tip.body)
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(Palette.bone)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if tip.kind == .fresh {
+                            Button(Strings.Tips.dismiss) { controller.rememberCurrentHarness() }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Palette.harnessGlow)
+                        }
+                    }
+                    .padding(9)
+                    .frame(width: 152, alignment: .leading)
+                    .background(Palette.canvas.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Palette.harnessGlow.opacity(0.45), lineWidth: 1)
+                    )
+                    .transition(.scale(scale: 0.65, anchor: .trailing).combined(with: .opacity))
+                }
+            }
+            .position(x: max(point.x - 98, 88), y: point.y - 26)
+            .animation(.spring(response: 0.34, dampingFraction: 0.78), value: tipExpanded)
+        }
+    }
+
     private func nodeView(
         _ node: GraphNode,
         at point: CGPoint,
@@ -256,7 +300,16 @@ struct EntityGraphView: View {
             if hovering { hovered = node.id }
             else if hovered == node.id { hovered = nil }
         }
-        .onTapGesture { select(node) }
+        .onTapGesture {
+            if node.id == activeHarnessID {
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+                    tipExpanded.toggle()
+                }
+            } else {
+                select(node)
+                tipExpanded = true
+            }
+        }
         .animation(.easeInOut(duration: 0.18), value: isActive)
     }
 

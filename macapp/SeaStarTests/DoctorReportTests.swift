@@ -227,6 +227,57 @@ struct LogStoreTests {
     }
 }
 
+@Suite("Harness tips")
+struct HarnessTipsTests {
+    @Test("a fresh harness gets the setting-up hint, and it names the harness")
+    func freshHarnessHint() {
+        let tip = HarnessTips.tip(
+            harnessName: "oMLX", isNew: true, isReady: true,
+            modelCount: 3, vaultName: "Vault", otherVaults: 2
+        )
+        #expect(tip?.kind == .fresh)
+        #expect(tip?.body.contains("oMLX") == true)
+    }
+
+    @Test("a known harness with no other vaults just reports it is connected")
+    func connectedLine() {
+        let tip = HarnessTips.tip(
+            harnessName: "Osaurus", isNew: false, isReady: true,
+            modelCount: 1, vaultName: "Brain", otherVaults: 0
+        )
+        #expect(tip?.kind == .reconnected)
+        #expect(tip?.body.contains("1 model") == true)
+    }
+
+    @Test("other vaults nearby raise the wrong-vault nudge")
+    func wrongVaultNudge() {
+        let tip = HarnessTips.tip(
+            harnessName: "oMLX", isNew: false, isReady: true,
+            modelCount: 3, vaultName: "Second", otherVaults: 1
+        )
+        #expect(tip?.kind == .wrongVault)
+        #expect(tip?.body.contains("Second") == true)
+    }
+
+    @Test("a known harness that is not ready says nothing")
+    func silentWhenNotReady() {
+        let tip = HarnessTips.tip(
+            harnessName: "oMLX", isNew: false, isReady: false,
+            modelCount: 0, vaultName: "Vault", otherVaults: 0
+        )
+        #expect(tip == nil)
+    }
+
+    @Test("remembering a harness is idempotent and keys on its endpoint")
+    func rememberingIsIdempotent() {
+        let id = HarnessTips.identity(baseURL: "http://127.0.0.1:8000")
+        let once = HarnessTips.remembered([], adding: id)
+        let twice = HarnessTips.remembered(once, adding: id)
+        #expect(once == twice)
+        #expect(once.contains("harness:http://127.0.0.1:8000"))
+    }
+}
+
 @Suite("Icon roster")
 struct IconRosterTests {
     @Test("there are four distinct faces")

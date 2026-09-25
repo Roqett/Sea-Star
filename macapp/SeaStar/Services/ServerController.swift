@@ -35,6 +35,13 @@ final class ServerController {
     private(set) var modelOverride: String?
     private(set) var harnessOverride: HarnessOption?
 
+    /// Harness identities the person has already been on. A brand-new one gets a
+    /// setting-up hint beside its starfish (spec §8.7), then drops out of the
+    /// "new" set once acknowledged.
+    private(set) var seenHarnesses: Set<String>
+
+    private static let seenHarnessesKey = "SeaStar.seenHarnesses"
+
     private let command: EngineCommand?
     private var serveProcess: Process?
 
@@ -45,6 +52,9 @@ final class ServerController {
 
     init(command: EngineCommand? = EngineCommand.resolve()) {
         self.command = command
+        self.seenHarnesses = Set(
+            UserDefaults.standard.stringArray(forKey: Self.seenHarnessesKey) ?? []
+        )
     }
 
     var isReady: Bool { report?.ready ?? false }
@@ -88,6 +98,38 @@ final class ServerController {
     var currentHarness: HarnessOption? {
         guard let report else { return nil }
         return harnessOptions.first { $0.baseURL == report.baseURL }
+    }
+
+    /// The note to grow beside the active starfish, or `nil` when there is
+    /// nothing worth saying (spec §8.7).
+    var currentTip: HarnessTip? {
+        guard let report else { return nil }
+        return HarnessTips.tip(
+            harnessName: currentHarness?.name ?? report.runtime,
+            isNew: isCurrentHarnessNew,
+            isReady: report.ready,
+            modelCount: modelOptions.count,
+            vaultName: (report.vault.path as NSString).lastPathComponent,
+            otherVaults: max(vaultOptions.count - 1, 0)
+        )
+    }
+
+    /// Whether the harness the report is describing has never been seen before.
+    var isCurrentHarnessNew: Bool {
+        guard let report else { return false }
+        return !seenHarnesses.contains(HarnessTips.identity(baseURL: report.baseURL))
+    }
+
+    /// Remember the current harness, so its setting-up hint doesn't nag again.
+    func rememberCurrentHarness() {
+        guard let report else { return }
+        let updated = HarnessTips.remembered(
+            seenHarnesses,
+            adding: HarnessTips.identity(baseURL: report.baseURL)
+        )
+        guard updated != seenHarnesses else { return }
+        seenHarnesses = updated
+        UserDefaults.standard.set(Array(updated), forKey: Self.seenHarnessesKey)
     }
 
     /// Vaults the popover offers: the Obsidian-known candidates, with the current

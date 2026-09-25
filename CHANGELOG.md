@@ -11,6 +11,13 @@ Harness: TRAE
 Date: 2026-09-25
 
 Summary of Changes:
+- **A tip grows from the starfish (spec §8.7).** A short note now opens beside the active node in
+  the graph, and tapping that starfish expands or contracts it. The rule is pure and unit-tested
+  (`Models/HarnessTips.swift`): a harness the person has **never been on** gets a setting-up hint,
+  other vaults nearby raise a **wrong-vault** nudge, and a known, ready harness gets a quiet
+  **"connected — *n* models on offer"** line. Seen harnesses are remembered in `UserDefaults`
+  (`SeaStar.seenHarnesses`, keyed by endpoint) and a fresh hint is dismissed with **Got it**, after
+  which the note settles into the connected line.
 - **The starfield moves (spec §8.7).** The entity graph is no longer a still frame. The orbs now
   drift on a slow per-node current (each entity's phase is hashed from its id, so nothing jitters
   between redraws), their glow breathes, and the vault↔harness connection **grows out of the
@@ -22,6 +29,8 @@ Summary of Changes:
   spot; it is now a proper disclosure row — a rotating chevron, a terminal mark, the title and a
   live entry count, with a hover fill and a Show/Hide tooltip — so the panel is obvious to open
   and close.
+- **Tests:** new `HarnessTips` cases (fresh hint, connected line, wrong-vault nudge, silence when
+  not ready, idempotent remembering) — `xcodebuild … test` → **25 tests in 7 suites passing**.
 
 Harness: TRAE
 

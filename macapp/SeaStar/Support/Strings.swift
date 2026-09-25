@@ -76,6 +76,24 @@ enum Strings {
         static let list = "List"
     }
 
+    /// The note that grows beside the active starfish (spec §8.7): the settable
+    /// hint for a brand-new harness, a wrong-vault nudge, and the everyday
+    /// "connected" line. Plain language, and it names the fix, not just a fault.
+    enum Tips {
+        static let dismiss = "Got it"
+        static func newHarness(_ name: String) -> String {
+            "First time on \(name). Point your own tools at its endpoint — this note will settle once you have."
+        }
+        static func wrongVault(_ vault: String, _ others: Int) -> String {
+            let count = others == 1 ? "one other vault" : "\(others) other vaults"
+            return "Reading \(vault). \(count) nearby — switch if that's not the one."
+        }
+        static func connected(_ name: String, _ models: Int) -> String {
+            let count = models == 1 ? "1 model" : "\(models) models"
+            return "\(name) is connected — \(count) on offer."
+        }
+    }
+
     /// The Settings window: the configuration surface the menu opens (spec §8.4).
     enum Settings {
         static let title = "Sea-Star Settings"

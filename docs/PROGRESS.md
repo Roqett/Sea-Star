@@ -354,24 +354,30 @@ No parallel agents active. Single-writer.
   all of it stills under Reduce Motion.
 - **Logs toggle made discoverable.** The bare Logs word is now a disclosure row (chevron, terminal
   mark, live count, hover fill, Show/Hide tooltip).
-- **Verified:** `xcodegen generate` → `xcodebuild … test` → **20 tests in 6 suites passing**;
+- **Harness tip grows from the starfish (spec §8.7).** `Models/HarnessTips.swift` (pure, tested)
+  decides one note: a **never-seen** harness → setting-up hint; else other vaults nearby →
+  **wrong-vault** nudge; else a ready known harness → **"connected — *n* models"**. A note opens
+  beside the active node and the starfish toggles expand/contract; a fresh hint's **Got it** records
+  the harness in `UserDefaults` (`SeaStar.seenHarnesses`, keyed by endpoint) via `ServerController`.
+- **Verified:** `xcodegen generate` → `xcodebuild … test` → **25 tests in 7 suites passing**;
   `… build` → **BUILD SUCCEEDED**. `uv run ruff check .` + `uv run pytest` → **51 passed**. Updated
   `spec.md` (§8.7, §8.8), `CHANGELOG.md` and this file.
-- **Committed** as `12cdcaa` on `feat/macapp-cockpit` (AppKit shell + cockpit/strips/logs/graph +
-  docs), with the animation slice to follow.
+- **Committed** on `feat/macapp-cockpit`: `12cdcaa` (AppKit shell + cockpit/strips/logs/graph),
+  `776d1dd` (the moving starfield), plus the harness-tip slice.
 
 **Half-finished / open**
 
 - The **light-appearance** log ink (`logInkLight` / `logSurfaceLight`) is defined but the panel
   always uses the dark end, because the cockpit canvas is always the dark rockpool. Make the
   popover itself adaptive if the founder wants a true light mode.
-- The **entity graph** is animated now; the founder still has more coloured strip combinations to
-  drop in, and offered to sample hex codes from the artwork for exact ink matching.
-- **Deferred by the founder, not started:** per-harness **tips** (new-harness setup hint,
-  wrong-vault reminder, a note that expands/contracts from the starfish), an **MCP/browser
-  probe** for current harness info, and optional **voice** that piggybacks the active harness.
+- The **entity graph** is animated with a working tip note; the founder still has more coloured
+  strip combinations to drop in, and offered to sample hex codes from the artwork for exact ink
+  matching.
+- **Deferred by the founder, not started:** the **MCP/browser probe** (fetch current info on the
+  harness before chatting so the tip can be specific rather than generic) and optional **voice**
+  that piggybacks the active harness.
 
 **Single next step**
 
-- Founder's look at the moving starfield and the findable Logs row; then fold the branch into
-  draft PR #2.
+- Founder's look at the moving starfield, the starfish tip note, and the findable Logs row; then
+  fold the branch into draft PR #2.

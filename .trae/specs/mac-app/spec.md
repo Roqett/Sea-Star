@@ -300,7 +300,17 @@ detail; tapping a node selects it through the same `selectVault` / `selectHarnes
 
 The **connection** between the vault and the active harness is drawn as a nudibranch strip
 (`NudiStrip.expands == false`, fixed length), rotated to sit between the two nodes — the 3px
-ribbon grown up into the wiring of the app.
+ribbon grown up into the wiring of the app. It *grows out of the vault* whenever the active
+harness changes, so the strip visibly shoots at the thing it just connected to. The orbs drift on
+a slow current and their glow breathes; all of that stills under Reduce Motion.
+
+A short **note** grows beside the active starfish, and tapping that starfish expands and contracts
+it. `HarnessTips.tip` (pure, unit-tested) decides what, if anything, to say, in priority order: a
+harness the person has **never been on** gets a setting-up hint ("you'll likely need to configure
+this"); failing that, **other vaults nearby** raise a wrong-vault nudge; failing that, a known,
+ready harness gets the quiet "connected — *n* models on offer" line. Seen harnesses are remembered
+in `UserDefaults` (`SeaStar.seenHarnesses`, keyed by endpoint) and a fresh hint is acknowledged
+with **Got it**, after which the note settles into the connected line.
 
 ### 8.8 Logs (kept short on purpose)
 
