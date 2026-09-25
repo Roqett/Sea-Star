@@ -2,10 +2,41 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Which way the cockpit is read (spec §8.7): the starfield graph, or the plain
-/// "letterface" list of rows.
-private enum CockpitMode {
+/// "letterface" list of rows. The raw value is what persists as the person's
+/// preference; an empty stored value means they have not chosen yet.
+enum CockpitMode: String, CaseIterable, Identifiable {
     case graph
     case list
+
+    var id: String { rawValue }
+
+    /// The stored preference, or the opening default (the graph) when unset.
+    static func resolved(from raw: String) -> CockpitMode {
+        CockpitMode(rawValue: raw) ?? .graph
+    }
+
+    /// Standard Apple symbols stand in for the words: connected points for the
+    /// graph, a bulleted list for the rows.
+    var symbol: String {
+        switch self {
+        case .graph: return "point.3.connected.trianglepath.dotted"
+        case .list: return "list.bullet"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .graph: return Strings.Views.graph
+        case .list: return Strings.Views.list
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .graph: return Strings.Views.graphHelp
+        case .list: return Strings.Views.listHelp
+        }
+    }
 }
 
 /// The cockpit popover: what the engine found, at a glance, with one button to
@@ -24,14 +55,22 @@ struct CockpitPopoverView: View {
     @State private var isImportingVault = false
     @State private var isLogsExpanded = false
     @State private var isLogsHovering = false
-    @State private var mode: CockpitMode = .list
+
+    /// Which reading of the cockpit the person prefers (spec §8.7). Empty until
+    /// they choose on first launch, after which the header toggle swaps it.
+    @AppStorage("SeaStar.cockpitMode") private var modeRaw = ""
+
+    private var mode: CockpitMode { CockpitMode.resolved(from: modeRaw) }
+    private var hasChosenMode: Bool { CockpitMode(rawValue: modeRaw) != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            modeToggle
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if !hasChosenMode {
+                        firstRunChoice
+                    }
                     switch mode {
                     case .graph:
                         EntityGraphView(controller: controller)
@@ -81,6 +120,8 @@ struct CockpitPopoverView: View {
 
             statePill
 
+            modeToggle
+
             if let onOpenSettings {
                 Button(action: onOpenSettings) {
                     Image(systemName: "gearshape")
@@ -104,14 +145,82 @@ struct CockpitPopoverView: View {
             .background(stateColour.opacity(0.16), in: Capsule())
     }
 
+    /// The mode switch, now up with the "ready" pill and the gear (spec §8.7):
+    /// two SF Symbols, the active one lit, rather than a text capsule.
     private var modeToggle: some View {
-        Picker("", selection: $mode) {
-            Text(Strings.Views.graph).tag(CockpitMode.graph)
-            Text(Strings.Views.list).tag(CockpitMode.list)
+        HStack(spacing: 2) {
+            ForEach(CockpitMode.allCases) { option in
+                Button {
+                    choose(option)
+                } label: {
+                    Image(systemName: option.symbol)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(isActive(option) ? Palette.bone : Palette.mauve)
+                        .frame(width: 24, height: 20)
+                        .background(
+                            isActive(option) ? Palette.bone.opacity(0.12) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 5)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
+                .help(option.help)
+            }
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .controlSize(.small)
+    }
+
+    /// The chosen reading is only lit once a preference exists, so first launch
+    /// shows neither side pressed.
+    private func isActive(_ option: CockpitMode) -> Bool {
+        hasChosenMode && option == mode
+    }
+
+    private func choose(_ option: CockpitMode) {
+        withAnimation(.easeInOut(duration: 0.18)) { modeRaw = option.rawValue }
+    }
+
+    /// Shown once, before a preference exists: the person picks how the cockpit
+    /// should open, and can change it from the header at any time (spec §8.7).
+    private var firstRunChoice: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(Strings.Mode.firstRunTitle)
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Palette.bone)
+
+            Text(Strings.Mode.firstRunBody)
+                .font(.caption)
+                .foregroundStyle(Palette.mauve)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                ForEach(CockpitMode.allCases) { option in
+                    Button {
+                        choose(option)
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: option.symbol)
+                                .font(.system(size: 18))
+                            Text(option.label)
+                                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .foregroundStyle(Palette.bone)
+                        .background(Palette.bone.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Palette.bone.opacity(0.12), lineWidth: 1)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                    .help(option.help)
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.electricBlue.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var details: some View {

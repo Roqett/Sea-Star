@@ -302,3 +302,28 @@ struct IconRosterTests {
         }
     }
 }
+
+@Suite("Cockpit mode")
+struct CockpitModeTests {
+    @Test("an unset preference opens the graph")
+    func unsetDefaultsToGraph() {
+        #expect(CockpitMode.resolved(from: "") == .graph)
+    }
+
+    @Test("a stored preference is honoured both ways")
+    func storedPreferenceRoundTrips() {
+        for option in CockpitMode.allCases {
+            #expect(CockpitMode.resolved(from: option.rawValue) == option)
+        }
+    }
+
+    @Test("both readings carry a symbol, a label and a help line")
+    func bothReadingsAreLabelled() {
+        #expect(CockpitMode.allCases.count == 2)
+        for option in CockpitMode.allCases {
+            #expect(!option.symbol.isEmpty)
+            #expect(!option.label.isEmpty)
+            #expect(!option.help.isEmpty)
+        }
+    }
+}

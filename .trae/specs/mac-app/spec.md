@@ -287,9 +287,13 @@ until it exists the item points at a placeholder URL.
 
 ### 8.7 Entity graph (the "starfield" view)
 
-Some people read the cockpit's rows; some prefer to *see* the shape of the thing. A segmented
-**Graph | List** toggle at the top of the popover switches between the two readings of the
-same facts; **List** is the default, because the chrome should never be the surprise.
+Some people read the cockpit's rows; some prefer to *see* the shape of the thing. The header
+carries a **mode toggle** — two SF Symbols (connected points for the graph, a bulleted list for
+the rows), lit the way Apple lights a segmented control — sitting **up with the "ready" pill and
+the gear**. On **first launch** the popover asks which reading to open with (either choice is
+fine) and remembers the answer in `UserDefaults` (`SeaStar.cockpitMode`); thereafter the header
+icons swap between the two readings of the same facts. Until a preference exists, the graph is
+shown behind the question and neither icon is pressed.
 
 The graph draws the roster as glowing nodes on a dark backdrop — the **vault** off to the
 left, each **harness** down the right edge, and the active harness's **models** ringing it.

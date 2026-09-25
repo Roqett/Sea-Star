@@ -8,6 +8,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Harness: TRAE
 
+Date: 2026-09-26
+
+Summary of Changes:
+- **The mode switch moved into the header (spec §8.7).** The cockpit's Graph/List choice was a text
+  capsule sitting in the body; it is now two standard Apple symbols — connected points for the
+  graph, a bulleted list for the rows — up with the **"ready"** pill and the gear, the active
+  reading lit the way Apple lights a segmented control.
+- **First launch asks how to open (spec §8.7).** Before a preference exists the popover shows a
+  one-time chooser offering both readings (either will do); the answer is remembered in
+  `UserDefaults` (`SeaStar.cockpitMode`) and the header icons swap it from then on. Until a choice
+  is made the graph shows behind the question and neither icon is pressed.
+- **Tests:** new `CockpitMode` cases (an unset preference opens the graph, a stored preference
+  round-trips both ways, every reading carries a symbol, a label and a help line) —
+  `xcodebuild … test` → **28 tests in 8 suites passing**.
+
+Harness: TRAE
+
 Date: 2026-09-25
 
 Summary of Changes:

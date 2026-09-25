@@ -74,6 +74,15 @@ enum Strings {
     enum Views {
         static let graph = "Graph"
         static let list = "List"
+        static let graphHelp = "Show the graph"
+        static let listHelp = "Show the list"
+    }
+
+    /// The one-time choice between the two readings, offered on first launch
+    /// (spec §8.7); afterwards the header toggle swaps them.
+    enum Mode {
+        static let firstRunTitle = "How should the cockpit open?"
+        static let firstRunBody = "The graph shows the shape of things; the list shows the plain rows. Pick one — you can swap from the header any time."
     }
 
     /// The note that grows beside the active starfish (spec §8.7): the settable

@@ -347,9 +347,11 @@ No parallel agents active. Single-writer.
   prune-on-write, pure testable `retained`); collapsible cockpit **Logs** panel (strips top/bottom,
   SF Mono, blue ink, selectable); Settings → **Logs** retention picker (Forever/7/14/30, default
   14), entry count, **Clear now**, **Reveal in Finder**.
-- **Entity graph (spec §8.7).** `Views/EntityGraphView.swift` + segmented **Graph | List** toggle
-  (List default); glowing vault/harness/model nodes, rotated-strip connection, tap-to-select via
-  the existing controller calls. Now **animated**: per-node water drift, breathing glow, `caustics`
+- **Entity graph (spec §8.7).** `Views/EntityGraphView.swift` + a **header** mode toggle (two SF
+  Symbols — connected points / bulleted list — beside the "ready" pill and the gear; the choice is
+  remembered in `UserDefaults` `SeaStar.cockpitMode`, and **first launch asks which reading to open
+  with**). Glowing vault/harness/model nodes, rotated-strip connection, tap-to-select via the
+  existing controller calls. **Animated**: per-node water drift, breathing glow, `caustics`
   highlight, and a connection ribbon that grows out of the vault on every active-harness change;
   all of it stills under Reduce Motion.
 - **Logs toggle made discoverable.** The bare Logs word is now a disclosure row (chevron, terminal
@@ -359,11 +361,11 @@ No parallel agents active. Single-writer.
   **wrong-vault** nudge; else a ready known harness → **"connected — *n* models"**. A note opens
   beside the active node and the starfish toggles expand/contract; a fresh hint's **Got it** records
   the harness in `UserDefaults` (`SeaStar.seenHarnesses`, keyed by endpoint) via `ServerController`.
-- **Verified:** `xcodegen generate` → `xcodebuild … test` → **25 tests in 7 suites passing**;
+- **Verified:** `xcodegen generate` → `xcodebuild … test` → **28 tests in 8 suites passing**;
   `… build` → **BUILD SUCCEEDED**. `uv run ruff check .` + `uv run pytest` → **51 passed**. Updated
   `spec.md` (§8.7, §8.8), `CHANGELOG.md` and this file.
 - **Committed** on `feat/macapp-cockpit`: `12cdcaa` (AppKit shell + cockpit/strips/logs/graph),
-  `776d1dd` (the moving starfield), plus the harness-tip slice.
+  `776d1dd` (the moving starfield), `220d841` (the harness tip), plus the header mode-toggle slice.
 
 **Half-finished / open**
 
