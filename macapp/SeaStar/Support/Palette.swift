@@ -20,6 +20,20 @@ enum Palette {
     static let ready = neonGreen
     static let offline = vermilion
     static let working = electricBlue
+
+    /// Entity colours for the starfield: each kind of thing glows its own hue,
+    /// so the graph reads as meaning, not decoration (spec §8.7).
+    static let harnessGlow = electricBlue
+    static let vaultGlow = teal
+    static let modelGlow = neonGreen
+
+    /// Log ink, drawn from the blue-white nudibranch strip. Two ends of the
+    /// same ribbon: the neon blue for the dark rockpool, the deeper blue for a
+    /// light surface when the app goes adaptive.
+    static let logInkDark = Color(hex: 0x9FC6FF)
+    static let logInkLight = Color(hex: 0x1F5FB0)
+    static let logSurfaceDark = Color(hex: 0x0A0C12)
+    static let logSurfaceLight = Color(hex: 0xF2F6FF)
 }
 
 extension Color {

@@ -60,8 +60,12 @@ Three layers. **Only the third is new code.**
    autodetect, MCP server. Already complete.
 2. **Bridge** — the app runs `sea-star ...` and parses a **machine-readable** result.
    The gap to close first is documented in §6.
-3. **Cockpit (new)** — a SwiftUI app. `MenuBarExtra` scene, files split by
-   responsibility: `App/`, `Views/`, `Models/`, `Services/`, `Support/`.
+3. **Cockpit (new)** — a SwiftUI app whose imperative edge is AppKit. SwiftUI
+   `MenuBarExtra` renders the popover but exposes **no** right-click hook, so the status
+   item is owned directly: `@main enum SeaStarMain` → `AppDelegate` (`NSStatusItem` +
+   `NSPopover`), and the popover/settings views are the *same* SwiftUI views hosted in
+   `NSHostingController`. Files split by responsibility: `App/`, `Views/`, `Models/`,
+   `Services/`, `Support/`.
 
 Engine internals the app leans on:
 
@@ -216,13 +220,102 @@ feel, lit from the rockpool palette.
 
 On launch / on click of the menu-bar item:
 
-1. **Vault** → show the detected vault; offer the other Obsidian-known vaults to switch.
-2. **Harness** → run autodetect and show what answered ("oMLX — found", "Ollama — found").
-3. **Model** → list the models the endpoint reports; click to choose.
+1. **Vault** (§8.1) → show the detected vault; offer the other Obsidian-known vaults to
+   switch, filterable, plus **Open folder…** to adopt any folder at all.
+2. **Harness** (§8.2) → run autodetect and show what answered ("oMLX — found", "Ollama — found").
+3. **Model** (§8.3) → list the models the *selected harness* reports; click to choose.
 4. **Go** → one button to start/stop the server; show state at a glance.
+
+The popover is a **fixed-width (320pt) column with a scrolling body**: the header and the
+start/stop controls stay pinned, and everything between them scrolls when there is more to
+say than fits. It never grows past the screen edge.
 
 Menu-bar item text stays short (≤ ~30 characters); push detail into the popover or a
 window.
+
+### 8.1 Vault — browse and search
+
+The vault row is a menu of `report.vault.candidates` (the current vault always included,
+even when it came from env/TOML). Because a person may keep vaults Obsidian has never
+seen, the menu carries **Open folder…**, which raises a folder picker; the chosen path is
+pinned via `SEASTAR_VAULT`. The **Settings window** (§8.4) adds a searchable, scrolling
+list of the same candidates for machines with many vaults.
+
+### 8.2 Harness — one row per live endpoint
+
+`runtimes[]` gives one entry per live harness; each is labelled `name · baseURL` (an
+endpoint alone cannot say which app answers on a shared port). Switching pins
+`SEASTAR_BASE_URL` + `SEASTAR_RUNTIME` and clears any model override, since the previous
+model may not exist on the new endpoint.
+
+### 8.3 Model — follows the selected harness
+
+The model row lists the **selected harness's** own models (from `runtimes[]`), falling back
+to `report.models`; the current model is kept first. This is what makes a model served only
+by one harness (e.g. a Qwen model behind oMLX) appear as soon as that harness is chosen.
+Switching pins `SEASTAR_MODEL`.
+
+### 8.4 Settings window (the configuration surface)
+
+The right-click menu's **Settings…** opens a proper window (not the popover) — the "must
+have" the founder asked for, kept deliberately simple but complete:
+
+- **Engine** — whether `sea-star` resolved, where it points, and the fix (`SEASTAR_CLI`)
+  when it did not.
+- **Vault** — the current path, a **search field**, a scrolling list of every candidate
+  (current one ticked), and **Open folder… / Use detected vault**.
+- **Harness / Model** — the same two choices as the popover, as pickers.
+- **Updates** — check now, with the result inline; the bundled version is always shown.
+- **Links** — Help & Comments (issues), Patchdog, and the repository.
+
+### 8.5 Update check (GitHub Releases)
+
+**Check for Updates…** (in the right-click menu and in Settings) asks the GitHub Releases
+API for `Roqett/Sea-Star`'s latest release, compares it to the bundled
+`CFBundleShortVersionString` as dotted numbers (a leading `v` and ragged segment counts are
+tolerated), and — only when the release is genuinely newer — offers to open its page. On a
+network failure it says so plainly; it never blocks the app.
+
+### 8.6 Right-click menu (the standard app menu)
+
+An accessory (`LSUIElement`) app has no menu bar of its own, so the standard app menu lives
+on the status item's **right-click** (and ⌃-click): **Check for Updates…**, a separator,
+**Settings…** (⌘,), **Help & Comments**, **Patchdog**, a separator, a disabled
+**Version `<version> (<build>)`** line, a separator, and **Quit Sea-Star** (⌘Q). Left-click
+still opens the cockpit popover. Patchdog is the planned GitHub agent for comments/issues;
+until it exists the item points at a placeholder URL.
+
+### 8.7 Entity graph (the "starfield" view)
+
+Some people read the cockpit's rows; some prefer to *see* the shape of the thing. A segmented
+**Graph | List** toggle at the top of the popover switches between the two readings of the
+same facts; **List** is the default, because the chrome should never be the surprise.
+
+The graph draws the roster as glowing nodes on a dark backdrop — the **vault** off to the
+left, each **harness** down the right edge, and the active harness's **models** ringing it.
+Colour is meaning, not decoration: vault `teal`, harness `electricBlue`, model `neonGreen`
+(the same accents the list rows carry). Hovering or selecting a node reveals its name and
+detail; tapping a node selects it through the same `selectVault` / `selectHarness` /
+`selectModel` calls the list uses, so the two views can never disagree.
+
+The **connection** between the vault and the active harness is drawn as a nudibranch strip
+(`NudiStrip.expands == false`, fixed length), rotated to sit between the two nodes — the 3px
+ribbon grown up into the wiring of the app.
+
+### 8.8 Logs (kept short on purpose)
+
+The cockpit exposes the engine's own output in a collapsible **Logs** panel: the blue-white
+nudibranch strip borders it top and bottom, the body is SF Mono, selectable, and inked in the
+matching blue (`Palette.logInkDark` / `logSurfaceDark` for the always-dark rockpool canvas;
+`logInkLight` / `logSurfaceLight` are defined for an adaptive surface). Engine `stdout` and
+`stderr` are piped into a single `LogStore`, so the lines are durable rather than transient.
+
+A menu-bar helper has no business letting logs pile up on the disk for years. `LogStore`
+**prunes on every write** against a retention window the person chooses in Settings →
+**Logs** (default **14 days**; options Forever / 7 / 14 / 30), keeps a single small file at
+`~/Library/Logs/Sea-Star/sea-star.log`, and offers **Clear now** and **Reveal in Finder**.
+The retention rule is a pure function (`LogStore.retained`) so it is unit-tested without a
+clock or a disk.
 
 ## 9. Build, sign, release
 

@@ -11,6 +11,73 @@ Harness: TRAE
 Date: 2026-09-25
 
 Summary of Changes:
+- **Cockpit controls de-capsuled (spec §8).** The glass Start/Refresh pills are gone. Both are
+  now plain mono words — small, toned down, the way Apple draws a text button — with **Start in
+  the left corner and Refresh in the right**, and a clean band of space above and below the
+  pair. A **blue-white nudibranch strip** sits above and below that band as the column
+  reference the 3px bar was always meant to be.
+- **Nudibranch strips land in the app (spec §7).** The founder's three 3px ribbons are now
+  asset-catalog imagesets (`NudiBlueWhite`, `NudiGreenOrange1`, `NudiGreenOrange2`) rendered
+  with `template-rendering-intent: original` so their gradients survive, and wrapped by a
+  reusable `Views/NudiStrip.swift` (2px default, `expands` toggles full-width rule vs. fixed
+  connection stroke).
+- **Logs, kept short on purpose (spec §8.8).** A new `Services/LogStore.swift` pipes the
+  engine's `stdout`/`stderr` into one durable, selectable log. The cockpit gains a collapsible
+  **Logs** panel bordered top and bottom by the blue-white strip, inked in the matching blue
+  (`logInkDark` / `logSurfaceDark`; a light pair is defined for an adaptive surface) in **SF
+  Mono**. Settings gains a **Logs** section: a retention window (**Forever / 7 / 14 / 30 days**,
+  default 14), an entry count, **Clear now**, and **Reveal in Finder**. Pruning runs on every
+  write against `~/Library/Logs/Sea-Star/sea-star.log`, so nothing piles up on the disk the way
+  most apps let it.
+- **Entity graph — the "starfield" view (spec §8.7).** A segmented **Graph | List** toggle
+  (List is the default) switches the popover between the familiar rows and a dark backdrop of
+  glowing nodes: the vault on the left, harnesses down the right edge, the active harness's
+  models ringing it, each in its own accent (`vaultGlow`/`harnessGlow`/`modelGlow`). Hovering or
+  selecting a node reveals its name; tapping one drives the same `selectVault` /
+  `selectHarness` / `selectModel` calls the list uses. The vault↔harness **connection** is drawn
+  as a rotated nudibranch strip.
+- **Tests:** new `LogStore` cases (the retention rule as a pure function — old lines dropped, a
+  zero window keeps everything, the offered windows, plain-language labels) — `xcodebuild …
+  test` → **20 tests in 6 suites passing**; `… build` → **BUILD SUCCEEDED**.
+
+Harness: TRAE
+
+Date: 2026-09-25
+
+Summary of Changes:
+- **Right-click menu on the glyph — the "must have" (spec §8.6).** SwiftUI's
+  `MenuBarExtra` renders the popover but exposes **no** right-click hook, so an accessory app
+  had nowhere to put the standard app menu. The shell was rebuilt around AppKit: a new
+  `@main enum SeaStarMain` starts `NSApplication` directly and hands off to a new
+  `App/AppDelegate.swift`, which owns the `NSStatusItem` and shows an `NSMenu` on
+  right-click (⌃-click too): **Check for Updates…**, **Settings…** (⌘,), **Help & Comments**,
+  **Patchdog**, a disabled **Version × (build)** line, and **Quit Sea-Star** (⌘Q). Left-click
+  still opens the cockpit popover. `App/SeaStarApp.swift` (the old `MenuBarExtra` shell) was
+  deleted; the popover and settings are the *same* SwiftUI views, hosted in
+  `NSPopover` / `NSHostingController`.
+- **Settings window (spec §8.4).** A new `Views/SettingsView.swift` — the configuration
+  surface the menu opens. Engine resolution + path, a **searchable** scrolling vault list with
+  **Open folder… / Use detected vault**, harness/model pickers, an inline update check, and
+  links (Help & Comments, Patchdog, repository).
+- **GitHub Releases update check (spec §8.5).** New `Services/UpdateChecker.swift` asks the
+  Releases API for `Roqett/Sea-Star`'s latest release and compares it to
+  `CFBundleShortVersionString` as dotted numbers (a leading `v` and ragged segment counts are
+  tolerated). Only a genuinely newer release offers to open its page; a failure says so
+  plainly. `Support/Links.swift` is the one home for every external URL; `Support/AppInfo.swift`
+  reads the bundled version/build.
+- **Vault row can now search and adopt any folder (spec §8.1).** The popover's vault menu
+  gained **Open folder…** (a folder picker → `SEASTAR_VAULT`), and its `PickerRow` no longer
+  greys out when there is a folder entry to reach. `ServerController.clearVaultOverride()`
+  returns to autodetection.
+- **Model row follows the selected harness (spec §8.3).** `ServerController.modelOptions` now
+  prefers `currentHarness.models` (falling back to `report.models`), so a Qwen model served
+  only by oMLX appears the moment oMLX is chosen — the model that "wasn't coming up".
+- **Popover scrolls (spec §8).** The header and the start/stop controls stay pinned; the
+  detail body scrolls inside a `maxHeight: 320` region, so a long report no longer overflows
+  the panel.
+- **Tests:** new `Version`/`UpdateChecker.normalize` Swift Testing cases (newer wins; equal or
+  older never does; leading `v` + ragged segments; tag normalisation) — `xcodebuild … test` →
+  **16 tests in 5 suites passing**; `… build` → **BUILD SUCCEEDED**.
 - **Real faces wired in (spec T4.3/T4.4 cuts).** The roster now points at the founder's
   actual artwork: each face ships two asset-catalog imagesets — `Face*Header` (40/80/120px)
   and `Face*MenuBar` (18/36/54px) — all black-ink-on-transparent, `template-rendering-intent:

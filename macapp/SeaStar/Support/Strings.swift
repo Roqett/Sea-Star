@@ -10,6 +10,17 @@ enum Strings {
         static let label = "Sea-Star"
     }
 
+    /// The right-click menu on the menu-bar glyph (the standard app menu an
+    /// accessory app otherwise has nowhere to put).
+    enum Menu {
+        static let settings = "Settings…"
+        static let checkForUpdates = "Check for Updates…"
+        static let help = "Help & Comments"
+        static let patchdog = "Patchdog"
+        static let quit = "Quit Sea-Star"
+        static func version(_ value: String) -> String { "Version \(value)" }
+    }
+
     enum Header {
         static let title = "Sea-Star"
         static let subtitle = "Your vault, on device."
@@ -38,6 +49,68 @@ enum Strings {
         static let chooseVault = "Switch vault…"
         static let chooseModel = "Choose model…"
         static let chooseHarness = "Switch harness…"
+        static let openFolder = "Open folder…"
+        static let checkNow = "Check now"
+    }
+
+    /// The rolling log: what the engine said, kept short-lived on purpose
+    /// (spec §8.8). Other apps let logs pile up for years; this one doesn't.
+    enum Logs {
+        static let title = "Logs"
+        static let empty = "Nothing logged yet."
+        static let retention = "Keep logs for"
+        static let entries = "Entries"
+        static let clearNow = "Clear now"
+        static let reveal = "Reveal in Finder"
+        static let show = "Show logs"
+        static let hide = "Hide logs"
+        static func retentionLabel(_ days: Int) -> String {
+            days == 0 ? "Forever" : "\(days) days"
+        }
+    }
+
+    /// The two ways to read the cockpit (spec §8.7): the starfield graph, or the
+    /// plain chrome the founder calls "the letterface".
+    enum Views {
+        static let graph = "Graph"
+        static let list = "List"
+    }
+
+    /// The Settings window: the configuration surface the menu opens (spec §8.4).
+    enum Settings {
+        static let title = "Sea-Star Settings"
+        static let engine = "Engine"
+        static let engineResolved = "Engine found"
+        static let engineMissing = "Engine not found"
+        static let engineHint = "Set SEASTAR_CLI to the full path of the sea-star command."
+        static let vault = "Vault"
+        static let vaultSearch = "Search vaults"
+        static let vaultDetected = "Use detected vault"
+        static let harness = "Harness"
+        static let model = "Model"
+        static let updates = "Updates"
+        static let links = "Links"
+    }
+
+    /// The update-check alerts (spec §8.5).
+    enum Updates {
+        static let checking = "Checking for updates…"
+        static let upToDateTitle = "Up to date"
+        static let availableTitle = "Update available"
+        static let failedTitle = "Couldn't check for updates"
+        static let unreachable = "GitHub didn't answer."
+        static let openRelease = "Open Release Page"
+        static let later = "Later"
+        static let dismiss = "OK"
+        static func upToDate(_ current: String) -> String {
+            "Sea-Star \(current) is the newest version."
+        }
+        static func available(current: String, latest: String) -> String {
+            "Sea-Star \(latest) is available — you're on \(current)."
+        }
+        static func badResponse(_ status: Int) -> String {
+            "GitHub returned status \(status)."
+        }
     }
 
     /// Plain-language guidance — the app never drops the person into a shell

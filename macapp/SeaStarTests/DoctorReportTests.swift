@@ -164,6 +164,69 @@ struct ServerControllerTests {
     }
 }
 
+@Suite("Version comparison")
+struct VersionTests {
+    @Test("a higher patch, minor or major wins")
+    func detectsNewer() {
+        #expect(Version.isNewer("0.1.1", than: "0.1.0"))
+        #expect(Version.isNewer("0.2.0", than: "0.1.9"))
+        #expect(Version.isNewer("1.0.0", than: "0.9.9"))
+    }
+
+    @Test("equal or older versions are never newer")
+    func rejectsSameOrOlder() {
+        #expect(!Version.isNewer("0.1.0", than: "0.1.0"))
+        #expect(!Version.isNewer("0.1.0", than: "0.1.1"))
+        #expect(!Version.isNewer("0.1", than: "0.1.0"))
+    }
+
+    @Test("a leading v and ragged segment counts compare by number")
+    func toleratesPrefixAndRaggedSegments() {
+        #expect(Version.isNewer("v1.2", than: "1.1.9"))
+        #expect(!Version.isNewer("v1.2.0", than: "1.2"))
+        #expect(Version.components("v0.1.0") == [0, 1, 0])
+    }
+
+    @Test("a release tag normalises to a bare version")
+    func normalisesTag() {
+        #expect(UpdateChecker.normalize("v0.2.0") == "0.2.0")
+        #expect(UpdateChecker.normalize("0.2.0") == "0.2.0")
+    }
+}
+
+@Suite("Log retention")
+struct LogStoreTests {
+    private func entry(daysAgo: Int, text: String = "line") -> LogStore.Entry {
+        let date = Calendar.current.date(byAdding: .day, value: -daysAgo, to: Date())!
+        return LogStore.Entry(date: date, text: text)
+    }
+
+    @Test("entries older than the window are dropped")
+    func prunesOldLines() {
+        let kept = LogStore.retained([entry(daysAgo: 1), entry(daysAgo: 20)], within: 14)
+        #expect(kept.count == 1)
+        #expect(kept.first?.text == "line")
+    }
+
+    @Test("a window of zero keeps everything")
+    func keepsAllForever() {
+        let all = [entry(daysAgo: 1), entry(daysAgo: 4000)]
+        #expect(LogStore.retained(all, within: 0).count == 2)
+    }
+
+    @Test("the offered windows include the fortnight default")
+    func offersFortnight() {
+        #expect(LogStore.retentionOptions.contains(14))
+        #expect(LogStore.retentionOptions.contains(0))
+    }
+
+    @Test("every window carries a plain-language label")
+    func labelsRead() {
+        #expect(Strings.Logs.retentionLabel(0) == "Forever")
+        #expect(Strings.Logs.retentionLabel(14) == "14 days")
+    }
+}
+
 @Suite("Icon roster")
 struct IconRosterTests {
     @Test("there are four distinct faces")

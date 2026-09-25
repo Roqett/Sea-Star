@@ -38,11 +38,22 @@ final class ServerController {
     private let command: EngineCommand?
     private var serveProcess: Process?
 
+    /// The rolling log of engine output (spec §8.8). It lives here because the
+    /// engine process does — everything the engine prints lands in one place,
+    /// pruned on a retention window the person sets in Settings.
+    let logs = LogStore()
+
     init(command: EngineCommand? = EngineCommand.resolve()) {
         self.command = command
     }
 
     var isReady: Bool { report?.ready ?? false }
+
+    /// Whether an engine command resolved, and where it points — surfaced in the
+    /// Settings window so a broken install is diagnosable at a glance.
+    var isEngineResolved: Bool { command != nil }
+
+    var enginePath: String? { command?.executableURL.path }
 
     /// The extra environment every engine call carries — the person's choices,
     /// mapped onto the same knobs the CLI reads.
@@ -91,10 +102,12 @@ final class ServerController {
     }
 
     /// Models the endpoint reports, with the current model kept in the list
-    /// (spec §8.3).
+    /// (spec §8.3). The selected harness's own models come first, so switching
+    /// harness swaps the model list even before the engine re-reports (e.g. a
+    /// Qwen model served only by oMLX).
     var modelOptions: [String] {
         guard let report else { return [] }
-        var options = report.models
+        var options = currentHarness.map(\.models).flatMap { $0.isEmpty ? nil : $0 } ?? report.models
         if !report.model.isEmpty, !options.contains(report.model) {
             options.insert(report.model, at: 0)
         }
@@ -118,6 +131,7 @@ final class ServerController {
             case .report(let report):
                 self.report = report
                 self.message = nil
+                logs.append("refresh · \(report.runtime) · \(report.model.isEmpty ? "no model" : report.model)")
             case .failure(let failure):
                 apply(failure: failure)
             }
@@ -130,6 +144,13 @@ final class ServerController {
     /// takes effect — it was spawned with the previous environment.
     func selectVault(_ path: String) {
         vaultOverride = path
+        applySelection()
+    }
+
+    /// Drop any explicit vault so the engine autodetects again (env > TOML >
+    /// Obsidian, config.py).
+    func clearVaultOverride() {
+        vaultOverride = nil
         applySelection()
     }
 
@@ -198,6 +219,9 @@ final class ServerController {
             serveProcess = process
             isServerRunning = true
             message = nil
+            logs.append("engine started · \(invocation.executableURL.lastPathComponent)")
+            drain(process.standardOutput as? Pipe)
+            drain(process.standardError as? Pipe)
             return true
         } catch {
             apply(failure: Strings.Errors.launchFailed(error.localizedDescription))
@@ -205,10 +229,24 @@ final class ServerController {
         }
     }
 
+    /// Feed whatever the engine prints into the rolling log. The handler runs on
+    /// a background queue, so it hops to the main actor before touching state.
+    private func drain(_ pipe: Pipe?) {
+        guard let pipe else { return }
+        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
+            Task { @MainActor in self?.logs.append(text) }
+        }
+    }
+
     private func stopServer() {
+        (serveProcess?.standardOutput as? Pipe)?.fileHandleForReading.readabilityHandler = nil
+        (serveProcess?.standardError as? Pipe)?.fileHandleForReading.readabilityHandler = nil
         serveProcess?.terminate()
         serveProcess = nil
         isServerRunning = false
+        logs.append("engine stopped")
     }
 
     private func apply(failure: String) {

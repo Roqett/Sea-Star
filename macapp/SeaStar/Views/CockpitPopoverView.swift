@@ -1,28 +1,64 @@
 import SwiftUI
+import UniformTypeIdentifiers
+
+/// Which way the cockpit is read (spec §8.7): the starfield graph, or the plain
+/// "letterface" list of rows.
+private enum CockpitMode {
+    case graph
+    case list
+}
 
 /// The cockpit popover: what the engine found, at a glance, with one button to
 /// start or stop the server (spec §8). Glass is applied to the control layer
 /// only — the canvas stays flat so the accents read as glowing (spec §7).
 struct CockpitPopoverView: View {
     let controller: ServerController
+    /// Opens the Settings window. Supplied by the AppKit host, which owns that
+    /// window; `nil` when the popover is used without one.
+    var onOpenSettings: (() -> Void)?
 
     /// The header mark's side in points; also the caustic shimmer's scale, so the
     /// two can never drift apart.
     private static let markSize: CGFloat = 26
 
+    @State private var isImportingVault = false
+    @State private var isLogsExpanded = false
+    @State private var isLogsHovering = false
+    @State private var mode: CockpitMode = .list
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             header
-            details
-            controls
-            if let message = controller.message {
-                guidance(message)
+            modeToggle
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    switch mode {
+                    case .graph:
+                        EntityGraphView(controller: controller)
+                    case .list:
+                        details
+                    }
+                    if let message = controller.message {
+                        guidance(message)
+                    }
+                }
             }
+            .frame(maxHeight: 320)
+            logs
+            controls
         }
         .padding(18)
         .frame(width: 320)
         .background(Palette.canvas)
         .task { await controller.refresh() }
+        .fileImporter(
+            isPresented: $isImportingVault,
+            allowedContentTypes: [.folder]
+        ) { result in
+            if case .success(let url) = result {
+                controller.selectVault(url.path)
+            }
+        }
     }
 
     private var header: some View {
@@ -44,9 +80,21 @@ struct CockpitPopoverView: View {
             Spacer()
 
             statePill
+
+            if let onOpenSettings {
+                Button(action: onOpenSettings) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.mauve)
+                }
+                .buttonStyle(.plain)
+                .help(Strings.Menu.settings)
+            }
         }
     }
 
+    /// The "ready" pill stays — the founder likes it as a status. Everything
+    /// else that used to be a capsule is now a plain word.
     private var statePill: some View {
         Text(stateText)
             .font(.caption2.weight(.semibold))
@@ -54,6 +102,16 @@ struct CockpitPopoverView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(stateColour.opacity(0.16), in: Capsule())
+    }
+
+    private var modeToggle: some View {
+        Picker("", selection: $mode) {
+            Text(Strings.Views.graph).tag(CockpitMode.graph)
+            Text(Strings.Views.list).tag(CockpitMode.list)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .controlSize(.small)
     }
 
     private var details: some View {
@@ -67,7 +125,8 @@ struct CockpitPopoverView: View {
                     get: { controller.report?.vault.path ?? "" },
                     set: { controller.selectVault($0) }
                 ),
-                display: Self.vaultName
+                display: Self.vaultName,
+                onChooseFolder: { isImportingVault = true }
             )
             .help(Strings.Actions.chooseVault)
 
@@ -109,23 +168,131 @@ struct CockpitPopoverView: View {
         (path as NSString).lastPathComponent
     }
 
+    /// The control layer, stripped of its pill capsules (spec §8). Start sits in
+    /// the left corner and Refresh in the right, with a nudibranch strip above
+    /// and below the pair as the column reference — the 3px bar grown up.
     private var controls: some View {
-        GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
-                Button(controller.isServerRunning ? Strings.Actions.stop : Strings.Actions.start) {
+        VStack(spacing: 10) {
+            NudiStrip(style: .blueWhite)
+
+            HStack(alignment: .firstTextBaseline) {
+                actionButton(
+                    title: controller.isServerRunning ? Strings.Actions.stop : Strings.Actions.start,
+                    enabled: controller.isServerRunning || controller.isReady
+                ) {
                     controller.toggleServer()
                 }
-                .buttonStyle(.glassProminent)
-                .disabled(!controller.isReady && !controller.isServerRunning)
 
-                Button(Strings.Actions.refresh) {
+                Spacer(minLength: 12)
+
+                actionButton(
+                    title: Strings.Actions.refresh,
+                    enabled: !controller.isRefreshing
+                ) {
                     Task { await controller.refresh() }
                 }
-                .buttonStyle(.glass)
-                .disabled(controller.isRefreshing)
             }
+            .padding(.horizontal, 2)
+
+            NudiStrip(style: .blueWhite)
         }
     }
+
+    /// A plain word where a pill used to be: mono, small, toned down, exactly as
+    /// Apple would draw a text button.
+    private func actionButton(
+        title: String,
+        enabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium, design: .monospaced))
+                .foregroundStyle(enabled ? Palette.bone : Palette.mauve.opacity(0.45))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+    }
+
+    // MARK: - Logs
+
+    private var logs: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) { isLogsExpanded.toggle() }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Palette.mauve)
+                        .rotationEffect(.degrees(isLogsExpanded ? 90 : 0))
+                        .frame(width: 9)
+
+                    Image(systemName: "terminal")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Palette.electricBlue)
+
+                    Text(Strings.Logs.title)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Palette.bone)
+
+                    Spacer(minLength: 0)
+
+                    Text("\(controller.logs.entries.count)")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Palette.mauve)
+                        .monospacedDigit()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .frame(maxWidth: .infinity)
+                .background(
+                    Palette.bone.opacity(isLogsHovering ? 0.10 : 0.05),
+                    in: RoundedRectangle(cornerRadius: 8)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+            .onHover { isLogsHovering = $0 }
+            .help(isLogsExpanded ? Strings.Logs.hide : Strings.Logs.show)
+
+            if isLogsExpanded { logPanel }
+        }
+    }
+
+    /// The log body, bordered top and bottom by the blue-white nudibranch strip
+    /// and inked in the matching blue (spec §8.8). Always the dark end of the
+    /// ribbon, because the cockpit canvas is always the dark rockpool.
+    private var logPanel: some View {
+        VStack(spacing: 0) {
+            NudiStrip(style: .blueWhite)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    if controller.logs.entries.isEmpty {
+                        Text(Strings.Logs.empty)
+                            .foregroundStyle(Palette.mauve)
+                    } else {
+                        ForEach(controller.logs.entries.suffix(300)) { entry in
+                            Text(entry.text)
+                                .foregroundStyle(Palette.logInkDark)
+                                .textSelection(.enabled)
+                        }
+                    }
+                }
+                .font(.system(size: 10, design: .monospaced))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+            }
+            .frame(maxHeight: 150)
+            .background(Palette.logSurfaceDark)
+
+            NudiStrip(style: .blueWhite)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: - Guidance & derived state
 
     private func guidance(_ message: String) -> some View {
         Text(message)
@@ -221,6 +388,8 @@ private struct PickerRow: View {
     let options: [String]
     let selection: Binding<String>
     let display: (String) -> String
+    /// Optional extra menu entry — the vault row uses it to adopt any folder.
+    var onChooseFolder: (() -> Void)?
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -239,6 +408,11 @@ private struct PickerRow: View {
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
+
+                if let onChooseFolder {
+                    Divider()
+                    Button(Strings.Actions.openFolder, action: onChooseFolder)
+                }
             } label: {
                 HStack(spacing: 4) {
                     Text(value)
@@ -253,7 +427,7 @@ private struct PickerRow: View {
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .disabled(options.count <= 1)
+            .disabled(options.count <= 1 && onChooseFolder == nil)
 
             Spacer(minLength: 0)
         }

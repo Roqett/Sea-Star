@@ -7,7 +7,7 @@ note at the end of every session.
 
 - **Version:** 0.1.0 (unreleased). Repo is **private** until built and tested.
 - **Health:** `uv run ruff check .` clean; `uv run pytest` — 51 passing. App:
-  `xcodebuild … test` — 12 Swift Testing cases passing (4 suites).
+  `xcodebuild … test` — 20 Swift Testing cases passing (6 suites).
 - **Bridge:** `sea-star doctor --json` now emits the full §6 contract —
   `schema_version`, nested `vault {path, source, note_count, candidates}`, `server.state`,
   and `runtimes[]` (one object per live harness). Always one JSON object, even on failure.
@@ -21,6 +21,24 @@ note at the end of every session.
   **real art** (T4.3/T4.4 cuts): `Face*MenuBar` solid silhouettes for the menu bar,
   `Face*Header` full-detail cuts for the header, both template-tinted. The header face carries
   a caustic shimmer (T4.5) via `Shaders/Caustics.metal`.
+- **Cockpit: standard app menu (new).** The shell is now AppKit-hosted (`@main enum
+  SeaStarMain` → `App/AppDelegate.swift`) because `MenuBarExtra` has no right-click hook. The
+  status item's **right-click** shows the standard app menu — Check for Updates…, Settings…
+  (⌘,), Help & Comments, Patchdog, a version line, Quit — and **Settings…** opens a proper
+  `Views/SettingsView.swift` window (engine + searchable vault list + harness/model + updates
+  + links). Updates check the GitHub Releases API (`Services/UpdateChecker.swift`). The
+  popover's detail body **scrolls**; the vault row gained **Open folder…**; the model row
+  follows the **selected harness**.
+- **Cockpit: strips, logs and the starfield (new).** The Start/Refresh glass pills are gone —
+  plain mono words, **Start left / Refresh right**, a **blue-white nudibranch strip** above and
+  below the pair (`Views/NudiStrip.swift`; the founder's three 3px ribbons are now imagesets).
+  A collapsible **Logs** panel (strips top and bottom, SF Mono, blue ink, selectable) reads from
+  a new `Services/LogStore.swift` that pipes engine `stdout`/`stderr` to
+  `~/Library/Logs/Sea-Star/sea-star.log` and **prunes on every write** against a retention
+  window set in Settings → **Logs** (Forever / 7 / 14 / 30, default 14; **Clear now** + **Reveal
+  in Finder**). A segmented **Graph | List** toggle (List default) opens the **entity graph**
+  (`Views/EntityGraphView.swift`): vault/harnesses/models as glowing nodes, the vault↔harness
+  connection drawn as a rotated nudibranch strip, tap-to-select via the same controller calls.
 - **Naming:** repo is **`Roqett/Sea-Star`** (personal — keeps the history on the founder's
   profile). "Up Periscope" is the **product identity** (licence + bundle id), not a GitHub
   org. Codeberg remote is `Touretro/theSeaStar`.
@@ -42,7 +60,7 @@ note at the end of every session.
 | MCP server | `src/sea_star/mcp_server.py` | Done — exposes `ask_seastar`, `vault_*`. |
 | MCP client | `src/sea_star/mcp_client.py` | Done — bridges external servers, namespaced, curated by `include`/`exclude`. |
 | Docs | `docs/` | **Added this session** — tiered: start-here → connect → reference → troubleshooting. |
-| Cockpit (mac app) | `macapp/` | **New** — XcodeGen project + SwiftUI `MenuBarExtra`. `App/ Views/ Models/ Services/ Support/ Shaders/`; builds, launches, 11 Swift tests pass. Vault + model pick-lists (T3.2/T3.3) wired to `SEASTAR_VAULT`/`SEASTAR_MODEL`. Four-face icon roster rerolls on start/stop (T4.7), now wearing the real T4.3/T4.4 cuts; header caustic shimmer (T4.5). |
+| Cockpit (mac app) | `macapp/` | **New** — XcodeGen project; **AppKit-hosted** SwiftUI (`SeaStarMain` → `AppDelegate`, `NSStatusItem` + `NSPopover`). `App/ Views/ Models/ Services/ Support/ Shaders/`; builds, launches, 16 Swift tests pass. Right-click app menu + Settings window + GitHub-Releases update check. Vault + model + harness pick-lists wired to `SEASTAR_VAULT`/`SEASTAR_MODEL`/`SEASTAR_BASE_URL`. Four-face icon roster rerolls on start/stop (T4.7); real T4.3/T4.4 cuts; header caustic shimmer (T4.5). |
 
 ## File ownership
 
@@ -270,3 +288,86 @@ No parallel agents active. Single-writer.
 - Founder's `.icns` export for T4.4 (the app icon is the last unwired piece), or a live
   run-through of the harness picker against 8009 to confirm the sweep names oMLX correctly;
   then fold the port-sweep commit into draft PR #2.
+
+## Handoff — 2026-09-25 (app menu + settings + updates)
+
+**Completed**
+
+- **Right-click menu — the founder's "must have" (spec §8.6).** `MenuBarExtra` gives no
+  right-click hook, so the shell was rebuilt on AppKit: new `@main enum SeaStarMain` starts
+  `NSApplication` directly and hands to a new `App/AppDelegate.swift`, which owns the
+  `NSStatusItem` and shows an `NSMenu` on right-click / ⌃-click — Check for Updates…,
+  Settings… (⌘,), Help & Comments, Patchdog, a disabled version line, Quit Sea-Star (⌘Q).
+  Left-click still opens the popover. The popover and settings are the *same* SwiftUI views,
+  hosted in `NSPopover` / `NSHostingController`. `App/SeaStarApp.swift` (old `MenuBarExtra`
+  shell) was deleted. New `Support/Links.swift` (all URLs) and `Support/AppInfo.swift`
+  (bundled version/build).
+- **Settings window (spec §8.4).** New `Views/SettingsView.swift`: engine resolution + path,
+  a **searchable** scrolling vault list with Open folder… / Use detected vault, harness/model
+  pickers, an inline update check, and links.
+- **GitHub Releases update check (spec §8.5).** New `Services/UpdateChecker.swift` +
+  pure `Version.isNewer` (dotted-number compare, leading `v` and ragged segments tolerated);
+  offers the release page only when genuinely newer, says so plainly on failure.
+- **Vault / model / panel fixes.** The vault row gained **Open folder…** (folder picker →
+  `SEASTAR_VAULT`) and no longer greys out when a folder entry is reachable; the model row now
+  follows the **selected harness** (`currentHarness.models`), so the oMLX-only Qwen model
+  appears on switch; the popover's detail body **scrolls** (pinned header + controls).
+- **Verified:** `xcodegen generate` → `xcodebuild … test` → **16 tests in 5 suites passing**;
+  `… build` → **BUILD SUCCEEDED**.
+- Updated `spec.md` (§4 AppKit host; new §8.1–§8.6), `CHANGELOG.md` and this file.
+
+**Half-finished / open**
+
+- The right-click menu, settings window and update alert have **compiled and are unit-tested
+  but not yet eyeballed by the founder** in a running build — worth a live pass.
+- `Patchdog` points at a **placeholder URL** (`github.com/Roqett/patchdog`) and the agent
+  repo itself does not exist yet.
+- Start/stop still does not watch the child's exit (state can go stale if `serve` dies).
+- Graph embedding (T4.2), re-index (T4.1) and operator docs (T6.x) are untouched; `.icns`
+  app icon (T4.4) still pending the founder.
+- Not yet committed — the AppKit shell + settings + updates are staged on
+  `feat/macapp-cockpit`.
+
+**Single next step**
+
+- Live run-through of the new build (right-click menu → Settings → Check for Updates), then
+  commit the work and fold it into draft PR #2.
+
+## Handoff — 2026-09-25 (cockpit strips, logs & the starfield)
+
+**Done**
+
+- **Start/Refresh de-capsuled (spec §8).** Removed the `GlassEffectContainer` pills; both are now
+  plain SF Mono words, toned down, with **Start in the left corner and Refresh in the right** and
+  a clean band of space above/below. A **blue-white nudibranch strip** frames that band.
+- **Strips in the app (spec §7).** Three 3px ribbons added as imagesets (`NudiBlueWhite`,
+  `NudiGreenOrange1/2`, `template-rendering-intent: original`) and wrapped in
+  `Views/NudiStrip.swift` (`expands` = full-width rule vs. fixed stroke).
+- **Logs (spec §8.8).** New `Services/LogStore.swift` (engine `stdout`/`stderr` → one file,
+  prune-on-write, pure testable `retained`); collapsible cockpit **Logs** panel (strips top/bottom,
+  SF Mono, blue ink, selectable); Settings → **Logs** retention picker (Forever/7/14/30, default
+  14), entry count, **Clear now**, **Reveal in Finder**.
+- **Entity graph (spec §8.7).** `Views/EntityGraphView.swift` + segmented **Graph | List** toggle
+  (List default); glowing vault/harness/model nodes, rotated-strip connection, tap-to-select via
+  the existing controller calls.
+- **Verified:** `xcodegen generate` → `xcodebuild … test` → **20 tests in 6 suites passing**;
+  `… build` → **BUILD SUCCEEDED**. Updated `spec.md` (§8.7, §8.8), `CHANGELOG.md` and this file.
+
+**Half-finished / open**
+
+- The **light-appearance** log ink (`logInkLight` / `logSurfaceLight`) is defined but the panel
+  always uses the dark end, because the cockpit canvas is always the dark rockpool. Make the
+  popover itself adaptive if the founder wants a true light mode.
+- The **entity graph is a first pass** — static (no water drift), and the founder has more
+  coloured strip combinations to drop in.
+- **Deferred by the founder, not started:** per-harness **tips** (new-harness setup hint,
+  wrong-vault reminder, a note that expands/contracts from the starfish), an **MCP/browser
+  probe** for current harness info, and optional **voice** that piggybacks the active harness.
+- Founder offered to **sample hex codes** from the artwork — useful for matching the log ink and
+  the strip colours precisely.
+- Not yet committed — this slice sits alongside the AppKit shell on `feat/macapp-cockpit`.
+
+**Single next step**
+
+- Founder's live look at the new cockpit (strips, Logs dropdown, Graph/List toggle), then commit
+  and fold into draft PR #2.
