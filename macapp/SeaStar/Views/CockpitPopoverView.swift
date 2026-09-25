@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -63,6 +64,15 @@ struct CockpitPopoverView: View {
     private var mode: CockpitMode { CockpitMode.resolved(from: modeRaw) }
     private var hasChosenMode: Bool { CockpitMode(rawValue: modeRaw) != nil }
 
+    /// The most the whole cockpit may occupy before the middle section starts
+    /// scrolling instead of growing. Without this the header, the 320pt body,
+    /// the logs panel and the controls simply stack, and on a shorter display
+    /// the bottom runs off the screen and is clipped (spec §8).
+    private var maxPopoverHeight: CGFloat {
+        let usable = NSScreen.main?.visibleFrame.height ?? 800
+        return max(320, usable - 96)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
@@ -88,6 +98,7 @@ struct CockpitPopoverView: View {
         }
         .padding(18)
         .frame(width: 320)
+        .frame(maxHeight: maxPopoverHeight)
         .background(Palette.canvas)
         .task { await controller.refresh() }
         .fileImporter(

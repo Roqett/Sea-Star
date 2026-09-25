@@ -11,6 +11,27 @@ Harness: TRAE
 Date: 2026-09-26
 
 Summary of Changes:
+- **The cockpit no longer runs off the bottom of the screen (spec §8).** The panel's height was
+  only ever whatever its stacks added up to — an unbounded body plus a 150pt logs panel plus the
+  header and the controls — so on a shorter display (or with the logs open) the bottom fell off
+  the screen and was clipped. The whole cockpit is now capped to the screen's usable height
+  (`NSScreen.visibleFrame` less a margin) and the middle section scrolls to fit, so every control
+  stays reachable.
+- **Operator instructions, in both tracks (spec §10 / T6.x).** New `docs/use-the-app.md`: the
+  menu-bar Cockpit on one side (get it, open it, read what it found, choose, go) and the exact
+  terminal equivalent on the other, headed by the parity table so no step exists on only one
+  side. Linked from `docs/README.md` and the root `README.md`. It also records that macOS builds
+  do **not** have to be shell-first (Xcode's own headless `xcrun mcpbridge`, §9.1) and that the
+  `.icns` app icon (T4.4) is unnecessary while the app is `LSUIElement` (no Dock presence).
+- **A no-go zone for every agent (AGENTS.md).** The founder's external drive — and any mirror of
+  it — is off-limits: no reading, indexing, embedding, summarising or transmitting anything from
+  it to a cloud or third-party model. Local-only at most, and only on an explicit written ask.
+
+Harness: TRAE
+
+Date: 2026-09-26
+
+Summary of Changes:
 - **The mode switch moved into the header (spec §8.7).** The cockpit's Graph/List choice was a text
   capsule sitting in the body; it is now two standard Apple symbols — connected points for the
   graph, a bulleted list for the rows — up with the **"ready"** pill and the gear, the active

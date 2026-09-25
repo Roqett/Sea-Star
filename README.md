@@ -28,6 +28,7 @@ Four pages, one for wherever you're starting from. Start at the
 | I want to…                                                   | Read                                               |
 | ------------------------------------------------------------ | -------------------------------------------------- |
 | Understand what this is, in plain English (no jargon)        | [docs/start-here.md](docs/start-here.md)           |
+| Run it day to day — by clicking or by typing                 | [docs/use-the-app.md](docs/use-the-app.md)         |
 | Connect Sea-Star to Osaurus / Claude Desktop / Cursor / TRAE | [docs/connect.md](docs/connect.md)                 |
 | See every command, tool, setting and runtime                 | [docs/reference.md](docs/reference.md)             |
 | Fix something that's broken                                  | [docs/troubleshooting.md](docs/troubleshooting.md) |

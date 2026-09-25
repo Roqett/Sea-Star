@@ -7,7 +7,7 @@ note at the end of every session.
 
 - **Version:** 0.1.0 (unreleased). Repo is **private** until built and tested.
 - **Health:** `uv run ruff check .` clean; `uv run pytest` — 51 passing. App:
-  `xcodebuild … test` — 20 Swift Testing cases passing (6 suites).
+  `xcodebuild … test` — 28 Swift Testing cases passing (8 suites).
 - **Bridge:** `sea-star doctor --json` now emits the full §6 contract —
   `schema_version`, nested `vault {path, source, note_count, candidates}`, `server.state`,
   and `runtimes[]` (one object per live harness). Always one JSON object, even on failure.
@@ -383,3 +383,44 @@ No parallel agents active. Single-writer.
 
 - Founder's look at the moving starfield, the starfish tip note, and the findable Logs row; then
   fold the branch into draft PR #2.
+
+## Handoff — 2026-09-26 (popover fit, operator docs, shipped)
+
+**Done**
+
+- **Pushed the branch; draft PR #2 refreshed.** The four cockpit commits (AppKit shell,
+  strips/logs/graph, starfield, harness tip) had never been pushed; they now are, and PR #2's
+  body describes the whole engine + app change set. Checks re-run green first.
+- **AGENTS.md committed — the no-go zone.** The founder's external drive (and any mirror of it)
+  is off-limits to every agent: no reading, indexing, embedding, summarising or transmitting
+  anything from it to a cloud or third-party model; local-only at most, and only on an explicit
+  written ask.
+- **The cockpit is capped to the screen (spec §8).** It was only ever as tall as its stacks summed
+  to, so on a shorter display — or with Logs open — the bottom was clipped: exactly the "I can't
+  see the whole thing" the founder hit. `CockpitPopoverView` now frames to
+  `NSScreen.visibleFrame` less a margin and the middle section scrolls instead of spilling;
+  `import AppKit` added. Verified: `xcodebuild … test` → **28 tests in 8 suites passing**.
+- **Operator instructions written (T6.x).** New `docs/use-the-app.md` — a GUI-first track (the
+  Cockpit) and a terminal-first track (the exact commands), with the parity table up top; wired
+  into `docs/README.md` (door + map) and the root `README.md` (docs table). It also records that
+  macOS builds do **not** have to be shell-first (§9.1) and that the `.icns` (T4.4) is
+  unnecessary while the app is `LSUIElement` (no Dock presence).
+- **CHANGELOG.md + this file** updated.
+
+**Half-finished / open**
+
+- **T4.2 (embed the graph web UI) is superseded** — the graph was built natively instead
+  (`Views/EntityGraphView.swift`), so no `WKWebView` → `localhost:9749` embed is planned; confirm
+  with the founder before closing it in `tasks.md`.
+- **T4.1 re-index** (codebase-memory) and **T4.4 `.icns`** remain. The icon is now judged
+  unnecessary (no Dock presence); the re-index is dev-machine hygiene, not a shippable change.
+- **Onboarding shape — founder's new idea, not started.** The one-time Graph/List chooser should
+  grow into proper on-boarding: the two readings shown as **two large, distinct panels** to pick
+  between, with the header expanding to hold them; the header toggle takes over once a choice
+  exists. Founder asked to keep it lightweight and do it **later**. Recorded, not built.
+- The popover fit and the docs are **committed on `feat/macapp-cockpit`** and folded into PR #2.
+
+**Single next step**
+
+- Founder: relaunch the app to see the fit fix; then decide whether T4.2 closes as superseded and
+  whether to schedule the two-panel onboarding.
