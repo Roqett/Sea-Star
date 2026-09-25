@@ -16,26 +16,29 @@ private struct GraphNode: Identifiable {
 /// nudibranch strip — the ribbon literally shoots out at the thing it connects
 /// to. Clicking a node selects it, which is what "making the connection" means.
 ///
-/// First pass: the geometry is deterministic (vault left, harnesses right,
-/// models ringing the active harness) and the drift is still. Motion and
-/// harness tips are the next slice; this proves the shape.
+/// The geometry is deterministic (vault left, harnesses right, models ringing the
+/// active harness) and the orbs drift on their own slow current; `reduceMotion`
+/// stills the whole pool. Harness tips are the next slice.
 struct EntityGraphView: View {
     let controller: ServerController
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovered: String?
     @State private var selected: String?
+    /// How far the connection ribbon has grown out of the vault, 0…1. Reset and
+    /// re-run whenever the active harness changes, so the strip visibly *shoots*
+    /// from the vault at the thing it just connected to.
+    @State private var connectProgress: CGFloat = 0
 
     private let margin: CGFloat = 30
 
     var body: some View {
-        GeometryReader { geo in
-            let points = layout(in: geo.size)
-            ZStack {
-                connectionLayer(points)
-                ForEach(nodes) { node in
-                    if let point = points[node.id] {
-                        nodeView(node, at: point)
-                    }
+        Group {
+            if reduceMotion {
+                pool(at: 0, animated: false)
+            } else {
+                TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                    pool(at: timeline.date.timeIntervalSinceReferenceDate, animated: true)
                 }
             }
         }
@@ -43,6 +46,60 @@ struct EntityGraphView: View {
         .background(backdrop)
         .overlay(alignment: .bottomLeading) { readout }
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .onAppear { growConnection() }
+        .onChange(of: activeHarnessID) { _, _ in growConnection() }
+    }
+
+    /// The pool at one instant: static geometry plus a slow, per-node drift so the
+    /// orbs float rather than sit. `time` is seconds since the reference date.
+    private func pool(at time: Double, animated: Bool) -> some View {
+        GeometryReader { geo in
+            let points = drifted(layout(in: geo.size), at: time, animated: animated)
+            ZStack {
+                connectionLayer(points, time: time, animated: animated)
+                ForEach(nodes) { node in
+                    if let point = points[node.id] {
+                        nodeView(node, at: point, time: time, animated: animated)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Each orb rides its own phase of the same current, so the pool never reads
+    /// as a rigid grid sliding around.
+    private func drifted(
+        _ points: [String: CGPoint],
+        at time: Double,
+        animated: Bool
+    ) -> [String: CGPoint] {
+        guard animated else { return points }
+        var result: [String: CGPoint] = [:]
+        for (id, point) in points {
+            let phase = Self.phase(for: id)
+            result[id] = CGPoint(
+                x: point.x + sin(time * 0.22 + phase) * 2.4,
+                y: point.y + cos(time * 0.17 + phase * 1.3) * 2.0
+            )
+        }
+        return result
+    }
+
+    /// A stable 0…2π phase from a node id, so the same entity always drifts the
+    /// same way and nothing jitters between redraws.
+    private static func phase(for id: String) -> Double {
+        var hash: UInt64 = 1469598103934665603
+        for byte in id.utf8 { hash = (hash ^ UInt64(byte)) &* 1099511628211 }
+        return Double(hash % 6283) / 1000.0
+    }
+
+    private func growConnection() {
+        if reduceMotion {
+            connectProgress = 1
+        } else {
+            connectProgress = 0
+            withAnimation(.easeOut(duration: 0.5)) { connectProgress = 1 }
+        }
     }
 
     // MARK: - Model
@@ -126,7 +183,11 @@ struct EntityGraphView: View {
     // MARK: - Layers
 
     @ViewBuilder
-    private func connectionLayer(_ points: [String: CGPoint]) -> some View {
+    private func connectionLayer(
+        _ points: [String: CGPoint],
+        time: Double,
+        animated: Bool
+    ) -> some View {
         if let vault = points["vault"],
            let active = activeHarnessID,
            let target = points[active],
@@ -136,16 +197,29 @@ struct EntityGraphView: View {
             let length = max(sqrt(dx * dx + dy * dy), 1)
             NudiStrip(style: .blueWhite, height: 3, expands: false)
                 .frame(width: length, height: 3)
+                // Reveal from the vault end, so the ribbon grows *out of* the
+                // vault toward the harness it just connected to.
+                .mask(alignment: .leading) {
+                    Rectangle().frame(width: length * connectProgress)
+                }
                 .rotationEffect(.radians(atan2(dy, dx)))
                 .position(x: (vault.x + target.x) / 2, y: (vault.y + target.y) / 2)
+                .opacity(animated ? 0.8 + 0.2 * (0.5 + 0.5 * sin(time * 0.9)) : 1)
                 .shadow(color: Palette.harnessGlow.opacity(0.6), radius: 5)
         }
     }
 
-    private func nodeView(_ node: GraphNode, at point: CGPoint) -> some View {
+    private func nodeView(
+        _ node: GraphNode,
+        at point: CGPoint,
+        time: Double,
+        animated: Bool
+    ) -> some View {
         let isActive = hovered == node.id || selected == node.id
         let size: CGFloat = node.kind == .model ? 11 : (node.kind == .vault ? 22 : 18)
-        return Circle()
+        // A slow breath in the glow, each orb on its own phase.
+        let pulse = animated ? 0.5 + 0.5 * sin(time * 1.1 + Self.phase(for: node.id)) : 0.5
+        let orb = Circle()
             .fill(RadialGradient(
                 colors: [node.accent, node.accent.opacity(0.12)],
                 center: .center,
@@ -154,25 +228,36 @@ struct EntityGraphView: View {
             ))
             .overlay(Circle().stroke(node.accent.opacity(0.85), lineWidth: 1))
             .frame(width: size, height: size)
-            .shadow(color: node.accent.opacity(isActive ? 0.95 : 0.5), radius: isActive ? 10 : 5)
-            .scaleEffect(isActive ? 1.25 : 1)
-            .overlay(alignment: .bottom) {
-                if isActive {
-                    Text(node.title)
-                        .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Palette.bone)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .offset(y: size / 2 + 12)
-                }
+            .shadow(
+                color: node.accent.opacity(isActive ? 0.95 : 0.35 + 0.3 * pulse),
+                radius: isActive ? 10 : 4 + 3 * pulse
+            )
+
+        return Group {
+            if animated {
+                orb.caustics(size: size * 2)
+            } else {
+                orb
             }
-            .position(point)
-            .onHover { hovering in
-                if hovering { hovered = node.id }
-                else if hovered == node.id { hovered = nil }
+        }
+        .scaleEffect(isActive ? 1.25 : 1)
+        .overlay(alignment: .bottom) {
+            if isActive {
+                Text(node.title)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Palette.bone)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .offset(y: size / 2 + 12)
             }
-            .onTapGesture { select(node) }
-            .animation(.easeInOut(duration: 0.18), value: isActive)
+        }
+        .position(point)
+        .onHover { hovering in
+            if hovering { hovered = node.id }
+            else if hovered == node.id { hovered = nil }
+        }
+        .onTapGesture { select(node) }
+        .animation(.easeInOut(duration: 0.18), value: isActive)
     }
 
     private var backdrop: some View {

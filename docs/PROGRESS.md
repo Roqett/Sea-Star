@@ -349,25 +349,29 @@ No parallel agents active. Single-writer.
   14), entry count, **Clear now**, **Reveal in Finder**.
 - **Entity graph (spec §8.7).** `Views/EntityGraphView.swift` + segmented **Graph | List** toggle
   (List default); glowing vault/harness/model nodes, rotated-strip connection, tap-to-select via
-  the existing controller calls.
+  the existing controller calls. Now **animated**: per-node water drift, breathing glow, `caustics`
+  highlight, and a connection ribbon that grows out of the vault on every active-harness change;
+  all of it stills under Reduce Motion.
+- **Logs toggle made discoverable.** The bare Logs word is now a disclosure row (chevron, terminal
+  mark, live count, hover fill, Show/Hide tooltip).
 - **Verified:** `xcodegen generate` → `xcodebuild … test` → **20 tests in 6 suites passing**;
-  `… build` → **BUILD SUCCEEDED**. Updated `spec.md` (§8.7, §8.8), `CHANGELOG.md` and this file.
+  `… build` → **BUILD SUCCEEDED**. `uv run ruff check .` + `uv run pytest` → **51 passed**. Updated
+  `spec.md` (§8.7, §8.8), `CHANGELOG.md` and this file.
+- **Committed** as `12cdcaa` on `feat/macapp-cockpit` (AppKit shell + cockpit/strips/logs/graph +
+  docs), with the animation slice to follow.
 
 **Half-finished / open**
 
 - The **light-appearance** log ink (`logInkLight` / `logSurfaceLight`) is defined but the panel
   always uses the dark end, because the cockpit canvas is always the dark rockpool. Make the
   popover itself adaptive if the founder wants a true light mode.
-- The **entity graph is a first pass** — static (no water drift), and the founder has more
-  coloured strip combinations to drop in.
+- The **entity graph** is animated now; the founder still has more coloured strip combinations to
+  drop in, and offered to sample hex codes from the artwork for exact ink matching.
 - **Deferred by the founder, not started:** per-harness **tips** (new-harness setup hint,
   wrong-vault reminder, a note that expands/contracts from the starfish), an **MCP/browser
   probe** for current harness info, and optional **voice** that piggybacks the active harness.
-- Founder offered to **sample hex codes** from the artwork — useful for matching the log ink and
-  the strip colours precisely.
-- Not yet committed — this slice sits alongside the AppKit shell on `feat/macapp-cockpit`.
 
 **Single next step**
 
-- Founder's live look at the new cockpit (strips, Logs dropdown, Graph/List toggle), then commit
-  and fold into draft PR #2.
+- Founder's look at the moving starfield and the findable Logs row; then fold the branch into
+  draft PR #2.

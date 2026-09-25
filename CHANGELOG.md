@@ -11,6 +11,23 @@ Harness: TRAE
 Date: 2026-09-25
 
 Summary of Changes:
+- **The starfield moves (spec §8.7).** The entity graph is no longer a still frame. The orbs now
+  drift on a slow per-node current (each entity's phase is hashed from its id, so nothing jitters
+  between redraws), their glow breathes, and the vault↔harness connection **grows out of the
+  vault** — the nudibranch ribbon is masked from the vault end and drawn on whenever the active
+  harness changes, so the strip visibly *shoots out* at the thing it just connected to. Each orb
+  also picks up the `caustics` Metal highlight used elsewhere. The whole pool stills under
+  **Reduce Motion**.
+- **The Logs toggle is findable.** The cockpit's Logs control was a bare mauve word nobody could
+  spot; it is now a proper disclosure row — a rotating chevron, a terminal mark, the title and a
+  live entry count, with a hover fill and a Show/Hide tooltip — so the panel is obvious to open
+  and close.
+
+Harness: TRAE
+
+Date: 2026-09-25
+
+Summary of Changes:
 - **Cockpit controls de-capsuled (spec §8).** The glass Start/Refresh pills are gone. Both are
   now plain mono words — small, toned down, the way Apple draws a text button — with **Start in
   the left corner and Refresh in the right**, and a clean band of space above and below the
