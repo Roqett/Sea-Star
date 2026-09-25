@@ -11,6 +11,107 @@ Harness: TRAE
 Date: 2026-09-25
 
 Summary of Changes:
+- **Real faces wired in (spec T4.3/T4.4 cuts).** The roster now points at the founder's
+  actual artwork: each face ships two asset-catalog imagesets — `Face*Header` (40/80/120px)
+  and `Face*MenuBar` (18/36/54px) — all black-ink-on-transparent, `template-rendering-intent:
+  template`. The menu bar wears the solid silhouette (fine line art turns to grey mush at
+  18pt); the popover header wears the full-detail cut, tinted by the face's accent. Both are
+  templates because the ink lives in the alpha channel — that is what keeps the filigree
+  readable on the near-black canvas, where the original black-on-clear art would vanish.
+- **Header caustic shimmer (spec T4.5).** A new stitchable Metal shader
+  (`Shaders/Caustics.metal`, wrapped by `Views/CausticsEffect.swift`) drifts a slow
+  value-noise highlight across the header mark only. The highlight is gated by the artwork's
+  own alpha, so the silhouette never moves — only the light travelling across it does — and
+  the whole effect is disabled under **Reduce Motion**. Header-only: the menu-bar glyph stays
+  a flat tinted glyph, where motion would just be noise.
+- **`AppIconMark` renders both cuts as templates and sizes raster art explicitly.** Raster
+  images ignore `.font`, so a `size` parameter now frames them (`resizable().scaledToFit()`),
+  with the SF Symbol fallback kept behind it. `CockpitPopoverView` shares one `markSize`
+  constant between the mark and the shimmer so the two can't drift apart.
+- **Easter egg: the app has four faces and changes it on open/shut.** All four of the
+  founder's icons are held in one roster (`Support/IconRoster.swift`) and the app wears one
+  at a time. Every time the server is started or stopped it rerolls to a **different** face —
+  never the one that just went away, which is the bit that makes the change read as
+  deliberate. The face shows on **both** surfaces: the menu-bar glyph and the popover header
+  (each face also carries its own glow colour, so the swap is obvious).
+- **`ServerController` now owns `currentIcon`** and advances it on genuine start/stop
+  transitions (and on a vault/model switch, which restarts). The controller is hoisted into
+  `SeaStarApp` so the `MenuBarExtra` glyph is state-driven rather than a fixed symbol, and the
+  popover reads the same instance.
+- **Multi-harness detection (fixes the "Refresh missed my model" bug).** The engine's
+  `detect_runtime()` probed `KNOWN_RUNTIMES` in order and adopted the **first** that
+  answered, so if Osaurus (1337) was up it always won and shadowed oMLX/Ollama/LM Studio —
+  the panel showed `osaurus · foundation` instead of the model being loaded elsewhere.
+  `config.py` now exposes `probe_runtimes()`, which probes **every** known runtime
+  concurrently (one `PROBE_TIMEOUT_SECONDS` budget via `asyncio.gather`) and returns a
+  `RuntimeProbe` per live responder, de-duplicated by endpoint (oMLX and vLLM share port
+  8000; the first-known name labels it). `detect_runtime(probes=…)` and
+  `load_config(probes=…)` reuse the survey, so single-runtime machines behave exactly as
+  before while multi-harness machines see all of them.
+- **The bridge now carries `runtimes[]` (spec §6).** `doctor --json` emits one object per
+  live harness (`name`, `base_url`, `model`, `models`); the key is optional and
+  `schema_version` stays `1` — the engine only ever adds keys, so an older app still decodes.
+- **Cockpit: harness pick-list (spec §8).** The Harness row becomes a `PickerRow` when more
+  than one harness is live and a plain `StatusRow` otherwise; the current choice is labelled
+  `name · url` (an endpoint alone can't say which app answers on a shared port). Switching
+  pins `SEASTAR_BASE_URL` + `SEASTAR_RUNTIME` — the same knobs the engine reads — and clears
+  any model override, since the old model may not exist on the new endpoint.
+- **Build note:** `.metal` files need Xcode's separately-downloadable Metal toolchain; on a
+  fresh machine run `xcodebuild -downloadComponent MetalToolchain` before building.
+- **Tests:** `IconRoster` (four distinct faces; a reroll never repeats the current face;
+  a reroll with nothing showing still returns a face) plus the cockpit's opening face and
+  the new `runtimes[]` decode — `xcodebuild … test` → **12 tests in 4 suites passing**;
+  `… build` → **BUILD SUCCEEDED**; `Assets.car` (40 KB) and `default.metallib` (69 KB)
+  confirmed in the bundle; app launches without crashing. Python: `pytest` → **46 passed**
+  (5 new multi-harness cases: every live server reported, known order kept, shared port
+  de-duped, a survey reused without re-probing, fails loud when nothing answers).
+
+Harness: TRAE
+
+Date: 2026-09-25
+
+Summary of Changes:
+- **Cockpit: vault and model pick-lists (spec T3.2/T3.3).** The popover now offers the
+  other Obsidian-known vaults (`vault.candidates`) and the endpoint's models (`models`),
+  with the current choice shown in-row and checked in the menu. Switching re-runs the
+  bridge with `SEASTAR_VAULT` / `SEASTAR_MODEL` pinned — the same knobs `resolve_vault`
+  and `load_config` already read — so no engine change was needed. Choosing while the
+  server is running restarts it so the new choice takes effect.
+- **`EngineCommand.Invocation` now carries environment overrides**, threaded through
+  `EngineClient.doctor` and `ServerController` and merged over the inherited environment.
+  New Swift tests cover the threading and the empty-choice case (7 tests / 3 suites;
+  `xcodebuild build` + `test` green).
+
+Harness: TRAE
+
+Date: 2026-09-25
+
+Summary of Changes:
+- **macOS menu-bar app ("Cockpit") scaffolded** under `macapp/` — a SwiftUI
+  `MenuBarExtra` app that wraps the engine with no terminal. XcodeGen project
+  (`project.yml`), bundle id `UpPeriscope.Sea-Star`, deployment target macOS 26.0,
+  files split `App/ Views/ Models/ Services/ Support/`. Builds, launches, and its four
+  Swift Testing cases pass. The menu-bar mark is a placeholder SF Symbol until the
+  founder's monochrome template icon lands (spec T4.3).
+- **`doctor --json` reshaped to the full §6 bridge contract.** It now emits
+  `schema_version` and a nested `vault { path, source, note_count, candidates }` object
+  (was a flat `vault` string + `notes`), plus `server.state`. One JSON object, always,
+  even on failure; human output stays the default.
+- **Vault resolution moved into `config.py`:** `detect_vault_candidates()` (open-first,
+  then most-recent) and `resolve_vault()` returning `(path, source)` with `source` ∈
+  `env` / `toml` / `obsidian`, failing loud when none resolves — so the app can show
+  *why* a vault won and offer the alternatives.
+- **`tests/test_cli.py` added** for the JSON bridge (shape, fail-loud single object,
+  human default), and `tests/test_config.py` extended with vault candidate/resolution and
+  `allows()` coverage (spec T1.5/T1.6/T1.8). Engine: `ruff` clean, **40 tests** passing.
+- **`macapp/SeaStar/Services/EngineClient.swift` + `Models/DoctorReport.swift`** — the app
+  decodes the bridge object; it never scrapes human-formatted text.
+
+Harness: TRAE
+
+Date: 2026-09-25
+
+Summary of Changes:
 - **`doctor --json` — the app bridge contract.** `sea-star doctor` now takes `--json` and
   always emits one JSON object (vault, notes, runtime, base_url, model, models, bridged
   servers), even on failure, so a host app can poll it instead of scraping rich text. The

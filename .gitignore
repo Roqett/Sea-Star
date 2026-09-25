@@ -30,3 +30,11 @@ assets/reference/
 # EXCEPT the mac-app spec set, which is a tracked design document (the lodestone).
 .trae/*
 !.trae/specs/
+
+# macOS app — the Xcode project and Info.plist are generated from macapp/project.yml
+# (`xcodegen generate`); regenerate rather than commit them.
+macapp/*.xcodeproj/
+macapp/*.xcworkspace/
+macapp/SeaStar/Support/Info.plist
+**/xcuserdata/
+**/DerivedData/
