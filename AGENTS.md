@@ -181,4 +181,5 @@ Never edit this file unless the founder explicitly asks for a lasting rule. In t
 - **Protocol access rules:** `inference.py` is the only permitted path to a model. `vault.py` is the only permitted path to a vault. The agent loop calls tools; it never reaches into a vault or an endpoint itself.
 - **Named exceptions:** none yet.
 - **Privacy/product-value clauses:** on-device by default; no cloud fallback unless the founder explicitly configures and approves one; nothing leaves the house quietly.
+- **No-go zones (founder rule, 2026-09-26):** The founder's **external drive and any mirror of it** (including its Obsidian vault) are off-limits. No agent or harness may read, index, embed, summarise, quote, or transmit anything from it to a cloud API or third-party model — local-only at most — unless the founder explicitly asks for a specific item in writing. This matches the standing default: don't go there unless asked.
 - **Mirrors:** `~/.trae/memory/user_profile.md`, `README.md`, `CHANGELOG.md`.
