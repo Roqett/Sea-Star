@@ -19,10 +19,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
 
     /// A first guess only. The hosting controller carries `.preferredContentSize`,
-    /// so the cockpit reports its own width — 340 for the rows, 460 for the
+    /// so the cockpit reports its own width — 360 for the rows, 600 for the
     /// starfield (spec §8.7) — and the popover follows it. This just avoids an
     /// undersized flash before that lands, so it matches the opening reading.
-    private static let popoverSize = NSSize(width: 460, height: 720)
+    private static let popoverSize = NSSize(width: 600, height: 820)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureStatusItem()

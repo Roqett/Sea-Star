@@ -76,6 +76,11 @@ enum Strings {
         static let list = "List"
         static let graphHelp = "Show the graph"
         static let listHelp = "Show the list"
+        /// The tide-out control on the starfield: puts the pool back the way it
+        /// was found after it has been dragged, zoomed or turned (spec §8.7).
+        static let recentre = "Recentre"
+        static let recentreHelp = "Put the pool back the way it was"
+        static let panHint = "Drag to drift, pinch to zoom, twist to turn"
     }
 
     /// The one-time choice between the two readings, offered on first launch

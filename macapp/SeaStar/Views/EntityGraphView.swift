@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// One thing in the rockpool: a vault, a harness, or a model.
@@ -11,14 +12,102 @@ private struct GraphNode: Identifiable {
     let accent: Color
 }
 
-/// The starfield (spec §8.7): vaults, harnesses and models as glowing orbs
-/// drifting in water, with the active harness joined to the vault by a
-/// nudibranch strip — the ribbon literally shoots out at the thing it connects
-/// to. Clicking a node selects it, which is what "making the connection" means.
+/// A plain star polygon — `arms` outer points on a circle with `arms` valleys
+/// pulled in between them. The same shape draws both the faint outline behind
+/// the pool and, five-armed, the mark each entity wears.
+private struct StarShape: Shape {
+    var arms: Int
+    var innerRatio: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let centre = CGPoint(x: rect.midX, y: rect.midY)
+        let outer = min(rect.width, rect.height) / 2
+        let inner = outer * innerRatio
+        let total = max(arms, 3) * 2
+        for index in 0..<total {
+            let radius = index.isMultiple(of: 2) ? outer : inner
+            let angle = -Double.pi / 2 + Double(index) / Double(total) * 2 * .pi
+            let point = CGPoint(
+                x: centre.x + radius * cos(angle),
+                y: centre.y + radius * sin(angle)
+            )
+            if index == 0 { path.move(to: point) } else { path.addLine(to: point) }
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
+/// The multicoloured star a single entity wears. Its hues are *seeded* from the
+/// entity id — never random — so a given vault, harness or model always spins the
+/// same unique blend around its own entity colour. The structure stays a plain
+/// five-armed sea-star; only the tint and its rotation differ, which is what makes
+/// each node read as its own thing rather than a copy (spec §8.7).
+private struct SeaStarGlyph: View {
+    let accent: Color
+    let seed: Double
+    let isActive: Bool
+
+    var body: some View {
+        let shape = StarShape(arms: 5, innerRatio: 0.42)
+        let stops: [Gradient.Stop] = (0..<6).map { index in
+            let location = Double(index) / 6
+            return Gradient.Stop(
+                color: Self.shift(accent, by: seed / 6 + location * 0.4),
+                location: location
+            )
+        }
+        ZStack {
+            shape.fill(
+                AngularGradient(
+                    gradient: Gradient(stops: stops),
+                    center: .center,
+                    angle: .radians(seed)
+                )
+            )
+            shape.stroke(accent.opacity(0.9), lineWidth: 0.8)
+            Circle()
+                .fill(RadialGradient(
+                    colors: [Palette.bone.opacity(0.95), accent.opacity(0)],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: isActive ? 7 : 4.5
+                ))
+        }
+        .rotationEffect(.radians(seed * 0.5))
+    }
+
+    /// Rotate a colour's hue by `delta` (0…1 = a full turn), keeping its
+    /// saturation and brightness. Gives the arm-to-arm shimmer its palette.
+    private static func shift(_ color: Color, by delta: Double) -> Color {
+        let ns = NSColor(color).usingColorSpace(.sRGB) ?? .white
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+        ns.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
+        var shifted = (hue + CGFloat(delta)).truncatingRemainder(dividingBy: 1)
+        if shifted < 0 { shifted += 1 }
+        return Color(
+            hue: Double(shifted),
+            saturation: Double(saturation),
+            brightness: Double(min(1, brightness * 1.06)),
+            opacity: Double(alpha)
+        )
+    }
+}
+
+/// The starfield (spec §8.7): vaults, harnesses and models as glowing sea-stars
+/// drifting in water. The majors — the vault and its harnesses — sit on the tips
+/// of an N-pointed star, so four majors read as a four-pointed star, seven as
+/// seven, and a faint star outline is traced behind them. Models ring the active
+/// harness, and the active harness is joined to the vault by a nudibranch strip.
 ///
-/// The geometry is deterministic (vault left, harnesses right, models ringing the
-/// active harness) and the orbs drift on their own slow current; `reduceMotion`
-/// stills the whole pool. Harness tips are the next slice.
+/// The whole pool is tactile: drag to drift it, pinch to zoom, twist to turn it
+/// as if it were an object in your hand, and the recentre control tides it back.
+/// The geometry is deterministic (seeded per node) and the orbs drift on their
+/// own slow current; `reduceMotion` stills the pool.
 struct EntityGraphView: View {
     let controller: ServerController
     /// The pool's height in points. The cockpit opens it taller for the visual
@@ -36,7 +125,19 @@ struct EntityGraphView: View {
     /// starfish expands and contracts it (spec §8.7).
     @State private var tipExpanded = true
 
-    private let margin: CGFloat = 30
+    /// The pool as an object you can hold: its pan, zoom and turn, with the
+    /// committed resting values each gesture returns to.
+    @State private var offset: CGSize = .zero
+    @State private var scale: CGFloat = 1
+    @State private var rotation: Angle = .zero
+    @State private var panBase: CGSize = .zero
+    @State private var scaleBase: CGFloat = 1
+    @State private var rotationBase: Angle = .zero
+
+    /// How far the star's points stand off the pool's edge, and how deep its
+    /// valleys cut between them.
+    private let starInset: CGFloat = 16
+    private let starInnerRatio: CGFloat = 0.42
 
     var body: some View {
         Group {
@@ -51,7 +152,14 @@ struct EntityGraphView: View {
         .frame(height: height)
         .background(backdrop)
         .overlay(alignment: .bottomLeading) { readout }
+        .overlay(alignment: .topTrailing) { recentreControl }
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
+        .gesture(
+            panGesture
+                .simultaneously(with: magnifyGesture)
+                .simultaneously(with: rotateGesture)
+        )
         .onAppear { growConnection() }
         .onChange(of: activeHarnessID) { _, _ in
             growConnection()
@@ -59,20 +167,25 @@ struct EntityGraphView: View {
         }
     }
 
-    /// The pool at one instant: static geometry plus a slow, per-node drift so the
-    /// orbs float rather than sit. `time` is seconds since the reference date.
+    /// The pool at one instant: the faint star outline, the connection ribbon,
+    /// every node, and the tip note — all carried as one piece by the pan, zoom
+    /// and turn, so the whole thing moves like an object.
     private func pool(at time: Double, animated: Bool) -> some View {
         GeometryReader { geo in
             let points = drifted(layout(in: geo.size), at: time, animated: animated)
             ZStack {
+                starBackdrop(in: geo.size)
                 connectionLayer(points, time: time, animated: animated)
                 ForEach(nodes) { node in
                     if let point = points[node.id] {
                         nodeView(node, at: point, time: time, animated: animated)
                     }
                 }
-                tipCallout(points)
+                tipCallout(points, in: geo.size)
             }
+            .scaleEffect(scale)
+            .rotationEffect(rotation)
+            .offset(offset)
         }
     }
 
@@ -96,7 +209,8 @@ struct EntityGraphView: View {
     }
 
     /// A stable 0…2π phase from a node id, so the same entity always drifts the
-    /// same way and nothing jitters between redraws.
+    /// same way and nothing jitters between redraws. Also seeds each node's star
+    /// colours and its own slight turn.
     private static func phase(for id: String) -> Double {
         var hash: UInt64 = 1469598103934665603
         for byte in id.utf8 { hash = (hash ^ UInt64(byte)) &* 1099511628211 }
@@ -146,6 +260,11 @@ struct EntityGraphView: View {
         return nodes
     }
 
+    /// The majors: everything that is not a satellite model. These wear the star.
+    private var majors: [GraphNode] {
+        nodes.filter { $0.kind != .model }
+    }
+
     private var activeHarnessID: String? {
         controller.report.map { "harness:\($0.baseURL)" }
     }
@@ -157,32 +276,41 @@ struct EntityGraphView: View {
 
     // MARK: - Layout
 
+    /// The major nodes stand on the tips of an N-pointed star, evenly around a
+    /// circle — so the count of majors is the count of points. Models ring the
+    /// active harness, pulled in toward the middle so they never clip the edge.
     private func layout(in size: CGSize) -> [String: CGPoint] {
         var points: [String: CGPoint] = [:]
+        let centre = CGPoint(x: size.width / 2, y: size.height / 2)
+        let outer = starOuterRadius(in: size)
+        let majorNodes = majors
 
-        if nodes.contains(where: { $0.kind == .vault }) {
-            points["vault"] = CGPoint(x: margin + 12, y: size.height / 2)
-        }
-
-        let harnesses = nodes.filter { $0.kind == .harness }
-        for (index, harness) in harnesses.enumerated() {
-            let t = harnesses.count == 1
-                ? 0.5
-                : CGFloat(index) / CGFloat(harnesses.count - 1)
-            let y = margin + t * (size.height - 2 * margin)
-            points[harness.id] = CGPoint(x: size.width - margin - 12, y: y)
+        for (index, node) in majorNodes.enumerated() {
+            let angle = -Double.pi / 2
+                + Double(index) / Double(max(majorNodes.count, 1)) * 2 * .pi
+            points[node.id] = CGPoint(
+                x: centre.x + outer * cos(angle),
+                y: centre.y + outer * sin(angle)
+            )
         }
 
         let models = nodes.filter { $0.kind == .model }
-        let anchor = nodes.first(where: { $0.id == activeHarnessID })
-            ?? harnesses.first
-        if let anchor, let centre = points[anchor.id] {
-            let radius: CGFloat = 26
+        let anchor = nodes.first(where: { $0.id == activeHarnessID }) ?? majorNodes.first
+        if let anchor, let tip = points[anchor.id], !models.isEmpty {
+            // Sit the model constellation between the active harness and the
+            // middle, so it reads as "what this harness offers" without spilling
+            // past the star's edge.
+            let hub = CGPoint(
+                x: tip.x + (centre.x - tip.x) * 0.42,
+                y: tip.y + (centre.y - tip.y) * 0.42
+            )
+            let radius = outer * 0.26
             for (index, model) in models.enumerated() {
-                let angle = (Double(index) / Double(max(models.count, 1))) * 2 * .pi - .pi / 2
+                let angle = -Double.pi / 2
+                    + Double(index) / Double(models.count) * 2 * .pi
                 points[model.id] = CGPoint(
-                    x: centre.x - 34 + radius * cos(angle),
-                    y: centre.y + radius * sin(angle)
+                    x: hub.x + radius * cos(angle),
+                    y: hub.y + radius * sin(angle)
                 )
             }
         }
@@ -190,7 +318,51 @@ struct EntityGraphView: View {
         return points
     }
 
+    /// The radius of the star's outer points — pushed right out to the pool's
+    /// edge so the graphic reaches it, unlike the text reading's margins.
+    private func starOuterRadius(in size: CGSize) -> CGFloat {
+        max(min(size.width, size.height) / 2 - starInset, 24)
+    }
+
     // MARK: - Layers
+
+    /// The faint star traced behind the pool. Its points line up exactly with the
+    /// major nodes, and hair-thin rays run from the middle out to each point, so
+    /// the arrangement reads as a star even before you read a single node.
+    @ViewBuilder
+    private func starBackdrop(in size: CGSize) -> some View {
+        let count = majors.count
+        let centre = CGPoint(x: size.width / 2, y: size.height / 2)
+        let outer = starOuterRadius(in: size)
+        let inner = outer * starInnerRatio
+        Canvas { context, _ in
+            guard count >= 3 else { return }
+            var star = Path()
+            let total = count * 2
+            for index in 0..<total {
+                let radius = index.isMultiple(of: 2) ? outer : inner
+                let angle = -Double.pi / 2 + Double(index) / Double(total) * 2 * .pi
+                let point = CGPoint(
+                    x: centre.x + radius * cos(angle),
+                    y: centre.y + radius * sin(angle)
+                )
+                if index == 0 { star.move(to: point) } else { star.addLine(to: point) }
+            }
+            star.closeSubpath()
+            context.stroke(star, with: .color(Palette.bone.opacity(0.07)), lineWidth: 1)
+
+            var rays = Path()
+            for index in 0..<count {
+                let angle = -Double.pi / 2 + Double(index) / Double(count) * 2 * .pi
+                rays.move(to: centre)
+                rays.addLine(to: CGPoint(
+                    x: centre.x + outer * cos(angle),
+                    y: centre.y + outer * sin(angle)
+                ))
+            }
+            context.stroke(rays, with: .color(Palette.mauve.opacity(0.05)), lineWidth: 1)
+        }
+    }
 
     @ViewBuilder
     private func connectionLayer(
@@ -223,7 +395,7 @@ struct EntityGraphView: View {
     /// hint for a harness the person has never been on, a wrong-vault nudge, or
     /// the quiet "connected" line. Tapping that starfish contracts it.
     @ViewBuilder
-    private func tipCallout(_ points: [String: CGPoint]) -> some View {
+    private func tipCallout(_ points: [String: CGPoint], in size: CGSize) -> some View {
         if let tip = controller.currentTip,
            let active = activeHarnessID,
            let point = points[active] {
@@ -252,9 +424,15 @@ struct EntityGraphView: View {
                 }
             }
             // Keep the note inside the pool: it rides just above the active
-            // starfish, but is clamped so a harness near the top edge (or the
-            // left edge) can never push the note outside the clipped frame.
-            .position(x: max(point.x - 98, 88), y: max(point.y - 26, 52))
+            // starfish, but is clamped so a harness out at any point of the star
+            // can never push the note outside the clipped frame.
+            .position(
+                x: min(max(point.x - 98, 88), max(88, size.width - 168)),
+                y: min(max(point.y - 26, 52), max(52, size.height - 12))
+            )
+            // The note stays upright and legible even when the pool has been
+            // turned on its side.
+            .rotationEffect(.radians(-rotation.radians))
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: tipExpanded)
         }
     }
@@ -266,17 +444,11 @@ struct EntityGraphView: View {
         animated: Bool
     ) -> some View {
         let isActive = hovered == node.id || selected == node.id
-        let size: CGFloat = node.kind == .model ? 11 : (node.kind == .vault ? 22 : 18)
+        let size: CGFloat = node.kind == .model ? 17 : (node.kind == .vault ? 27 : 23)
         // A slow breath in the glow, each orb on its own phase.
-        let pulse = animated ? 0.5 + 0.5 * sin(time * 1.1 + Self.phase(for: node.id)) : 0.5
-        let orb = Circle()
-            .fill(RadialGradient(
-                colors: [node.accent, node.accent.opacity(0.12)],
-                center: .center,
-                startRadius: 0,
-                endRadius: size
-            ))
-            .overlay(Circle().stroke(node.accent.opacity(0.85), lineWidth: 1))
+        let phase = Self.phase(for: node.id)
+        let pulse = animated ? 0.5 + 0.5 * sin(time * 1.1 + phase) : 0.5
+        let glyph = SeaStarGlyph(accent: node.accent, seed: phase, isActive: isActive)
             .frame(width: size, height: size)
             .shadow(
                 color: node.accent.opacity(isActive ? 0.95 : 0.35 + 0.3 * pulse),
@@ -285,9 +457,9 @@ struct EntityGraphView: View {
 
         return Group {
             if animated {
-                orb.caustics(size: size * 2)
+                glyph.caustics(size: size * 2)
             } else {
-                orb
+                glyph
             }
         }
         .scaleEffect(isActive ? 1.25 : 1)
@@ -350,6 +522,71 @@ struct EntityGraphView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
         }
+    }
+
+    // MARK: - Handling the object
+
+    /// The control that appears once the pool has been moved, offering to tide it
+    /// back to how it opened.
+    @ViewBuilder
+    private var recentreControl: some View {
+        if isTransformed {
+            Button(action: recentre) {
+                Text(Strings.Views.recentre)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Palette.bone.opacity(0.9))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Palette.pool.opacity(0.9), in: Capsule())
+                    .overlay(Capsule().stroke(Palette.mauve.opacity(0.4), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .help(Strings.Views.recentreHelp)
+            .padding(9)
+            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        }
+    }
+
+    private var isTransformed: Bool {
+        offset != .zero || scale != 1 || rotation != .zero
+    }
+
+    private var panGesture: some Gesture {
+        DragGesture(minimumDistance: 6)
+            .onChanged { value in
+                offset = CGSize(
+                    width: panBase.width + value.translation.width,
+                    height: panBase.height + value.translation.height
+                )
+            }
+            .onEnded { _ in panBase = offset }
+    }
+
+    private var magnifyGesture: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                scale = min(max(scaleBase * value.magnification, 0.55), 2.6)
+            }
+            .onEnded { _ in scaleBase = scale }
+    }
+
+    private var rotateGesture: some Gesture {
+        RotateGesture()
+            .onChanged { value in
+                rotation = rotationBase + value.rotation
+            }
+            .onEnded { _ in rotationBase = rotation }
+    }
+
+    private func recentre() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            offset = .zero
+            scale = 1
+            rotation = .zero
+        }
+        panBase = .zero
+        scaleBase = 1
+        rotationBase = .zero
     }
 
     // MARK: - Selection

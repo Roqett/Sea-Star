@@ -74,10 +74,11 @@ struct CockpitPopoverView: View {
     }
 
     /// The two readings want different rooms (spec §8.7). The rows are happy in a
-    /// column, but the starfield needs width so the harnesses on the right edge
-    /// and the tip note beside the active starfish stop crowding the frame — the
-    /// visual reading opens a wider panel than the text one.
-    private var panelWidth: CGFloat { mode == .graph ? 460 : 340 }
+    /// column, but the starfield is a *canvas*, not a utility dropdown: it opens
+    /// wide so the vault, the harnesses on the right edge and the tip note beside
+    /// the active starfish all have room and nothing crowds or clips — the visual
+    /// reading opens a big panel, the text one a comfortable column.
+    private var panelWidth: CGFloat { mode == .graph ? 600 : 360 }
 
     /// The pool's height for the visual reading. The starfield wants room, so it
     /// takes a fixed, generous one — but it is clamped so the whole panel (header,
@@ -86,8 +87,8 @@ struct CockpitPopoverView: View {
     /// needs to be and never shows a half-empty void.
     private var graphHeight: CGFloat {
         let chrome: CGFloat = 250 + (isLogsExpanded ? 190 : 0)
-        let desired: CGFloat = 460
-        return max(200, min(desired, maxPopoverHeight - chrome))
+        let desired: CGFloat = 560
+        return max(240, min(desired, maxPopoverHeight - chrome))
     }
 
     var body: some View {
