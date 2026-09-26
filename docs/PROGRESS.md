@@ -481,9 +481,15 @@ No parallel agents active. Single-writer.
 
 - **The two readings got their own rooms (spec §8, §8.7).** The popover was a fixed 320pt column for
   both readings, which crowded the starfield. `CockpitPopoverView` now sizes by mode — **graph
-  420×420** (graph height 260), **list 320×320** — via `panelWidth` / `bodyMaxHeight` / `graphHeight`,
-  and `EntityGraphView` gained a `height` parameter. The rows are happy in the narrow column; the
-  starfield gets the width for the right-edge harnesses and the height for the tip note.
+  ~460 wide** (graph height = the body height), **list 340** — via `panelWidth` / `bodyHeight` /
+  `graphHeight`, and `EntityGraphView` gained a `height` parameter. The rows are happy in the narrow
+  column; the starfield gets the width for the right-edge harnesses and the height for the tip note.
+- **The popover no longer clips itself (the founder's "still truncated").** The middle used a flexible
+  `maxHeight`, which left the popover's preferred size *undecided*, so it opened undersized and cut off
+  its own content (confirmed by screenshotting the live popover). It now gets a **concrete height**
+  (`bodyHeight`, clamped only to keep the bottom on-screen) with the root's flexible `maxHeight`
+  removed, so the fitting size is deterministic and it opens whole. The reading is only open for a
+  moment, so it is allowed to be large.
 - **The icon stopped reading as a snowflake (spec §7).** `AppIconMark` draws a **solid band partway
   out from the fuzzy centre** — a sea-star's body with the ray tips free, so it reads as neither a
   snowflake's spokes nor a cog's rim. The ratio was chosen by eye against a rendered set of
@@ -491,9 +497,8 @@ No parallel agents active. Single-writer.
   menu-bar sizes; wider or further out and it starts to read as a cog). Added
   `AppIconMark.menuBarImage(for:)` so the **menu bar** draws the same band as a template;
   `AppDelegate.applyStatusIcon` now calls it instead of loading the raw asset.
-- **The popover's opening size follows the reading.** `AppDelegate`'s stale 320pt guess is now
-  `popoverSize` (420×360, matching the graph default); the hosting controller's
-  `.preferredContentSize` still drives the real width from the view.
+- **`AppDelegate.popoverSize`** (460×720) matches the graph default so there is no undersized flash
+  before the hosting controller reports its real size.
 - **Wording:** dropped the colour absolute from CHANGELOG/PROGRESS (UI absolutes are out).
 - **`Face*MenuBar` imagesets kept** as potential tools (see above).
 

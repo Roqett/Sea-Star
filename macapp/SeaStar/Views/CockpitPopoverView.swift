@@ -64,22 +64,34 @@ struct CockpitPopoverView: View {
     private var mode: CockpitMode { CockpitMode.resolved(from: modeRaw) }
     private var hasChosenMode: Bool { CockpitMode(rawValue: modeRaw) != nil }
 
-    /// The most the whole cockpit may occupy before the middle section starts
-    /// scrolling instead of growing. Without this the header, the 320pt body,
-    /// the logs panel and the controls simply stack, and on a shorter display
-    /// the bottom runs off the screen and is clipped (spec §8).
+    /// The most the whole cockpit may occupy before it would run off the screen.
+    /// The reading is only open for a moment, so it can be large — we give it as
+    /// much room as the display allows and clamp only to keep the bottom on-screen
+    /// (spec §8).
     private var maxPopoverHeight: CGFloat {
         let usable = NSScreen.main?.visibleFrame.height ?? 800
-        return max(320, usable - 96)
+        return max(320, usable - 72)
     }
 
     /// The two readings want different rooms (spec §8.7). The rows are happy in a
-    /// narrow column, but the starfield needs width so the harnesses on the right
-    /// edge and the tip note beside the active starfish stop crowding the frame —
-    /// the visual reading opens a bigger panel than the text one.
-    private var panelWidth: CGFloat { mode == .graph ? 420 : 320 }
-    private var bodyMaxHeight: CGFloat { mode == .graph ? 420 : 320 }
-    private var graphHeight: CGFloat { 260 }
+    /// column, but the starfield needs width so the harnesses on the right edge
+    /// and the tip note beside the active starfish stop crowding the frame — the
+    /// visual reading opens a wider panel than the text one.
+    private var panelWidth: CGFloat { mode == .graph ? 460 : 340 }
+
+    /// How tall the scrolling middle is. This is a concrete height, not a flexible
+    /// `maxHeight`: a flexible middle leaves the popover's preferred size
+    /// undecided, so it opened undersized and clipped its own content. A definite
+    /// height makes the fitting size deterministic, so the popover always opens
+    /// whole. It is clamped to the screen only to keep the bottom visible.
+    private var bodyHeight: CGFloat {
+        let chrome: CGFloat = 250
+        let desired: CGFloat = mode == .graph ? 460 : 360
+        return max(220, min(desired, maxPopoverHeight - chrome))
+    }
+
+    /// The graph fills the scrolling middle so the starfield gets the room.
+    private var graphHeight: CGFloat { bodyHeight }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -100,13 +112,12 @@ struct CockpitPopoverView: View {
                     }
                 }
             }
-            .frame(maxHeight: bodyMaxHeight)
+            .frame(height: bodyHeight)
             logs
             controls
         }
         .padding(18)
         .frame(width: panelWidth)
-        .frame(maxHeight: maxPopoverHeight)
         .background(Palette.canvas)
         .task { await controller.refresh() }
         .fileImporter(

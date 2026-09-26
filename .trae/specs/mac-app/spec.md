@@ -232,9 +232,11 @@ On launch / on click of the menu-bar item:
 
 The popover is a **column with a scrolling body**: the header and the start/stop controls stay
 pinned, and everything between them scrolls when there is more to say than fits. The reading the
-person chose sets the column's rooms — the **rows** stay in a 320pt column, while the **starfield
-opens wider and taller (420pt square)** so the harnesses on its right edge and the tip note beside
-the active starfish have space (§8.7). It never grows past the screen edge.
+person chose sets the column's rooms — the **rows** stay in a 340pt column, while the **starfield
+opens wider and taller (~460pt square)** so the harnesses on its right edge and the tip note beside
+the active starfish have space (§8.7). The reading is only open for a moment, so it may be large;
+the middle gets a definite height (not a flexible max) so the popover opens whole rather than
+clipping itself, and it is clamped only to keep the bottom on-screen.
 
 Menu-bar item text stays short (≤ ~30 characters); push detail into the popover or a
 window.
@@ -301,8 +303,8 @@ fine) and remembers the answer in `UserDefaults` (`SeaStar.cockpitMode`); therea
 icons swap between the two readings of the same facts. Until a preference exists, the graph is
 shown behind the question and neither icon is pressed.
 
-The starfield opens a **larger panel than the rows do** — roughly 420pt square against the rows'
-320pt column. It needs the width so the harnesses down the right edge and the tip note beside the
+The starfield opens a **larger panel than the rows do** — roughly 460pt square against the rows'
+340pt column. It needs the width so the harnesses down the right edge and the tip note beside the
 active starfish stop crowding the frame, and the height so the orbs have room to drift (spec §8).
 
 The graph draws the roster as glowing nodes on a dark backdrop — the **vault** off to the
