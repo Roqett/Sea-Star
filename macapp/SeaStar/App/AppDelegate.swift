@@ -41,11 +41,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The glyph wears whichever face the app is showing, so the Easter-egg
-    /// reroll lands in the menu bar too (spec §7).
+    /// reroll lands in the menu bar too (spec §7). Marking the image as a
+    /// template lets the system tint it — white on a dark bar, black on a light
+    /// one — so the detailed starfish stays legible in both appearances.
     private func applyStatusIcon() {
         guard let button = statusItem?.button else { return }
         let icon = controller.currentIcon
-        let image = icon.menuBarAsset.flatMap { NSImage(named: $0) }
+        let image = icon.asset.flatMap { NSImage(named: $0) }
             ?? NSImage(systemSymbolName: icon.symbol, accessibilityDescription: Strings.MenuBar.label)
         image?.isTemplate = true
         image?.size = NSSize(width: 18, height: 18)

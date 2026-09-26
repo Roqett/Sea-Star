@@ -18,9 +18,10 @@ note at the end of every session.
   via `SEASTAR_VAULT` / `SEASTAR_MODEL` / `SEASTAR_BASE_URL`+`SEASTAR_RUNTIME`. It holds **all four founder icons in one roster** (`IconRoster`) and
   rerolls to a different face on server start/stop — the "open and shut" Easter egg (T4.7) —
   shown on both the menu-bar glyph and the popover header. Faces now wear the founder's
-  **real art** (T4.3/T4.4 cuts): `Face*MenuBar` solid silhouettes for the menu bar,
-  `Face*Header` full-detail cuts for the header, both template-tinted. The header face carries
-  a caustic shimmer (T4.5) via `Shaders/Caustics.metal`.
+  **real art** (T4.3) as a **single cut each** (`Face*Header`), rendered as a **template** on
+  every surface — the menu bar takes the system's tint (white-on-dark / black-on-light), so the
+  detailed starfish stays legible in both appearances instead of the old solid star. The header
+  face carries a caustic shimmer (T4.5) via `Shaders/Caustics.metal`.
 - **Cockpit: standard app menu (new).** The shell is now AppKit-hosted (`@main enum
   SeaStarMain` → `App/AppDelegate.swift`) because `MenuBarExtra` has no right-click hook. The
   status item's **right-click** shows the standard app menu — Check for Updates…, Settings…
@@ -39,6 +40,11 @@ note at the end of every session.
   in Finder**). A segmented **Graph | List** toggle (List default) opens the **entity graph**
   (`Views/EntityGraphView.swift`): vault/harnesses/models as glowing nodes, the vault↔harness
   connection drawn as a rotated nudibranch strip, tap-to-select via the same controller calls.
+- **Cockpit: light/dark chrome, dark starfield (new).** `Support/Palette.swift` splits into an
+  **adaptive chrome** layer (`canvas`/`ink`/`inkMuted`/`logInk`/`logSurface`, via an `NSColor`
+  dynamic provider keyed on `bestMatch(.darkAqua/.aqua)`) and a **fixed-dark `pool`** used by the
+  entity graph — so both panels follow the system appearance while the starfield stays black.
+  Sampled both appearances offscreen to confirm the swap.
 - **Naming:** repo is **`Roqett/Sea-Star`** (personal — keeps the history on the founder's
   profile). "Up Periscope" is the **product identity** (licence + bundle id), not a GitHub
   org. Codeberg remote is `Touretro/theSeaStar`.
@@ -60,7 +66,7 @@ note at the end of every session.
 | MCP server | `src/sea_star/mcp_server.py` | Done — exposes `ask_seastar`, `vault_*`. |
 | MCP client | `src/sea_star/mcp_client.py` | Done — bridges external servers, namespaced, curated by `include`/`exclude`. |
 | Docs | `docs/` | **Added this session** — tiered: start-here → connect → reference → troubleshooting. |
-| Cockpit (mac app) | `macapp/` | **New** — XcodeGen project; **AppKit-hosted** SwiftUI (`SeaStarMain` → `AppDelegate`, `NSStatusItem` + `NSPopover`). `App/ Views/ Models/ Services/ Support/ Shaders/`; builds, launches, 16 Swift tests pass. Right-click app menu + Settings window + GitHub-Releases update check. Vault + model + harness pick-lists wired to `SEASTAR_VAULT`/`SEASTAR_MODEL`/`SEASTAR_BASE_URL`. Four-face icon roster rerolls on start/stop (T4.7); real T4.3/T4.4 cuts; header caustic shimmer (T4.5). |
+| Cockpit (mac app) | `macapp/` | **New** — XcodeGen project; **AppKit-hosted** SwiftUI (`SeaStarMain` → `AppDelegate`, `NSStatusItem` + `NSPopover`). `App/ Views/ Models/ Services/ Support/ Shaders/`; builds, launches, 28 Swift tests pass. Right-click app menu + Settings window + GitHub-Releases update check. Vault + model + harness pick-lists wired to `SEASTAR_VAULT`/`SEASTAR_MODEL`/`SEASTAR_BASE_URL`. Four-face icon roster rerolls on start/stop (T4.7); real T4.3/T4.4 cuts; header caustic shimmer (T4.5). |
 
 ## File ownership
 
@@ -424,3 +430,41 @@ No parallel agents active. Single-writer.
 
 - Founder: relaunch the app to see the fit fix; then decide whether T4.2 closes as superseded and
   whether to schedule the two-panel onboarding.
+
+## Handoff — 2026-09-26 (icon as template, light/dark, README)
+
+**Done**
+
+- **Menu bar now wears the detailed starfish (spec §7).** The glyph was a solid star; the four
+  faces collapsed to **one cut each** (`IconRoster`'s single `asset`, the former `Face*Header`),
+  rendered as a **template** on every surface. The system tints it, so it is white on a dark menu
+  bar and black on a light one and the fine line art survives — and it is the same art as the
+  popover header, never orange. `AppIconMark` lost its `template` parameter; `AppDelegate.applyStatusIcon`
+  marks the image `isTemplate = true`.
+- **Both panels gained light/dark mode; the starfield stays dark (spec §7).** `Palette.swift`
+  rewritten into an **adaptive chrome** layer (`canvas`, `ink`, `inkMuted`, `logInk`, `logSurface`,
+  via an `NSColor` dynamic provider on `bestMatch(.darkAqua/.aqua)`) plus a **fixed-dark `pool`**
+  for the entity graph. `CockpitPopoverView` chrome renamed to the adaptive tokens; `EntityGraphView`
+  switched to `pool` (its ink stays light on purpose). Verified by sampling both appearances with a
+  throwaway `swiftc` program: canvas `#10131A`↔`#F7F3EC`, ink `#EDE3D2`↔`#1C1A17`, pool `#10131A` both.
+- **Log strips inset (spec §8.8).** The blue-white nudibranch ribbons are pulled in from the panel
+  edges and floated on the log ground, matching the Start/Refresh controls.
+- **README polished.** Subtitle typo fixed, Local-first + MCP badges added (flat-square), a new
+  **At a glance** section, page count corrected to five, founder's closing note centered — no facts
+  or links changed.
+- **CHANGELOG.md + this file** updated. Throwaway verification artifacts deleted.
+- **Verified:** `xcodebuild … test` → **28 tests in 8 suites passing** (twice).
+
+**Half-finished / open**
+
+- **The old `Face*MenuBar` imagesets are now unreferenced** (`IconRoster` uses only `Face*Header`).
+  Harmless, but they can be pruned from the asset catalog when convenient.
+- **Onboarding shape — founder's idea, still not started** (two large Graph/List panels). Explicitly
+  deferred to later.
+- **Inverse (dark-on-light) starfield variant** — the founder floated it ("maybe an inverse one might
+  look cool"), deferred to later.
+
+**Single next step**
+
+- Founder: relaunch to see the detailed menu-bar starfish and the light/dark panels; then decide on
+  pruning the `Face*MenuBar` imagesets and whether to schedule the two-panel onboarding.

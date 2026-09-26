@@ -1,28 +1,43 @@
 <div align="center">
 
-<img src="assets/sea-star.png" alt="The Sea Star — the octopus with the martini glass" width="300">
+<img src="assets/sea-star.png" alt="Sea-Star" width="280">
 
 # ⭐ Sea-Star
 
 **A private, local-first AI agent that lives in your Obsidian vault.**
-One-click's ease. Nothing leaves your house.
+One click's ease. Nothing leaves your house.
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)](CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://www.python.org/)
+[![Local-first](https://img.shields.io/badge/local--first-no%20cloud-2F7FE0?style=flat-square)](#why-it-stays-sovereign)
+[![MCP](https://img.shields.io/badge/MCP-server%20%2B%20client-8BD450?style=flat-square)](docs/connect.md)
+
+A sea star holds on tight to its rock and doesn't let go.
+Sea-Star does the same with your notes — and helps you find the right one.
 
 </div>
 
 ***
 
-A sea star holds on tight to its rock and doesn't let go.
-Sea-Star does the same with your notes — and helps you find the right one.
+## At a glance
+
+- 🏠 **Local by default** — the reasoning runs on your machine, against your model.
+  No cloud, no telemetry, no account.
+- 🗂️ **Your vault *is* the memory** — it reads Obsidian notes directly and answers
+  **with citations** back to them.
+- 🔌 **MCP both ways** — it's a server *and* a client, so it drops into Osaurus,
+  Claude Desktop, Cursor or TRAE, and can borrow other MCP servers as its own tools.
+- ⚙️ **Runtime-agnostic** — any OpenAI-compatible endpoint works unchanged: Osaurus,
+  Ollama, LM Studio, llama.cpp, MLX, vLLM, Unsloth Studio.
+- 🖱️ **Two front doors** — a terminal-first CLI today, a native macOS app in build.
+  Anything you can click, you can also type.
 
 ***
 
 ## Documentation
 
-Four pages, one for wherever you're starting from. Start at the
+Five pages, one for wherever you're starting from. Start at the
 **[docs index](docs/README.md)** if you're unsure.
 
 | I want to…                                                   | Read                                               |
@@ -151,14 +166,14 @@ above *is* the product.
 The same engine, two front doors. **Terminal-first** works today. **GUI-first** is
 the app in build. Every action maps both ways:
 
-| What you want to do           | GUI (coming)            | Terminal (now)                     |
-| ----------------------------- | ----------------------- | ---------------------------------- |
-| Detect vault / runtime / model | Detects on launch      | `uv run sea-star doctor`           |
-| Machine-readable status       | —                       | `uv run sea-star doctor --json`    |
-| Start the MCP server          | Starts with the app     | `uv run sea-star serve`            |
-| Create `seastar.toml`         | Choose folder in-app    | `uv run sea-star init`             |
-| Ask the vault a question      | Type in the window      | `uv run sea-star ask "…"`          |
-| Keep the engine green         | —                       | `uv run ruff check . && uv run pytest` |
+| What you want to do            | GUI (coming)            | Terminal (now)                         |
+| ------------------------------ | ----------------------- | -------------------------------------- |
+| Detect vault / runtime / model | Detects on launch       | `uv run sea-star doctor`               |
+| Machine-readable status        | —                       | `uv run sea-star doctor --json`        |
+| Start the MCP server           | Starts with the app     | `uv run sea-star serve`                |
+| Create `seastar.toml`          | Choose folder in-app    | `uv run sea-star init`                 |
+| Ask the vault a question       | Type in the window      | `uv run sea-star ask "…"`              |
+| Keep the engine green          | —                       | `uv run ruff check . && uv run pytest` |
 
 The app never hides a capability: anything you can click, you can also type.
 
@@ -396,6 +411,8 @@ MIT © Roqett / Up Periscope
 
 ***
 
+<div align="center">
+
 *Built by an Oz winemaker who bought an M4 Pro 64GB, got curious, and started a small
 software factory called* ***Up Periscope*** *to bump up diverse projects. Learned in public.*
 
@@ -403,3 +420,5 @@ software factory called* ***Up Periscope*** *to bump up diverse projects. Learne
 or insanity to anyone... but admitted they'd always worked for him — we took the
 parts worth keeping:* ***no dangerous drugs, only high-quality alcohol, no propellant weapons.*** *Mostly
 Swift, Python, sometimes Rust, mainly Swift.*
+
+</div>

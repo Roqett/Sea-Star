@@ -121,10 +121,10 @@ struct CockpitPopoverView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(Strings.Header.title)
                     .font(.headline)
-                    .foregroundStyle(Palette.bone)
+                    .foregroundStyle(Palette.ink)
                 Text(Strings.Header.subtitle)
                     .font(.caption)
-                    .foregroundStyle(Palette.mauve)
+                    .foregroundStyle(Palette.inkMuted)
             }
 
             Spacer()
@@ -137,7 +137,7 @@ struct CockpitPopoverView: View {
                 Button(action: onOpenSettings) {
                     Image(systemName: "gearshape")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Palette.mauve)
+                        .foregroundStyle(Palette.inkMuted)
                 }
                 .buttonStyle(.plain)
                 .help(Strings.Menu.settings)
@@ -166,10 +166,10 @@ struct CockpitPopoverView: View {
                 } label: {
                     Image(systemName: option.symbol)
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(isActive(option) ? Palette.bone : Palette.mauve)
+                        .foregroundStyle(isActive(option) ? Palette.ink : Palette.inkMuted)
                         .frame(width: 24, height: 20)
                         .background(
-                            isActive(option) ? Palette.bone.opacity(0.12) : Color.clear,
+                            isActive(option) ? Palette.ink.opacity(0.12) : Color.clear,
                             in: RoundedRectangle(cornerRadius: 5)
                         )
                         .contentShape(RoundedRectangle(cornerRadius: 5))
@@ -196,11 +196,11 @@ struct CockpitPopoverView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(Strings.Mode.firstRunTitle)
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Palette.bone)
+                .foregroundStyle(Palette.ink)
 
             Text(Strings.Mode.firstRunBody)
                 .font(.caption)
-                .foregroundStyle(Palette.mauve)
+                .foregroundStyle(Palette.inkMuted)
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 10) {
@@ -216,11 +216,11 @@ struct CockpitPopoverView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .foregroundStyle(Palette.bone)
-                        .background(Palette.bone.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
+                        .foregroundStyle(Palette.ink)
+                        .background(Palette.ink.opacity(0.06), in: RoundedRectangle(cornerRadius: 8))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
-                                .stroke(Palette.bone.opacity(0.12), lineWidth: 1)
+                                .stroke(Palette.ink.opacity(0.12), lineWidth: 1)
                         )
                         .contentShape(RoundedRectangle(cornerRadius: 8))
                     }
@@ -292,8 +292,9 @@ struct CockpitPopoverView: View {
     /// the left corner and Refresh in the right, with a nudibranch strip above
     /// and below the pair as the column reference — the 3px bar grown up.
     private var controls: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             NudiStrip(style: .blueWhite)
+                .padding(.horizontal, 10)
 
             HStack(alignment: .firstTextBaseline) {
                 actionButton(
@@ -315,11 +316,14 @@ struct CockpitPopoverView: View {
             .padding(.horizontal, 2)
 
             NudiStrip(style: .blueWhite)
+                .padding(.horizontal, 10)
         }
+        .padding(.vertical, 2)
     }
 
     /// A plain word where a pill used to be: mono, small, toned down, exactly as
-    /// Apple would draw a text button.
+    /// Apple would draw a text button. Weight and ink stay light so the pair
+    /// reads as part of the panel's prose rather than shouting over it.
     private func actionButton(
         title: String,
         enabled: Bool,
@@ -327,8 +331,8 @@ struct CockpitPopoverView: View {
     ) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .foregroundStyle(enabled ? Palette.bone : Palette.mauve.opacity(0.45))
+                .font(.system(size: 12, weight: .regular, design: .monospaced))
+                .foregroundStyle(enabled ? Palette.ink.opacity(0.85) : Palette.inkMuted.opacity(0.4))
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
@@ -344,7 +348,7 @@ struct CockpitPopoverView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(Palette.mauve)
+                        .foregroundStyle(Palette.inkMuted)
                         .rotationEffect(.degrees(isLogsExpanded ? 90 : 0))
                         .frame(width: 9)
 
@@ -354,20 +358,20 @@ struct CockpitPopoverView: View {
 
                     Text(Strings.Logs.title)
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Palette.bone)
+                        .foregroundStyle(Palette.ink)
 
                     Spacer(minLength: 0)
 
                     Text("\(controller.logs.entries.count)")
                         .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Palette.mauve)
+                        .foregroundStyle(Palette.inkMuted)
                         .monospacedDigit()
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 7)
                 .frame(maxWidth: .infinity)
                 .background(
-                    Palette.bone.opacity(isLogsHovering ? 0.10 : 0.05),
+                    Palette.ink.opacity(isLogsHovering ? 0.10 : 0.05),
                     in: RoundedRectangle(cornerRadius: 8)
                 )
                 .contentShape(RoundedRectangle(cornerRadius: 8))
@@ -380,35 +384,41 @@ struct CockpitPopoverView: View {
         }
     }
 
-    /// The log body, bordered top and bottom by the blue-white nudibranch strip
-    /// and inked in the matching blue (spec §8.8). Always the dark end of the
-    /// ribbon, because the cockpit canvas is always the dark rockpool.
+    /// The log body, framed top and bottom by the blue-white nudibranch strip
+    /// and inked in the matching blue (spec §8.8). The strips are inset from the
+    /// edges and floated on the log ground, so they read as wiring inside the
+    /// panel rather than as its border. Ground and ink adapt with the panel.
     private var logPanel: some View {
         VStack(spacing: 0) {
             NudiStrip(style: .blueWhite)
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 2) {
                     if controller.logs.entries.isEmpty {
                         Text(Strings.Logs.empty)
-                            .foregroundStyle(Palette.mauve)
+                            .foregroundStyle(Palette.inkMuted)
                     } else {
                         ForEach(controller.logs.entries.suffix(300)) { entry in
                             Text(entry.text)
-                                .foregroundStyle(Palette.logInkDark)
+                                .foregroundStyle(Palette.logInk)
                                 .textSelection(.enabled)
                         }
                     }
                 }
                 .font(.system(size: 10, design: .monospaced))
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(10)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
             }
             .frame(maxHeight: 150)
-            .background(Palette.logSurfaceDark)
 
             NudiStrip(style: .blueWhite)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
         }
+        .background(Palette.logSurface)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
@@ -417,7 +427,7 @@ struct CockpitPopoverView: View {
     private func guidance(_ message: String) -> some View {
         Text(message)
             .font(.caption)
-            .foregroundStyle(Palette.bone.opacity(0.85))
+            .foregroundStyle(Palette.ink.opacity(0.85))
             .fixedSize(horizontal: false, vertical: true)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -484,12 +494,12 @@ private struct StatusRow: View {
 
             Text(label)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(Palette.mauve)
+                .foregroundStyle(Palette.inkMuted)
                 .frame(width: 60, alignment: .leading)
 
             Text(value)
                 .font(.caption)
-                .foregroundStyle(Palette.bone)
+                .foregroundStyle(Palette.ink)
                 .lineLimit(2)
                 .truncationMode(.middle)
 
@@ -517,7 +527,7 @@ private struct PickerRow: View {
 
             Text(label)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(Palette.mauve)
+                .foregroundStyle(Palette.inkMuted)
                 .frame(width: 60, alignment: .leading)
 
             Menu {
@@ -537,12 +547,12 @@ private struct PickerRow: View {
                 HStack(spacing: 4) {
                     Text(value)
                         .font(.caption)
-                        .foregroundStyle(Palette.bone)
+                        .foregroundStyle(Palette.ink)
                         .lineLimit(2)
                         .truncationMode(.middle)
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(Palette.mauve)
+                        .foregroundStyle(Palette.inkMuted)
                 }
             }
             .menuStyle(.borderlessButton)

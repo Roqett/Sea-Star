@@ -240,7 +240,7 @@ struct EntityGraphView: View {
                     }
                     .padding(9)
                     .frame(width: 152, alignment: .leading)
-                    .background(Palette.canvas.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
+                    .background(Palette.pool.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Palette.harnessGlow.opacity(0.45), lineWidth: 1)
@@ -315,7 +315,7 @@ struct EntityGraphView: View {
 
     private var backdrop: some View {
         ZStack {
-            Palette.canvas
+            Palette.pool
             RadialGradient(
                 colors: [Palette.electricBlue.opacity(0.16), .clear],
                 center: .topTrailing,

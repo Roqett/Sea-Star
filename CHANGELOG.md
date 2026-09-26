@@ -11,6 +11,32 @@ Harness: TRAE
 Date: 2026-09-26
 
 Summary of Changes:
+- **The menu bar wears the detailed starfish, in both appearances (spec §7).** The glyph was a
+  solid star; it now shows the same detailed starfish as the popover header — the same art, never
+  orange. The four faces collapsed to a **single cut each** (`IconRoster`'s `asset`, the former
+  `Face*Header`), rendered as a **template** on every surface, so the system tints it white on a
+  dark menu bar and black on a light one and the fine line art stays legible either way.
+- **Both panels gained light and dark mode; the starfield stays dark (spec §7).** `Palette.swift`
+  now splits into an **adaptive chrome** layer (`canvas`, `ink`, `inkMuted`, `logInk`, `logSurface`)
+  that resolves per appearance — an `NSColor` dynamic provider keyed on
+  `bestMatch(from: [.darkAqua, .aqua])` — and a **fixed-dark `pool`** that keeps the entity graph
+  and its ink pinned dark. The graph on a pale canvas looked silly; it does not any more. Verified
+  offscreen by sampling both appearances (canvas `#10131A`↔`#F7F3EC`, ink `#EDE3D2`↔`#1C1A17`,
+  pool `#10131A` both).
+- **The log's nudibranch strips are inset (spec §8.8).** The blue-white ribbons are floated on the
+  log ground and pulled in from the edges to match the Start/Refresh controls, so they read as
+  wiring *inside* the panel rather than its border; ground and ink adapt with the panel.
+- **README polished.** Subtitle typo fixed ("One-click's ease" → "One click's ease"), Local-first
+  and MCP badges added (all `?style=flat-square`), a new **At a glance** summary, the page count
+  corrected to five, and the founder's closing note centered. Every fact and link unchanged.
+- **Tests:** `xcodebuild … test` → **28 tests in 8 suites passing** (run twice across the icon and
+  palette changes).
+
+Harness: TRAE
+
+Date: 2026-09-26
+
+Summary of Changes:
 - **The cockpit no longer runs off the bottom of the screen (spec §8).** The panel's height was
   only ever whatever its stacks added up to — an unbounded body plus a 150pt logs panel plus the
   header and the controls — so on a shorter display (or with the logs open) the bottom fell off
