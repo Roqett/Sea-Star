@@ -80,7 +80,45 @@ enum Strings {
         /// was found after it has been dragged, zoomed or turned (spec §8.7).
         static let recentre = "Recentre"
         static let recentreHelp = "Put the pool back the way it was"
-        static let panHint = "Drag to drift, pinch to zoom, twist to turn"
+        /// The hint a person reads on the starfield. Names both the trackpad
+        /// gestures and the mouse ones, so neither device is left guessing.
+        static let panHint =
+            "Drag to drift, scroll or pinch to zoom, ⌥-drag or twist to turn — click a star to inspect it"
+    }
+
+    /// The card that blooms when a starfish is clicked (spec §8.7): the plain
+    /// facts the engine already hands us, laid out so a node is inspectable at a
+    /// glance. Nothing here needs a new engine call — it is all in the report.
+    enum Detail {
+        static let vault = "Vault"
+        static let harness = "Harness"
+        static let model = "Model"
+        static let notes = "Notes"
+        static let found = "Found via"
+        static let nearby = "Nearby"
+        static let endpoint = "Endpoint"
+        static let models = "Models"
+        static let servedBy = "Served by"
+        static let path = "Path"
+        static let status = "Status"
+        static let current = "Current"
+        static let available = "Available"
+        static func nearbyVaults(_ count: Int) -> String {
+            count == 1 ? "1 other" : "\(count) others"
+        }
+        static func modelCount(_ count: Int) -> String {
+            count == 1 ? "1 model" : "\(count) models"
+        }
+        /// How the engine came to be reading this vault, in plain words.
+        static func source(_ raw: String) -> String {
+            switch raw.lowercased() {
+            case "env", "environment": return "environment"
+            case "toml", "config": return "config file"
+            case "obsidian": return "Obsidian"
+            case "auto", "autodetect", "detected": return "detected"
+            default: return raw
+            }
+        }
     }
 
     /// The one-time choice between the two readings, offered on first launch

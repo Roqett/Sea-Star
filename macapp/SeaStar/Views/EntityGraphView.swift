@@ -98,6 +98,79 @@ private struct SeaStarGlyph: View {
     }
 }
 
+/// Catches the scroll wheel for the pool. A mouse has no pinch or twist, so
+/// without this the only way to zoom would be the trackpad. An app-local event
+/// monitor watches scroll events while the popover is open and, when the cursor
+/// is inside this view's own bounds, turns the wheel into zoom and swallows the
+/// event so nothing behind the graph scrolls instead. `hitTest` returns `nil`,
+/// so clicks and hovers still fall through to the sea-stars beneath it.
+private struct GraphScrollCatcher: NSViewRepresentable {
+    var onZoom: (CGFloat) -> Void
+
+    func makeNSView(context: Context) -> CatcherView {
+        let view = CatcherView()
+        view.onZoom = onZoom
+        return view
+    }
+
+    func updateNSView(_ nsView: CatcherView, context: Context) {
+        nsView.onZoom = onZoom
+        nsView.refreshFrame()
+    }
+
+    final class CatcherView: NSView {
+        /// All three are `nonisolated(unsafe)` so the event-monitor closure can
+        /// read them without hopping actors. They are only ever written on the
+        /// main thread; the handler is also delivered on the main thread.
+        nonisolated(unsafe) var onZoom: ((CGFloat) -> Void)?
+        nonisolated(unsafe) private var monitor: Any?
+        nonisolated(unsafe) private var cachedWindow: NSWindow?
+        /// This view's rect in *screen* coordinates, refreshed on layout, so the
+        /// handler can test the cursor against `NSEvent.mouseLocation` without
+        /// touching any main-actor state.
+        nonisolated(unsafe) private var screenBounds: CGRect = .zero
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func layout() {
+            super.layout()
+            refreshFrame()
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            refreshFrame()
+            guard window != nil else {
+                if let monitor { NSEvent.removeMonitor(monitor) }
+                monitor = nil
+                return
+            }
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self] event in
+                guard let self,
+                      event.window === self.cachedWindow,
+                      self.screenBounds.contains(NSEvent.mouseLocation) else {
+                    return event
+                }
+                let delta = (event.hasPreciseScrollingDeltas ? 0.01 : 0.05)
+                    * event.scrollingDeltaY
+                guard delta != 0 else { return event }
+                self.onZoom?(delta)
+                return nil
+            }
+        }
+
+        func refreshFrame() {
+            cachedWindow = window
+            screenBounds = window.map { $0.convertToScreen(convert(bounds, to: nil)) } ?? .zero
+        }
+
+        deinit {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+        }
+    }
+}
+
 /// The starfield (spec §8.7): vaults, harnesses and models as glowing sea-stars
 /// drifting in water. The majors — the vault and its harnesses — sit on the tips
 /// of an N-pointed star, so four majors read as a four-pointed star, seven as
@@ -155,11 +228,13 @@ struct EntityGraphView: View {
         .overlay(alignment: .topTrailing) { recentreControl }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .contentShape(RoundedRectangle(cornerRadius: 12))
+        .overlay { scrollCatcher }
         .gesture(
             panGesture
                 .simultaneously(with: magnifyGesture)
                 .simultaneously(with: rotateGesture)
         )
+        .help(Strings.Views.panHint)
         .onAppear { growConnection() }
         .onChange(of: activeHarnessID) { _, _ in
             growConnection()
@@ -509,18 +584,116 @@ struct EntityGraphView: View {
         }
     }
 
-    /// The name at the bottom of the pool — what a click in a codebase graph
-    /// would surface. Empty until something is hovered or chosen.
+    /// The card that blooms when a starfish is hovered or clicked (spec §8.7):
+    /// the plain facts the engine already handed us, laid out so a node is
+    /// inspectable at a glance. Nothing here needs a second call to the engine —
+    /// it is all in the report we already hold. Empty until something is chosen.
     @ViewBuilder
     private var readout: some View {
         if let subject {
-            Text(subject.subtitle ?? subject.title)
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(Palette.mauve)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+            let rows = facts(for: subject)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(kindLabel(subject.kind).uppercased())
+                        .font(.system(size: 8, weight: .bold, design: .monospaced))
+                        .foregroundStyle(subject.accent)
+                    Text(subject.title)
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(Palette.bone)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                if !rows.isEmpty {
+                    VStack(alignment: .leading, spacing: 2) {
+                        ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(row.label)
+                                    .font(.system(size: 8, design: .monospaced))
+                                    .foregroundStyle(Palette.mauve)
+                                    .frame(width: 56, alignment: .leading)
+                                Text(row.value)
+                                    .font(.system(size: 9, design: .monospaced))
+                                    .foregroundStyle(Palette.bone.opacity(0.92))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(width: 240, alignment: .leading)
+            .background(Palette.pool.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(subject.accent.opacity(0.4), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.28), radius: 7, y: 2)
+            .padding(9)
+            .transition(.opacity)
+        }
+    }
+
+    private func kindLabel(_ kind: GraphNode.Kind) -> String {
+        switch kind {
+        case .vault: return Strings.Detail.vault
+        case .harness: return Strings.Detail.harness
+        case .model: return Strings.Detail.model
+        }
+    }
+
+    /// What a clicked sea-star can tell you, all of it already in the report: a
+    /// vault says how much is in it and how Sea-Star found it; a harness says its
+    /// endpoint and how many models it serves; a model says which harness offers
+    /// it. Ordered most-useful first, and rows that would say nothing are left out.
+    private func facts(for node: GraphNode) -> [(label: String, value: String)] {
+        guard let report = controller.report else { return [] }
+        switch node.kind {
+        case .vault:
+            var rows: [(label: String, value: String)] = [
+                (Strings.Detail.notes, report.vault.noteCount.formatted()),
+                (Strings.Detail.found, Strings.Detail.source(report.vault.source)),
+            ]
+            let others = max(controller.vaultOptions.count - 1, 0)
+            if others > 0 {
+                rows.append((Strings.Detail.nearby, Strings.Detail.nearbyVaults(others)))
+            }
+            if let path = node.subtitle {
+                rows.append((Strings.Detail.path, path))
+            }
+            return rows
+
+        case .harness:
+            var rows: [(label: String, value: String)] = [
+                (Strings.Detail.endpoint, node.subtitle ?? Strings.States.unknown),
+            ]
+            if let harness = controller.harnessOptions
+                .first(where: { "harness:\($0.baseURL)" == node.id }) {
+                rows.append((
+                    Strings.Detail.models,
+                    Strings.Detail.modelCount(harness.models.count)
+                ))
+            }
+            rows.append((
+                Strings.Detail.status,
+                node.id == activeHarnessID ? Strings.Detail.current : Strings.Detail.available
+            ))
+            return rows
+
+        case .model:
+            var rows: [(label: String, value: String)] = []
+            let servers = controller.harnessOptions
+                .filter { $0.models.contains(node.title) }
+                .map(\.name)
+            if !servers.isEmpty {
+                rows.append((Strings.Detail.servedBy, servers.joined(separator: ", ")))
+            }
+            rows.append((
+                Strings.Detail.status,
+                node.title == report.model ? Strings.Detail.current : Strings.Detail.available
+            ))
+            return rows
         }
     }
 
@@ -554,12 +727,34 @@ struct EntityGraphView: View {
     private var panGesture: some Gesture {
         DragGesture(minimumDistance: 6)
             .onChanged { value in
-                offset = CGSize(
-                    width: panBase.width + value.translation.width,
-                    height: panBase.height + value.translation.height
-                )
+                if NSEvent.modifierFlags.contains(.option) {
+                    rotation = rotationBase + .radians(Double(value.translation.width) * 0.006)
+                } else {
+                    offset = CGSize(
+                        width: panBase.width + value.translation.width,
+                        height: panBase.height + value.translation.height
+                    )
+                }
             }
-            .onEnded { _ in panBase = offset }
+            .onEnded { _ in
+                if NSEvent.modifierFlags.contains(.option) {
+                    rotationBase = rotation
+                } else {
+                    panBase = offset
+                }
+            }
+    }
+
+    /// Mouse zoom. Trackpads have pinch, but a mouse has only the wheel, so the
+    /// wheel scales the pool the same way. Kept inert to clicks so it never
+    /// stands between the cursor and a sea-star.
+    private var scrollCatcher: some View {
+        GraphScrollCatcher { delta in
+            let next = min(max(scale * (1 + delta), 0.55), 2.6)
+            scale = next
+            scaleBase = next
+        }
+        .allowsHitTesting(false)
     }
 
     private var magnifyGesture: some Gesture {
