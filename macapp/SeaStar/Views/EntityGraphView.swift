@@ -21,6 +21,9 @@ private struct GraphNode: Identifiable {
 /// stills the whole pool. Harness tips are the next slice.
 struct EntityGraphView: View {
     let controller: ServerController
+    /// The pool's height in points. The cockpit opens it taller for the visual
+    /// reading than the text one would need, so the orbs and the tip note have room.
+    var height: CGFloat = 190
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovered: String?
@@ -45,7 +48,7 @@ struct EntityGraphView: View {
                 }
             }
         }
-        .frame(height: 190)
+        .frame(height: height)
         .background(backdrop)
         .overlay(alignment: .bottomLeading) { readout }
         .clipShape(RoundedRectangle(cornerRadius: 12))

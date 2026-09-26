@@ -18,7 +18,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var popover: NSPopover?
     private var settingsWindow: NSWindow?
 
-    private static let popoverWidth: CGFloat = 320
+    /// A first guess only. The hosting controller carries `.preferredContentSize`,
+    /// so the cockpit reports its own width — 320 for the rows, 420 for the
+    /// starfield (spec §8.7) — and the popover follows it. This just avoids an
+    /// undersized flash before that lands, so it matches the opening reading.
+    private static let popoverSize = NSSize(width: 420, height: 360)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureStatusItem()
@@ -41,17 +45,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The glyph wears whichever face the app is showing, so the Easter-egg
-    /// reroll lands in the menu bar too (spec §7). Marking the image as a
-    /// template lets the system tint it — white on a dark bar, black on a light
-    /// one — so the detailed starfish stays legible in both appearances.
+    /// reroll lands in the menu bar too (spec §7). The face is drawn as a
+    /// template by `AppIconMark`, band and all, so the system tints it — white
+    /// on a dark bar, black on a light one — and it matches the popover header
+    /// rather than drifting from it.
     private func applyStatusIcon() {
         guard let button = statusItem?.button else { return }
-        let icon = controller.currentIcon
-        let image = icon.asset.flatMap { NSImage(named: $0) }
-            ?? NSImage(systemSymbolName: icon.symbol, accessibilityDescription: Strings.MenuBar.label)
-        image?.isTemplate = true
-        image?.size = NSSize(width: 18, height: 18)
-        button.image = image
+        button.image = AppIconMark.menuBarImage(for: controller.currentIcon)
     }
 
     /// Re-arm observation after every change — `withObservationTracking` fires
@@ -81,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         hosting.sizingOptions = [.preferredContentSize]
         popover.contentViewController = hosting
-        popover.contentSize = NSSize(width: Self.popoverWidth, height: 360)
+        popover.contentSize = Self.popoverSize
         self.popover = popover
     }
 

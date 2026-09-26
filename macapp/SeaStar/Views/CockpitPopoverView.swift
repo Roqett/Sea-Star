@@ -73,6 +73,14 @@ struct CockpitPopoverView: View {
         return max(320, usable - 96)
     }
 
+    /// The two readings want different rooms (spec §8.7). The rows are happy in a
+    /// narrow column, but the starfield needs width so the harnesses on the right
+    /// edge and the tip note beside the active starfish stop crowding the frame —
+    /// the visual reading opens a bigger panel than the text one.
+    private var panelWidth: CGFloat { mode == .graph ? 420 : 320 }
+    private var bodyMaxHeight: CGFloat { mode == .graph ? 420 : 320 }
+    private var graphHeight: CGFloat { 260 }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
@@ -83,7 +91,7 @@ struct CockpitPopoverView: View {
                     }
                     switch mode {
                     case .graph:
-                        EntityGraphView(controller: controller)
+                        EntityGraphView(controller: controller, height: graphHeight)
                     case .list:
                         details
                     }
@@ -92,12 +100,12 @@ struct CockpitPopoverView: View {
                     }
                 }
             }
-            .frame(maxHeight: 320)
+            .frame(maxHeight: bodyMaxHeight)
             logs
             controls
         }
         .padding(18)
-        .frame(width: 320)
+        .frame(width: panelWidth)
         .frame(maxHeight: maxPopoverHeight)
         .background(Palette.canvas)
         .task { await controller.refresh() }

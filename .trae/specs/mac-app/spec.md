@@ -204,7 +204,11 @@ feel, lit from the rockpool palette.
 
 - **Monochrome template image** (`isTemplate = true`). The system tints it for light/dark
   and the active menu-bar state. No colour in the top bar — Apple protects that treatment.
-- The eight-armed star silhouette is the mark; a subtle variant/shape shift may signal
+- The **detailed starfish** cut is the mark — the same art as the popover header, so the two
+  surfaces cannot drift. The bare cut's eight spokes read as a **snowflake** (a loaded word in
+  the US market), so the mark draws a **solid band partway out from the fuzzy centre**: a
+  sea-star's body with the ray tips left free. That gives it a centre of mass without hardening
+  into a **cog**'s rim — neither shape is acceptable. A subtle variant/shape shift may signal
   "running" vs "stopped" (state conveyed by form, not colour).
 - App icon (Dock/Finder) is distinct from the menu-bar icon and is layered per Icon
   Composer; colour is allowed there.
@@ -226,9 +230,11 @@ On launch / on click of the menu-bar item:
 3. **Model** (§8.3) → list the models the *selected harness* reports; click to choose.
 4. **Go** → one button to start/stop the server; show state at a glance.
 
-The popover is a **fixed-width (320pt) column with a scrolling body**: the header and the
-start/stop controls stay pinned, and everything between them scrolls when there is more to
-say than fits. It never grows past the screen edge.
+The popover is a **column with a scrolling body**: the header and the start/stop controls stay
+pinned, and everything between them scrolls when there is more to say than fits. The reading the
+person chose sets the column's rooms — the **rows** stay in a 320pt column, while the **starfield
+opens wider and taller (420pt square)** so the harnesses on its right edge and the tip note beside
+the active starfish have space (§8.7). It never grows past the screen edge.
 
 Menu-bar item text stays short (≤ ~30 characters); push detail into the popover or a
 window.
@@ -294,6 +300,10 @@ the gear**. On **first launch** the popover asks which reading to open with (eit
 fine) and remembers the answer in `UserDefaults` (`SeaStar.cockpitMode`); thereafter the header
 icons swap between the two readings of the same facts. Until a preference exists, the graph is
 shown behind the question and neither icon is pressed.
+
+The starfield opens a **larger panel than the rows do** — roughly 420pt square against the rows'
+320pt column. It needs the width so the harnesses down the right edge and the tip note beside the
+active starfish stop crowding the frame, and the height so the orbs have room to drift (spec §8).
 
 The graph draws the roster as glowing nodes on a dark backdrop — the **vault** off to the
 left, each **harness** down the right edge, and the active harness's **models** ringing it.

@@ -438,9 +438,11 @@ No parallel agents active. Single-writer.
 - **Menu bar now wears the detailed starfish (spec §7).** The glyph was a solid star; the four
   faces collapsed to **one cut each** (`IconRoster`'s single `asset`, the former `Face*Header`),
   rendered as a **template** on every surface. The system tints it, so it is white on a dark menu
-  bar and black on a light one and the fine line art survives — and it is the same art as the
-  popover header, never orange. `AppIconMark` lost its `template` parameter; `AppDelegate.applyStatusIcon`
-  marks the image `isTemplate = true`.
+  bar and black on a light one and the fine line art survives. The bare cut read as a snowflake,
+  so `AppIconMark` now draws a **solid band partway out from the fuzzy centre** (a sea-star's
+  body, ray tips free) on both the header and the menu bar — the menu bar via
+  `AppIconMark.menuBarImage(for:)`. `AppDelegate.applyStatusIcon` now uses that helper instead of
+  loading the raw asset.
 - **Both panels gained light/dark mode; the starfield stays dark (spec §7).** `Palette.swift`
   rewritten into an **adaptive chrome** layer (`canvas`, `ink`, `inkMuted`, `logInk`, `logSurface`,
   via an `NSColor` dynamic provider on `bestMatch(.darkAqua/.aqua)`) plus a **fixed-dark `pool`**
@@ -457,8 +459,10 @@ No parallel agents active. Single-writer.
 
 **Half-finished / open**
 
-- **The old `Face*MenuBar` imagesets are now unreferenced** (`IconRoster` uses only `Face*Header`).
-  Harmless, but they can be pruned from the asset catalog when convenient.
+- **The old `Face*MenuBar` imagesets are kept on purpose.** `IconRoster` uses only the `Face*Header`
+  cut now, so the `MenuBar` cuts are unreferenced — but the founder wants them filed as **potential
+  tools** rather than pruned ("keep them because they're nice little files"). They stay in the
+  catalog, unlinked, for later.
 - **Onboarding shape — founder's idea, still not started** (two large Graph/List panels). Explicitly
   deferred to later.
 - **Inverse (dark-on-light) starfield variant** — the founder floated it ("maybe an inverse one might
@@ -466,5 +470,39 @@ No parallel agents active. Single-writer.
 
 **Single next step**
 
-- Founder: relaunch to see the detailed menu-bar starfish and the light/dark panels; then decide on
-  pruning the `Face*MenuBar` imagesets and whether to schedule the two-panel onboarding.
+- Founder: relaunch to see the banded menu-bar starfish, the light/dark panels, and the larger
+  starfield panel; then decide whether to schedule the two-panel onboarding.
+
+---
+
+## Handoff — 2026-09-26 (panel sizing, banded icon)
+
+**Done**
+
+- **The two readings got their own rooms (spec §8, §8.7).** The popover was a fixed 320pt column for
+  both readings, which crowded the starfield. `CockpitPopoverView` now sizes by mode — **graph
+  420×420** (graph height 260), **list 320×320** — via `panelWidth` / `bodyMaxHeight` / `graphHeight`,
+  and `EntityGraphView` gained a `height` parameter. The rows are happy in the narrow column; the
+  starfield gets the width for the right-edge harnesses and the height for the tip note.
+- **The icon stopped reading as a snowflake (spec §7).** `AppIconMark` draws a **solid band partway
+  out from the fuzzy centre** — a sea-star's body with the ray tips free, so it reads as neither a
+  snowflake's spokes nor a cog's rim. The ratio was chosen by eye against a rendered set of
+  alternatives: **`bandDiameter` 0.55, `bandWidth` 0.12** (thinner and the ring thins away at
+  menu-bar sizes; wider or further out and it starts to read as a cog). Added
+  `AppIconMark.menuBarImage(for:)` so the **menu bar** draws the same band as a template;
+  `AppDelegate.applyStatusIcon` now calls it instead of loading the raw asset.
+- **The popover's opening size follows the reading.** `AppDelegate`'s stale 320pt guess is now
+  `popoverSize` (420×360, matching the graph default); the hosting controller's
+  `.preferredContentSize` still drives the real width from the view.
+- **Wording:** dropped the colour absolute from CHANGELOG/PROGRESS (UI absolutes are out).
+- **`Face*MenuBar` imagesets kept** as potential tools (see above).
+
+**Verified**
+
+- `xcodebuild test` — 28 tests in 8 suites pass; `xcodebuild build` succeeds; app relaunched.
+- The band was checked against the four faces in header-accent and menu-bar tints at 40/26/18pt
+  (throwaway `iconpeek` preview under `~/Random_MCP/iconpeek`).
+
+**Single next step**
+
+- The founder judges the band on the live menu bar and popover.

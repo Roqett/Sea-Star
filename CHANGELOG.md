@@ -12,10 +12,13 @@ Date: 2026-09-26
 
 Summary of Changes:
 - **The menu bar wears the detailed starfish, in both appearances (spec §7).** The glyph was a
-  solid star; it now shows the same detailed starfish as the popover header — the same art, never
-  orange. The four faces collapsed to a **single cut each** (`IconRoster`'s `asset`, the former
-  `Face*Header`), rendered as a **template** on every surface, so the system tints it white on a
-  dark menu bar and black on a light one and the fine line art stays legible either way.
+  solid star; it now shows the same detailed starfish as the popover header, drawn by the one
+  `AppIconMark` so the two can't drift. The four faces collapsed to a **single cut each**
+  (`IconRoster`'s `asset`, the former `Face*Header`), rendered as a **template** on every
+  surface, so the system tints it white on a dark menu bar and black on a light one and the fine
+  line art stays legible either way. The bare cut read as a snowflake, so the mark now draws a
+  **solid band partway out from the fuzzy centre** — a sea-star's body, with the ray tips still
+  free — which keeps it from reading as either a snowflake's spokes or a cog's rim.
 - **Both panels gained light and dark mode; the starfield stays dark (spec §7).** `Palette.swift`
   now splits into an **adaptive chrome** layer (`canvas`, `ink`, `inkMuted`, `logInk`, `logSurface`)
   that resolves per appearance — an `NSColor` dynamic provider keyed on
