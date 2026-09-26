@@ -10,6 +10,12 @@
 > **Revision 2** folds in the founder's directive for **two first-class instruction tracks**
 > (§10, D9) and **corrects §9**: a native, headless Xcode MCP path exists for macOS, so the
 > earlier *"macOS must be shell-first because the plugin is iOS-only"* note was wrong.
+> **Revision 3** records the founder's standing **north-star: delight** — the app must earn a
+> place on someone's Mac through *a ton of really nice little touches and actual usefulness*,
+> the "grab it and use it" feeling that makes a small indie GitHub project one people warm to.
+> It is a **design constraint on every change**, not a slogan: nothing ships if it works but
+> feels ordinary. Held together with the first rule — it must **work exceptionally well** at
+> what it is for; charm never excuses a broken core (see §2, Goal 7).
 > Source of truth for the workstream: [HANDOVER-mac-app.md](file:///Users/lono/Random_MCP/theSeaStar/docs/HANDOVER-mac-app.md).
 > Live build state: [PROGRESS.md](file:///Users/lono/Random_MCP/theSeaStar/docs/PROGRESS.md).
 
@@ -27,7 +33,7 @@ server.
   a *default*, not a cage: a **terminal-first** track ships alongside it (§10, D9), so
   CLI-comfortable users are served just as well.
 - **Engine status:** done and green — `uv run ruff check .` clean, `uv run pytest` →
-  27 passing, version `0.1.0` (unreleased). Re-verified at this revision. The two
+  51 passing, version `0.1.0` (unreleased). Re-verified at this revision. The two
   groundwork items the GUI leans on are in: `doctor --json` (§6) and per-server
   `include`/`exclude` tool scoping (§5, D8). Neither has dedicated tests yet — see T1.5
   and T1.6.
@@ -41,10 +47,17 @@ server.
 5. Shippable to the founder first as a local build; notarised later for other people.
 6. **Two equally-easy instruction tracks** — GUI-first (zero terminal) and terminal-first
    (CLI parity) — so neither audience is alienated (§10, D9).
+7. **Delight, on top of a flawless core.** The product must *work exceptionally well* at what
+   it is for — that comes first and never bends for polish. On that foundation, every surface
+   should carry small, real kindnesses: genuine usefulness plus the little touches that make a
+   person smile and keep the app. Aim it at someone who finds it on GitHub and *warms to it*
+   on sight (§ Revision 3 north-star). Concretely: honest state (the pill must never lie),
+   plain-language messages instead of codes, restrained defaults, and the day-to-day flows that
+   feel effortless — with the Easter-egg faces (§7) as the charm, not the substance.
 
 ## 3. Non-goals (v1)
 
-- No rewrite of the Python engine. Keep the 27 tests green.
+- No rewrite of the Python engine. Keep the 51 tests green.
 - No cross-platform (Windows/Linux) GUI **in v1**. A port to **Omarchy** (Arch Linux +
   Hyprland) is planned as **upcoming work** — tracked here, but not part of this
   workstream.
@@ -237,6 +250,13 @@ opens wider and taller (~460pt square)** so the harnesses on its right edge and 
 the active starfish have space (§8.7). The reading is only open for a moment, so it may be large;
 the middle gets a definite height (not a flexible max) so the popover opens whole rather than
 clipping itself, and it is clamped only to keep the bottom on-screen.
+
+**The server must be held open.** `sea-star serve` speaks MCP over **stdin/stdout** — the instant
+its stdin reaches EOF it exits, silently. So the app must give the child a **pipe it keeps open**
+(a `Pipe` set as `standardInput`), never the inherited handle; a menu-bar app's own stdin is
+closed, so a child left to inherit it dies at once while the toggle still reads *running*. The app
+also watches the child's exit and clears its state when the process ends, so the shown state always
+matches a live process (§8.8 logs the transition).
 
 Menu-bar item text stays short (≤ ~30 characters); push detail into the popover or a
 window.
@@ -432,7 +452,7 @@ The same engine, driven directly. Full parity with the GUI:
 See [checklist.md](file:///Users/lono/Random_MCP/theSeaStar/.trae/specs/mac-app/checklist.md).
 Top-level: the founder can complete detect → choose → start → stop without ever opening a
 terminal, a terminal-comfortable user can do the same entirely from the CLI (§10), and the
-engine's 27 tests stay green.
+engine's 51 tests stay green.
 
 ## 12. Risks / open questions
 

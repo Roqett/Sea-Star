@@ -79,40 +79,21 @@ struct CockpitPopoverView: View {
     /// visual reading opens a wider panel than the text one.
     private var panelWidth: CGFloat { mode == .graph ? 460 : 340 }
 
-    /// How tall the scrolling middle is. This is a concrete height, not a flexible
-    /// `maxHeight`: a flexible middle leaves the popover's preferred size
-    /// undecided, so it opened undersized and clipped its own content. A definite
-    /// height makes the fitting size deterministic, so the popover always opens
-    /// whole. It is clamped to the screen only to keep the bottom visible.
-    private var bodyHeight: CGFloat {
-        let chrome: CGFloat = 250
-        let desired: CGFloat = mode == .graph ? 460 : 360
-        return max(220, min(desired, maxPopoverHeight - chrome))
+    /// The pool's height for the visual reading. The starfield wants room, so it
+    /// takes a fixed, generous one — but it is clamped so the whole panel (header,
+    /// pool, logs and controls) still fits on the display. The rows reading has no
+    /// pool: it hugs its own content, so the popover is exactly as tall as it
+    /// needs to be and never shows a half-empty void.
+    private var graphHeight: CGFloat {
+        let chrome: CGFloat = 250 + (isLogsExpanded ? 190 : 0)
+        let desired: CGFloat = 460
+        return max(200, min(desired, maxPopoverHeight - chrome))
     }
-
-    /// The graph fills the scrolling middle so the starfield gets the room.
-    private var graphHeight: CGFloat { bodyHeight }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if !hasChosenMode {
-                        firstRunChoice
-                    }
-                    switch mode {
-                    case .graph:
-                        EntityGraphView(controller: controller, height: graphHeight)
-                    case .list:
-                        details
-                    }
-                    if let message = controller.message {
-                        guidance(message)
-                    }
-                }
-            }
-            .frame(height: bodyHeight)
+            content
             logs
             controls
         }
@@ -126,6 +107,30 @@ struct CockpitPopoverView: View {
         ) { result in
             if case .success(let url) = result {
                 controller.selectVault(url.path)
+            }
+        }
+    }
+
+    /// The middle of the cockpit: the first-run choice, the chosen reading, and
+    /// any guidance line. It is deliberately *not* wrapped in a scroll view — a
+    /// scroll view has no natural height, so the popover could never size itself
+    /// to its content and the panel showed a half-empty void, nested frames and
+    /// clipped edges. Without it the pool carries its own definite height and the
+    /// rows simply hug theirs, so the panel is exactly as tall as it needs to be.
+    @ViewBuilder
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            if !hasChosenMode {
+                firstRunChoice
+            }
+            switch mode {
+            case .graph:
+                EntityGraphView(controller: controller, height: graphHeight)
+            case .list:
+                details
+            }
+            if let message = controller.message {
+                guidance(message)
             }
         }
     }
@@ -348,13 +353,7 @@ struct CockpitPopoverView: View {
         enabled: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 12, weight: .regular, design: .monospaced))
-                .foregroundStyle(enabled ? Palette.ink.opacity(0.85) : Palette.inkMuted.opacity(0.4))
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
+        ControlWord(title: title, enabled: enabled, action: action)
     }
 
     // MARK: - Logs
@@ -580,5 +579,36 @@ private struct PickerRow: View {
 
             Spacer(minLength: 0)
         }
+    }
+}
+
+/// The Start/Refresh control, wearing a soft ground under the pointer the way
+/// the logs row already does. It is the same plain word, unmoved; only a faint
+/// capsule appears, so the panel answers the cursor without the button ever
+/// shouting over its own prose. The ground hides when the control is disabled,
+/// so an inert word never looks pressable.
+private struct ControlWord: View {
+    let title: String
+    let enabled: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .regular, design: .monospaced))
+                .foregroundStyle(enabled ? Palette.ink.opacity(0.85) : Palette.inkMuted.opacity(0.4))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    Palette.ink.opacity(enabled && hovering ? 0.10 : 0),
+                    in: RoundedRectangle(cornerRadius: 6)
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .onHover { hovering = $0 }
     }
 }

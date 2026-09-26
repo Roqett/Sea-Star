@@ -251,7 +251,10 @@ struct EntityGraphView: View {
                     .transition(.scale(scale: 0.65, anchor: .trailing).combined(with: .opacity))
                 }
             }
-            .position(x: max(point.x - 98, 88), y: point.y - 26)
+            // Keep the note inside the pool: it rides just above the active
+            // starfish, but is clamped so a harness near the top edge (or the
+            // left edge) can never push the note outside the clipped frame.
+            .position(x: max(point.x - 98, 88), y: max(point.y - 26, 52))
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: tipExpanded)
         }
     }

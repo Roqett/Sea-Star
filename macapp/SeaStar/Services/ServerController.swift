@@ -44,6 +44,13 @@ final class ServerController {
 
     private let command: EngineCommand?
     private var serveProcess: Process?
+    /// The write end of the server's stdin. `serve` is a stdio MCP server: the
+    /// moment its stdin hits EOF it shuts down. A `Process` whose standardInput
+    /// is left unset inherits the app's own stdin — closed for a menu-bar app —
+    /// so the child saw EOF and exited instantly while the pill still read
+    /// "Running". Holding this pipe open keeps the server genuinely alive; it is
+    /// released only when the server is stopped.
+    private var serveInput: Pipe?
 
     /// The rolling log of engine output (spec §8.8). It lives here because the
     /// engine process does — everything the engine prints lands in one place,
@@ -253,12 +260,27 @@ final class ServerController {
             process.environment = ProcessInfo.processInfo.environment
                 .merging(invocation.environment) { _, override in override }
         }
+        let inputPipe = Pipe()
+        process.standardInput = inputPipe
         process.standardOutput = Pipe()
         process.standardError = Pipe()
+
+        process.terminationHandler = { [weak self] proc in
+            let status = proc.terminationStatus
+            let reason = proc.terminationReason == .uncaughtSignal ? "signal" : "exit"
+            Task { @MainActor in
+                guard let self, self.serveProcess === process else { return }
+                self.isServerRunning = false
+                self.serveProcess = nil
+                self.serveInput = nil
+                self.logs.append("engine exited on its own · \(reason) \(status)")
+            }
+        }
 
         do {
             try process.run()
             serveProcess = process
+            serveInput = inputPipe
             isServerRunning = true
             message = nil
             logs.append("engine started · \(invocation.executableURL.lastPathComponent)")
@@ -287,8 +309,9 @@ final class ServerController {
         (serveProcess?.standardError as? Pipe)?.fileHandleForReading.readabilityHandler = nil
         serveProcess?.terminate()
         serveProcess = nil
+        serveInput = nil
         isServerRunning = false
-        logs.append("engine stopped")
+        logs.append("engine stopped by request")
     }
 
     private func apply(failure: String) {

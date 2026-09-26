@@ -511,3 +511,61 @@ No parallel agents active. Single-writer.
 **Single next step**
 
 - The founder judges the band on the live menu bar and popover.
+
+## Handoff — 2026-09-26 (the server that never stayed up)
+
+**Done**
+
+- **Found the real reason "Start" never worked.** `sea-star serve` is a **stdio MCP server**: the
+  instant its `stdin` reaches EOF it shuts down. `ServerController.startServer` built a `Process`
+  but never set `standardInput`, so the child **inherited the app's own stdin — closed for a
+  menu-bar app** — saw EOF, and exited in the same breath. Meanwhile `isServerRunning` stayed
+  `true`, so the pill read **Running** while nothing was actually serving. This is the bug behind
+  the founder's "it looks amazing, but it's still not actually working".
+- **The fix (`ServerController`).** Hold a `Pipe` open as the child's stdin (`serveInput`), so the
+  server stays genuinely alive; add a `terminationHandler` that clears `isServerRunning` /
+  `serveProcess` / `serveInput` and logs `engine stopped` if the child ever dies on its own; release
+  the pipe in `stopServer()`. State now tells the truth in both directions.
+- **Proved the lifecycle both ways** (faithful to the app's exact invocation
+  `.venv/bin/sea-star serve`): **stdin closed → exits in ~0s** (the bug); **stdin held open →
+  still alive after 4s** (the fix). Reproduced headlessly while the Mac was locked.
+- **One canonical run path.** New `script/build_and_run.sh` (kill → `xcodegen generate` →
+  `xcodebuild -derivedDataPath build` → `open` the *fresh* bundle; modes
+  `run`/`--debug`/`--logs`/`--telemetry`/`--verify`) plus `.codex/environments/environment.toml`
+  wiring the Codex **Run** button to it. Removed the stale
+  `~/Library/Developer/Xcode/DerivedData/SeaStar-…` bundle so the old binary can no longer be
+  launched by accident.
+
+**Verified**
+
+- `./script/build_and_run.sh --verify` → **BUILD SUCCEEDED**, "OK: Sea-Star is running from
+  `macapp/build/Build/Products/Debug/Sea-Star.app`".
+- The **currently-running** bundle contains the fix: `nm`/`strings` on
+  `Sea-Star.debug.dylib` show the `serveInput` property and the `engine stopped` string
+  (binary built 14:40, after `ServerController.swift` 14:37).
+- The panel renders correctly in both readings (graph: full starfield, tip inside the frame;
+  list: rows hug content); the tip "Got it" settles to *"osaurus is connected — 1 model on
+  offer."*; the log count updates on a refresh.
+- `xcodebuild … test` → **28 tests in 8 suites pass**.
+
+**Round-trip confirmed (screen unlocked).**
+
+- Rebuilt with `./script/build_and_run.sh run` (BUILD SUCCEEDED), then drove the popover via
+  System Events:
+  - **Start** → a real `.venv/bin/sea-star serve` process appeared and **stayed alive** (PID
+    47238; independently re-checked ~20s later — still running).
+  - **Stop** → process **gone**, log `engine stopped by request`.
+  - **Start** again → PID 47288 alive 5s+, log `engine started · sea-star`.
+- The two stop paths are now distinguishable in the log: `terminationHandler` writes
+  **`engine exited on its own · <reason> <status>`**, `stopServer()` writes
+  **`engine stopped by request`** — so a future spontaneous exit names itself (and its exit
+  code/signal) instead of hiding behind the same line.
+- Isolation proof of the spawn pattern: an app-exact probe (`script/serve_spawn_probe.swift` —
+  environment merge + three pipes + readability handlers + held stdin) keeps the child alive a
+  full 15s, matching the live app. The earlier one-off ~4s exit did not reproduce on a clean,
+  settled app and is now instrumented to name itself if it recurs.
+
+**Open**
+
+- Commit the `ServerController` lifecycle fix + `script/build_and_run.sh` +
+  `.codex/environments/environment.toml` + docs (PROGRESS/spec) to PR #2.
