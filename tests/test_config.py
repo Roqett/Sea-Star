@@ -21,6 +21,7 @@ from sea_star.config import (
     load_config,
     probe_endpoint,
     probe_runtimes,
+    read_osaurus_default_model,
     resolve_vault,
     scan_ports,
     write_default_config,
@@ -81,11 +82,28 @@ async def test_probe_runtimes_reports_every_live_server(monkeypatch):
         }.get(base_url)
 
     monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
+    # Osaurus answers only the placeholder ``foundation``; its real model lives in
+    # its own config, so the probe substitutes the configured binding. Keep this
+    # hermetic — never read the machine's real ``~/.osaurus``.
+    monkeypatch.setattr(
+        "sea_star.config.read_osaurus_default_model",
+        lambda home=None: "omlx/Dirk-Qwen3.8-27B-MLX-oQ6e",
+    )
     probes = await probe_runtimes()
     assert [(probe.name, probe.base_url, probe.model) for probe in probes] == [
-        ("osaurus", "http://127.0.0.1:1337/v1", "foundation"),
+        ("osaurus", "http://127.0.0.1:1337/v1", "omlx/Dirk-Qwen3.8-27B-MLX-oQ6e"),
         ("omlx", "http://127.0.0.1:8009/v1", "mlx-community/Qwen3"),
     ]
+
+
+async def test_probe_runtimes_keeps_foundation_when_osaurus_unconfigured(monkeypatch):
+    async def fake(base_url, *, timeout=1.5):
+        return (["foundation"], None) if base_url == "http://127.0.0.1:1337/v1" else None
+
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
+    monkeypatch.setattr("sea_star.config.read_osaurus_default_model", lambda home=None: None)
+    probes = await probe_runtimes()
+    assert [(probe.name, probe.model) for probe in probes] == [("osaurus", "foundation")]
 
 
 async def test_probe_runtimes_keeps_scan_order(monkeypatch):
@@ -299,3 +317,32 @@ def test_allows_exclude_beats_include():
     spec = MCPServerSpec(name="s", command="c", include=("search", "delete"), exclude=("delete",))
     assert spec.allows("search")
     assert not spec.allows("delete")
+
+
+def _write_osaurus_agent(home: Path, payload: dict) -> None:
+    config = home / ".osaurus" / "config"
+    config.mkdir(parents=True, exist_ok=True)
+    (config / "default-agent.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_read_osaurus_default_model_reads_config(tmp_path):
+    _write_osaurus_agent(tmp_path, {"defaultModel": "omlx/Dirk-Qwen3.8-27B-MLX-oQ6e"})
+    assert (
+        read_osaurus_default_model(home=tmp_path) == "omlx/Dirk-Qwen3.8-27B-MLX-oQ6e"
+    )
+
+
+def test_read_osaurus_default_model_absent_is_none(tmp_path):
+    assert read_osaurus_default_model(home=tmp_path) is None
+
+
+def test_read_osaurus_default_model_unreadable_is_none(tmp_path):
+    config = tmp_path / ".osaurus" / "config"
+    config.mkdir(parents=True, exist_ok=True)
+    (config / "default-agent.json").write_text("{not json", encoding="utf-8")
+    assert read_osaurus_default_model(home=tmp_path) is None
+
+
+def test_read_osaurus_default_model_nameless_is_none(tmp_path):
+    _write_osaurus_agent(tmp_path, {"defaultModel": "   "})
+    assert read_osaurus_default_model(home=tmp_path) is None

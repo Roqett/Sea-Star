@@ -30,6 +30,15 @@ DEFAULT_API_KEY = "seastar-local"
 
 LOCAL_HOST = "127.0.0.1"
 
+#: The one runtime Sea-Star treats specially. Osaurus hides the model it is
+#: actually bound to behind a placeholder over its API (``/v1/models`` answers
+#: only ``foundation``), so its real model has to be read from Osaurus's own
+#: config rather than believed from the endpoint — see
+#: :func:`read_osaurus_default_model`.
+OSAURUS_RUNTIME_NAME = "osaurus"
+OSAURUS_HOME_DIRNAME = ".osaurus"
+OSAURUS_DEFAULT_AGENT = ("config", "default-agent.json")
+
 KNOWN_RUNTIMES: tuple[tuple[str, str], ...] = (
     ("osaurus", "http://127.0.0.1:1337/v1"),
     ("ollama", "http://127.0.0.1:11434/v1"),
@@ -252,6 +261,13 @@ async def probe_runtimes(*, timeout: float = PROBE_TIMEOUT_SECONDS) -> tuple[Run
             continue
         models, owner = answer
         name = owner or NAMED_PORTS.get(port) or "local"
+        if name == OSAURUS_RUNTIME_NAME:
+            # Osaurus advertises only the placeholder ``foundation``; the model it
+            # is really bound to lives in its own config. Trust that over the
+            # endpoint, or the cockpit would name a model nobody can select.
+            configured = read_osaurus_default_model()
+            if configured:
+                models = [configured]
         probes.append(
             RuntimeProbe(
                 name=name,
@@ -340,6 +356,33 @@ def detect_vault(home: Path | None = None) -> Path | None:
 
     candidates = detect_vault_candidates(home)
     return candidates[0] if candidates else None
+
+
+def read_osaurus_default_model(home: Path | None = None) -> str | None:
+    """The model Osaurus is actually bound to, read from Osaurus's own config.
+
+    Osaurus never names that model over its API — ``/v1/models`` answers only the
+    placeholder ``foundation`` — so when the person has pointed Osaurus at a real
+    provider (oMLX, say) the binding is visible only in
+    ``~/.osaurus/config/default-agent.json``. Returns ``None`` when that file is
+    absent, unreadable or nameless, so a caller can fall back to the probe.
+    """
+
+    path = (
+        (home or Path.home())
+        .expanduser()
+        .joinpath(OSAURUS_HOME_DIRNAME, *OSAURUS_DEFAULT_AGENT)
+    )
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    model = data.get("defaultModel") or data.get("default_model") or data.get("model")
+    if isinstance(model, str) and model.strip():
+        return model.strip()
+    return None
 
 
 def read_config_file(path: Path | None = None) -> dict:

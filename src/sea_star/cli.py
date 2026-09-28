@@ -20,6 +20,7 @@ from rich.markup import escape
 
 from . import __version__
 from .agent import build_agent
+from .agents import detect_agents
 from .config import (
     ConfigError,
     detect_vault_candidates,
@@ -30,6 +31,7 @@ from .config import (
     resolve_vault,
     write_default_config,
 )
+from .harnesses import detect_latent_harnesses
 from .mcp_server import create_server
 from .vault import Vault
 
@@ -55,7 +57,11 @@ async def _build_report() -> dict:
     vault_path, vault_source = resolve_vault(read_config_file())
     probes = await probe_runtimes()
     config = await load_config(probes=probes)
-    models = await probe_base_url(config.base_url)
+    # Trust the resolved probe's model list when there is one: it carries the
+    # Osaurus fix-up (the configured model in place of ``foundation``), which a
+    # fresh probe of the same endpoint would not.
+    live = next((probe for probe in probes if probe.base_url == config.base_url), None)
+    models = list(live.models) if live is not None else await probe_base_url(config.base_url)
     return {
         "schema_version": BRIDGE_SCHEMA_VERSION,
         "ready": bool(models),
@@ -70,6 +76,22 @@ async def _build_report() -> dict:
         "base_url": config.base_url,
         "model": config.model,
         "models": models or [],
+        "agents": [
+            {
+                "name": spec.name,
+                "model": spec.model,
+                "description": spec.description,
+            }
+            for spec in detect_agents(vault_path)
+        ],
+        "latent_harnesses": [
+            {
+                "name": spec.name,
+                "bundle_id": spec.bundle_id,
+                "path": spec.path,
+            }
+            for spec in detect_latent_harnesses(active=(probe.name for probe in probes))
+        ],
         "runtimes": [
             {
                 "name": probe.name,
@@ -158,6 +180,12 @@ def doctor(
         console.print(f"Bridged MCP servers: {names}")
     else:
         console.print("Bridged MCP servers: none")
+    if report["agents"]:
+        names = ", ".join(agent["name"] for agent in report["agents"])
+        console.print(f"Agents:   {names}")
+    if report["latent_harnesses"]:
+        names = ", ".join(harness["name"] for harness in report["latent_harnesses"])
+        console.print(f"Latent:   {names}")
     console.print("[green]Ready.[/green]")
 
 

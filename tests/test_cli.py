@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 from sea_star import __version__
 from sea_star.cli import app
 from sea_star.config import RuntimeProbe
+from sea_star.harnesses import HarnessSpec
 
 runner = CliRunner()
 
@@ -18,6 +19,9 @@ runner = CliRunner()
 def _clean_env(monkeypatch):
     for key in ("SEASTAR_VAULT", "SEASTAR_BASE_URL", "SEASTAR_MODEL", "SEASTAR_API_KEY", "SEASTAR_RUNTIME"):
         monkeypatch.delenv(key, raising=False)
+    # Latent-harness discovery reads the real /Applications; keep every bridge
+    # test hermetic unless a test opts back in by re-patching.
+    monkeypatch.setattr("sea_star.cli.detect_latent_harnesses", lambda **kwargs: ())
 
 
 def _async_return(value):
@@ -74,6 +78,7 @@ def test_doctor_json_emits_the_bridge_shape(tmp_path, monkeypatch):
     assert report["model"] == "test-model"
     assert report["models"] == ["test-model"]
     assert report["runtimes"] == []
+    assert report["latent_harnesses"] == []
     assert report["server"] == {"state": "running"}
     assert report["servers"] == [
         {"name": "obsidian", "command": "npx", "include": ["search"], "exclude": ["delete"]}
@@ -112,6 +117,34 @@ def test_doctor_json_reports_every_running_harness(tmp_path, monkeypatch):
             "model": "mlx-community/Qwen3",
             "models": ["mlx-community/Qwen3"],
         },
+    ]
+
+
+def test_doctor_json_reports_latent_harnesses(tmp_path, monkeypatch):
+    _write_vault(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sea_star.cli.probe_base_url", _async_return(["test-model"]))
+    monkeypatch.setattr("sea_star.cli.probe_runtimes", _async_return(()))
+    monkeypatch.setattr("sea_star.cli.detect_vault_candidates", lambda home=None: ())
+    monkeypatch.setattr(
+        "sea_star.cli.detect_latent_harnesses",
+        lambda **kwargs: (
+            HarnessSpec(
+                name="Xcode", bundle_id="com.apple.dt.Xcode", path="/Applications/Xcode.app"
+            ),
+            HarnessSpec(
+                name="Goose", bundle_id="com.electron.goose", path="/Applications/Goose.app"
+            ),
+        ),
+    )
+
+    result = runner.invoke(app, ["doctor", "--json"])
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert report["latent_harnesses"] == [
+        {"name": "Xcode", "bundle_id": "com.apple.dt.Xcode", "path": "/Applications/Xcode.app"},
+        {"name": "Goose", "bundle_id": "com.electron.goose", "path": "/Applications/Goose.app"},
     ]
 
 
