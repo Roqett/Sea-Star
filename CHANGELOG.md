@@ -8,6 +8,147 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Harness: TRAE
 
+Model: unknown (the active harness does not report its own model id to this session)
+
+Routing: omlx → Dirk-Qwen3.8-27B-MLX-oQ6e (per `sea-star doctor` on this machine)
+
+Date: 2026-09-26 (late — a **backfill**, see note)
+
+Summary of Changes:
+- **Backfill for two commits that shipped without an entry.** The graph work below was
+  committed and pushed on 2026-09-26 (`f427d37`, `74f63b9`) but never written up here, so
+  the changelog described a *smaller* product than the one that had actually shipped. This
+  entry records **only what those two commits contain**; later uncommitted work on the same
+  view is written up in the 2026-09-28 entry below and is deliberately not claimed here. The
+  original commits are untouched, per the append-only rule.
+- **The cockpit graph became a tactile, star-shaped, multicoloured canvas** (`f427d37`). The
+  starfield is no longer a scatter of dots: the majors — the **vault** and its **harnesses**
+  — now sit on the **tips of an N-pointed star**, drawn out to the panel edge, with a faint
+  star outline and rays behind them. So four majors read as a four-pointed star and seven as
+  seven, and the *shape itself* is a count of what is connected. Each node wears a
+  five-armed sea-star glyph whose hues are **seeded from its entity id** — never random, so a
+  given vault/harness/model always spins the same blend around its own colour. The pool
+  became an object you handle: **drag to pan, pinch to zoom, twist to turn**, with a recentre
+  control to tide it back. Panel widths followed: **graph 600pt, list 360pt**, so the tip
+  note never truncates, and Start/Refresh gained a tactile hover ground.
+- **Clicking a node blooms a detail card** (`74f63b9`). A sea-star was already hoverable and
+  clickable but said nothing back, which made the graph look alive and feel dead. A click now
+  opens a small card carrying only facts the engine had **already** handed over in the report
+  — no second call: for a **vault**, the note count, how it was found, the other vaults
+  nearby and the full path; for a **harness**, its endpoint, how many models it serves, and
+  whether it is current or merely available; for a **model**, which harness serves it and
+  whether it is current or available. All copy lives in `Strings.Detail`.
+- **A mouse can drive the pool** (`74f63b9`). Only a trackpad can pinch and twist, so without
+  help a mouse user could not zoom or turn the graph at all. An **app-local event monitor**
+  now reads the wheel and a right/middle-drag while the popover is open, zooming **toward the
+  cursor** (the point under the pointer stays put) and spinning the pool like an object in
+  the hand. The monitor swallows the event so nothing behind the graph reacts, and its
+  `hitTest` returns `nil` so ordinary clicks and hovers still fall through to the sea-stars
+  beneath it — the catch never blocks the thing it is catching. The pan hint now names both
+  devices.
+- Verified at the time of the backfill: `xcodebuild … build` → **BUILD SUCCEEDED**;
+  `xcodebuild … test` → **29 Swift Testing cases in 8 suites passing**; `uv run pytest` →
+  **76 passed**; `uv run ruff check .` → clean. All four re-run during this backfill, not
+  quoted from an earlier note.
+
+Harness: TRAE
+
+Model: unknown (the active harness does not report its own model id to this session)
+
+Routing: omlx → Dirk-Qwen3.8-27B-MLX-oQ6e (per `sea-star doctor` on this machine)
+
+Date: 2026-09-28
+
+Summary of Changes:
+- **New binding foundation document (`docs/foundation.md`).** The founder identified that
+  Sea-Star had been built around the specific harnesses installed on his machine rather
+  than around capabilities, and asked for that to be written down as a foundation rule. The
+  lead clause is **"no name is ever a precondition"** — every known name is a hint that
+  improves a label, and its absence may never reduce what is displayed. Records the
+  eight-rung **capability ladder** (declared → present → running → listening →
+  self-describing → agent-aware → activity-aware → caller-attributed), the **degradation
+  contract** (show the highest rung reached, and show the rung; never claim above what was
+  established), **MCP as the generic adapter** (ask an unknown harness rather than know it),
+  and a symmetry clause — anything Sea-Star can prove must be callable over MCP, not only
+  drawable in the app. Four items of **known debt** are logged against the document so the
+  gap is visible rather than rediscovered.
+- **`AGENTS.md` now points at `docs/foundation.md`** as the foundation document (previously
+  `README.md` "until `docs/` exists"), and `docs/README.md` indexes it. The repository front
+  page is explicitly the shopfront, not the foundation.
+- **New `DECISIONS.md` (D-001), and the panel ontology is now decided rather than open.**
+  `AGENTS.md`'s definition of done requires a decision to be recorded here whenever it affects
+  architecture, UX flow, or product values, and the `Harness`/`Agent`/`Inference` split is
+  exactly that. The founder raised the split and then explicitly declined to resolve it, so the
+  call was made under the one-recommendation rule and the reasoning written down. The decision:
+  the **`Harness` row keeps its picker**, because switching harness is a real, already-shipped
+  action and the picker is not the defect — the **server URL in that row is the defect**. So the
+  endpoint descends to the new `Inference` row, where it is a property of a call rather than of
+  an app, and `Agent` becomes strictly additive. Moving selection to `Agent` would have deleted
+  a working control to fix a display collapse. Entry is immutable; a reversal is a new entry
+  that supersedes it. **The panel itself is not built yet** — this records the decision only.
+- **The state card no longer requires a click (`macapp/SeaStar/Views/EntityGraphView.swift`).**
+  The readout was bound to `selected ?? hovered`, so with neither set there was no card at
+  all and the graph opened looking empty — the "models and complexity around the active node"
+  were only visible after clicking. `subject` now falls back to the active harness, so the
+  endpoint/models/status state is on screen the moment the popover opens. Click and hover
+  still override, so inspecting any other node is unchanged.
+- **Idle harnesses now float by default (`macapp/SeaStar/Services/ServerController.swift`).**
+  Latent harnesses were stored as an *enabled* set that defaulted to empty, so every
+  installed-but-idle app was hidden until asked for — the same "boring" symptom from the
+  panel side. The preference is now stored as a **hidden** set (`SeaStar.latentHarnessesOff`),
+  so everything detected is in view until deliberately taken off. The old key held the
+  opposite meaning, so reusing it would have inverted every existing choice; it is moved to
+  a new key and the stale one is removed on launch. One-time consequence: a previously
+  hidden app reappears on first launch after this change.
+- **Test coverage for the new default** — `latentHarnessesDefaultToVisible` asserts
+  detect-by-default, take-off, and restore.
+- **Two new engine modules, and the bridge now carries what they find.** Both keys are
+  optional additions and `schema_version` stays `1`, so an older app still decodes.
+  - **`src/sea_star/harnesses.py` — latent harness discovery.** A *harness* here is anything
+    Sea-Star can hand a model to, and an IDE that hosts its own agent loop is one; the vault
+    host (Obsidian) deliberately is **not**, because it is the pool rather than a harness.
+    `detect_latent_harnesses()` is a pure read of `/Applications`, `~/Applications` and any
+    mounted volume's `Applications` — it never launches anything and never touches the
+    network — returning known harness apps that are installed but *not* answering on a port.
+    An app already answering is dropped so the graph never draws a double, first install
+    wins, and the order is stable so the graph does not reshuffle between reads. The bridge
+    emits it as `latent_harnesses[]` (`name`, `bundle_id`, `path`).
+  - **`src/sea_star/agents.py` — agent discovery.** `AgentSpec(name, model, description)`
+    read from Osaurus' declarative export, its live `~/.osaurus/agents/*.json` files, and its
+    default agent file. Emitted as `agents[]` (`name`, `model`, `description`). **This is one
+    adapter, not proof of generic agent-awareness** — the foundation's *agent-aware* rung is
+    only reached for harnesses that can be *asked* (see its known debt), and this module asks
+    a known app by reading its files.
+  - **Known foundation violation, logged not hidden:** `harnesses.py` gates on
+    `KNOWN_HARNESS_APPS`, so an unrecognised installed app is **silently skipped** rather
+    than shown as an unknown/degraded harness — which is exactly the "name as a precondition"
+    the foundation forbids. This is the deliberate next repair, because the new panel is
+    where a degraded row becomes visible.
+- **The sea-star was redrawn as anatomy, not a spiky polygon** (`SeaStarShape`,
+  `EntityGraphView.swift`). Eight slender arms taper from a soft central disc to rounded tips,
+  with webbing dipping between them — the leggy silhouette of a *Meridiastra* carpet sea-star
+  rather than a squat five-point graphic. Every proportion is a fraction of the circumscribed
+  radius, so one cut scales from a 17pt satellite up to the faint outline traced behind the
+  whole pool, and a tiny seeded wobble in each arm's length and angle keeps the creature from
+  reading as clockwork.
+- **The pool gained living water** (`Views/GrainOverlay.swift`). The faint visual snow of a
+  dark-adapted eye is laid over the void, so the space behind the starfield reads as water
+  rather than a flat fill. The field is sparse and cool on purpose — it must never lift the
+  pool's black or compete with a node for attention. Motion is the point, but not at the cost
+  of accessibility: **Reduce Motion holds the grain still**, keeping the texture while
+  dropping the drift.
+- **The graph learned the two new entity kinds it was already being fed** — an **agent**
+  (a persona in a harness) and a **latent** harness (installed, not answering on a port) — so
+  both now draw as nodes instead of arriving in the report and vanishing. The graph is
+  1,342 lines in the working tree against 800 at `74f63b9`.
+- **`docs/one-pager.md`** states the product in a page: a private local AI assistant that
+  lives in the person's own notes.
+- Verified: `xcodebuild … build` succeeded; `xcodebuild … test` — 29 Swift Testing cases
+  passing (8 suites), up from 28; `uv run pytest` → **76 passed**; `uv run ruff check .`
+  → clean.
+
+Harness: TRAE
+
 Date: 2026-09-26
 
 Summary of Changes:

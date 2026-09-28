@@ -37,7 +37,7 @@ Never close, resolve, or implement any of these without the founder's explicit w
 
 Every project has a single foundation document in `docs/`. Read the sections you are about to touch before any non-trivial change. The onboarding file is a tripwire list, not a substitute for it. Amendments, `DECISIONS.md` (ADRs), and `docs/PROGRESS.md` (live state, parallel-agent file ownership) are also binding.
 
-For Sea-Star, until `docs/` exists, `README.md` is the foundation document.
+For Sea-Star the foundation document is [`docs/foundation.md`](docs/foundation.md).
 
 ## Locked paths — and how they bend
 
@@ -161,7 +161,10 @@ Never edit this file unless the founder explicitly asks for a lasting rule. In t
 ## Project Tripwires (fill in per build)
 
 - **App name & one-line purpose:** Sea-Star — a private, local-first AI agent that lives in your Obsidian vault. It is an MCP server that is also an MCP client: hosts call `ask_seastar`, and Sea-Star consumes other MCP servers (including Obsidian ones) as its own tools.
-- **Foundation document:** `README.md` (moves to `docs/` once that directory exists).
+- **Foundation document:** [`docs/foundation.md`](docs/foundation.md) — binding from 2026-09-28.
+  Its lead clause, **"no name is ever a precondition,"** governs all discovery: known names
+  are additive hints, never gates on visibility. The repository front page (`README.md`) is
+  the shopfront, not the foundation.
 - **Language & build commands:** Python 3.11+ managed by `uv`.
   - Install/sync: `uv sync --extra dev`
   - Lint: `uv run ruff check .`

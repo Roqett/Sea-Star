@@ -6,8 +6,20 @@ note at the end of every session.
 ## Current state
 
 - **Version:** 0.1.0 (unreleased). Repo is **private** until built and tested.
-- **Health:** `uv run ruff check .` clean; `uv run pytest` — 51 passing. App:
-  `xcodebuild … test` — 28 Swift Testing cases passing (8 suites).
+- **Health:** `uv run ruff check .` clean; `uv run pytest` — 76 passing. App:
+  `xcodebuild … test` — 29 Swift Testing cases passing (8 suites).
+- **Foundation (`docs/foundation.md`, binding from 2026-09-28).** The lead clause is
+  **"no name is ever a precondition"** — every known harness/runtime name is an *additive
+  hint* that improves a label, and its absence may never reduce what is displayed. Carries
+  the eight-rung **capability ladder** (declared → present → running → listening →
+  self-describing → agent-aware → activity-aware → caller-attributed), the **degradation
+  contract** ("show the highest rung reached, and show the rung"), **MCP as the generic
+  adapter** (ask an unknown harness rather than know it), and a **symmetry clause** —
+  anything Sea-Star can prove must be callable over MCP, not only visible in the app.
+  Tier 1 (§1 values, §4 privacy) is the founder's alone to rewrite. Four items of known
+  debt are logged *in* the document — most importantly that `harnesses.py` still gates
+  visibility on a bundle-id allowlist and skips unknown apps entirely. `AGENTS.md` now
+  points here; the repo front page is the shopfront, not the foundation.
 - **Bridge:** `sea-star doctor --json` now emits the full §6 contract —
   `schema_version`, nested `vault {path, source, note_count, candidates}`, `server.state`,
   and `runtimes[]` (one object per live harness). Always one JSON object, even on failure.
@@ -66,7 +78,10 @@ note at the end of every session.
 | MCP server | `src/sea_star/mcp_server.py` | Done — exposes `ask_seastar`, `vault_*`. |
 | MCP client | `src/sea_star/mcp_client.py` | Done — bridges external servers, namespaced, curated by `include`/`exclude`. |
 | Docs | `docs/` | **Added this session** — tiered: start-here → connect → reference → troubleshooting. |
-| Cockpit (mac app) | `macapp/` | **New** — XcodeGen project; **AppKit-hosted** SwiftUI (`SeaStarMain` → `AppDelegate`, `NSStatusItem` + `NSPopover`). `App/ Views/ Models/ Services/ Support/ Shaders/`; builds, launches, 28 Swift tests pass. Right-click app menu + Settings window + GitHub-Releases update check. Vault + model + harness pick-lists wired to `SEASTAR_VAULT`/`SEASTAR_MODEL`/`SEASTAR_BASE_URL`. Four-face icon roster rerolls on start/stop (T4.7); real T4.3/T4.4 cuts; header caustic shimmer (T4.5). |
+| Foundation | `docs/foundation.md` | **New** — the binding document. "No name is ever a precondition"; capability ladder, degradation contract, MCP-first. Binding from 2026-09-28. |
+| Harness/app discovery | `src/sea_star/harnesses.py` | Partial — **violates foundation §1**: gates on `KNOWN_HARNESS_APPS` and skips unrecognised apps instead of showing them degraded. |
+| Agent roster | `src/sea_star/agents.py` | New — per-harness agent/provider/model config discovery. Private prompts are never copied out. |
+| Cockpit (mac app) | `macapp/` | **New** — XcodeGen project; **AppKit-hosted** SwiftUI (`SeaStarMain` → `AppDelegate`, `NSStatusItem` + `NSPopover`). `App/ Views/ Models/ Services/ Support/ Shaders/`; builds, launches, 29 Swift tests pass. Right-click app menu + Settings window + GitHub-Releases update check. Vault + model + harness pick-lists wired to `SEASTAR_VAULT`/`SEASTAR_MODEL`/`SEASTAR_BASE_URL`. Four-face icon roster rerolls on start/stop (T4.7); real T4.3/T4.4 cuts; header caustic shimmer (T4.5). Idle harnesses float by default (hidden-set preference, migrated off the old enabled-set key). |
 
 ## File ownership
 
@@ -569,3 +584,207 @@ No parallel agents active. Single-writer.
 
 - Commit the `ServerController` lifecycle fix + `script/build_and_run.sh` +
   `.codex/environments/environment.toml` + docs (PROGRESS/spec) to PR #2.
+
+---
+
+## Handoff — 2026-09-28 (the foundation, and the thread worth nipping)
+
+**Done**
+
+- **Named the thread, then wrote it down as law (`docs/foundation.md`, new).** The founder's
+  read was right and it is now binding rather than tribal knowledge: Sea-Star had been
+  learning *products* (Trae, Osaurus, oMLX) where it should have been learning
+  *capabilities*. The lead clause is **"no name is ever a precondition"** — every known
+  name is a *hint* that improves a label, and its absence may never reduce what is
+  displayed. A registry of the top ten harnesses is therefore an **upgrade, not a
+  permission**: if the list is a year stale, the product must be no worse off than before
+  the list existed. The document carries a three-question **test** for any name-keyed
+  behaviour — does removing the name make things *worse* (fine) or *blank* (a gate, a bug)?
+- **The capability ladder** replaces "which harness is this?" with "what can this thing
+  prove?", asked in a fixed order and stopping at the first yes: **declared → present →
+  running → listening → self-describing → agent-aware → activity-aware → caller-attributed**.
+  Rungs 0–4 are vendor-neutral and must stay that way — they are the reason Sea-Star works
+  with a runtime released last month. Rungs 5–7 are where adapters legitimately live.
+- **The degradation contract: show the highest rung reached, and show the rung.** This is
+  the clause that makes the whole thing honest, and it lines up exactly with the evidence
+  discipline the panel design was already built on: `Configured`, `Reachable`, `Active`
+  and `Last reported` are different facts and may never be collapsed. A configured route is
+  not a running model; a loaded model is not an active request; a healthy endpoint does not
+  prove anyone is using it, and never names the caller.
+- **MCP as the generic adapter, plus a symmetry clause.** Because MCP is a standard rather
+  than a product, an unknown harness can be *asked* rather than *known* — that is the
+  mechanism that makes degradation cheap, and the reason "a new harness appeared" is never
+  answered with a longer list. Symmetry: if Sea-Star can prove a fact, that fact must be
+  callable over MCP too, which is why "registered in Osaurus" and "useful to Osaurus" are
+  two different milestones.
+- **Tiers, so the rules cannot all be renegotiated at once.** Tier 1 (§1 values, §4
+  privacy) is the founder's alone to rewrite. Tier 2 (ladder, degradation, MCP-first) is
+  a design bet that can be pivoted with reasons. A spine that survives a real pivot
+  unchanged was probably never tested — friction is a signal to amend, not to argue.
+- **Four items of known debt are logged *inside* the document** so the gap is visible
+  rather than rediscovered: `harnesses.py` still gates on a bundle-id allowlist and skips
+  unrecognised apps entirely; no MCP activity probe exists; cockpit findings are not yet
+  MCP tools; rung 7 has no instrumentation.
+- **Wired in as the source of truth.** `AGENTS.md` now points at `docs/foundation.md`
+  (it previously said `README.md` "until `docs/` exists") and names the clause as a
+  tripwire; `docs/README.md` indexes it for developers and agents and states plainly that
+  the repo front page is the shopfront, not the foundation.
+- **Two UI changes, both from "know what's running without hunting for it".** The graph
+  state card was bound to `selected ?? hovered`, so with neither set there was no card at
+  all and the popover opened looking empty — `subject` now falls back to the active
+  harness, with click and hover still overriding. Idle harnesses now float **by default**:
+  the preference inverted from an *enabled* set to a *hidden* set (`SeaStar.latentHarnesses`
+  → `SeaStar.latentHarnessesOff`, old key removed on launch so it cannot linger), because
+  an app on the disk is somewhere this machine *could* work and the founder should take
+  things off the graph rather than switch them on.
+
+**Verified**
+
+- `xcodebuild … test` → **29 Swift Testing cases in 8 suites pass** (includes the new
+  `latentHarnessesDefaultToVisible` regression covering on-by-default *and* stay-off).
+- `uv run pytest` → **76 passing**; `uv run ruff check .` clean. (Both counts were stale
+  in this file — 28 and 51 — and are now corrected above.)
+
+**Open — carry into the next session**
+
+- **The debt is the work.** §1 of the foundation is currently *violated* by
+  `harnesses.py`: an app outside `KNOWN_HARNESS_APPS` is `continue`d, i.e. invisible
+  rather than degraded. Replacing that gate with a rung-1/2 path for unrecognised apps is
+  the single highest-value item here, because until it lands the document is a promise the
+  code does not keep.
+- **The redesigned text panel is agreed but unbuilt** — `Vault / Harness / Agent /
+  Inference` replacing today's `Vault / Harness / Model`, with `Working now` and
+  `Configured` as separate sections. Note the ontology reason: the Osaurus URL shown in
+  today's `Harness` row is a *server endpoint*, which is exactly the collapse the
+  `Agent` / `Inference` split exists to fix.
+- **Telemetry needs reconciling with Tier 1 before any continuous collection.** The
+  foundation's §4 keeps "no telemetry, no background monitoring", and activity records are
+  scoped to *who / what route / when / how we know* — never *what was said*. Any activity
+  stream has to be built inside that envelope, or the founder amends §4 explicitly.
+- `.trae/specs/mac-app/spec.md` has not yet been amended for either the foundation or the
+  new panel ontology.
+
+**Single next step**
+
+- Founder reads `docs/foundation.md` and confirms Tier 1 is worded as he means it; then
+  take debt item 1 (`harnesses.py`) and make an unknown app visible, since that is the
+  clause the code most clearly breaks.
+
+## Handoff — 2026-09-28 (late) (the history gap, and the panel decision)
+
+**Why this session existed**
+
+The founder reopened a long session cold and asked where it actually ended. The honest
+answer was: **the git history and the written history disagreed**, in both directions.
+
+- **Two commits shipped with no changelog entry at all** — `f427d37` (the star-shaped
+  tactile canvas) and `74f63b9` (detail card + mouse gestures). They were pushed, so the
+  changelog described a *smaller product than the one that had actually shipped*.
+- **A large body of work was in the working tree and never committed** — 17 modified files
+  and 7 new ones, including the entire graph evolution (`EntityGraphView.swift` had gone
+  800 → 1,342 lines), `GrainOverlay.swift`, `SeaStarShape`, and two new engine modules.
+
+So the record was wrong in both directions at once, which is the worst case: a changelog
+that both over- and under-claims. This session closed that gap, and then *decided* the panel
+direction the founder had asked for — the decision is written up below, the panel itself is
+not built yet.
+
+**Done — the record, made honest**
+
+- **Backfilled the two undocumented commits** as a dated **2026-09-26** entry, explicitly
+  labelled a backfill. Every bullet is tagged with the commit that contains it (`f427d37` /
+  `74f63b9`) and the entry states, in its own words, that it claims **only** those commits'
+  contents. An earlier draft of this entry wrongly attributed the *uncommitted* `SeaStarShape`
+  / `GrainOverlay` / agent-node work to those two commits; that was corrected before commit.
+  The original commits are untouched, per the append-only rule.
+- **Wrote up the uncommitted session** as a 2026-09-28 entry covering what is actually in
+  the tree: the two new engine modules and the bridge keys they feed, the sea-star anatomy
+  redraw, the living water, and the graph learning the `agent` / `latent` node kinds.
+- **Found a third gap while checking**: the 2026-09-25 entry documents the port sweep as
+  living in `config.py` — true — but `src/sea_star/harnesses.py` (latent harness discovery)
+  **was never committed at all** and had no entry describing it. Now written up.
+
+**The ontology decision (made here, deliberately not punted)**
+
+The last session left an open question and floated it back at the founder: when `Agent`
+splits out of the old `Harness` row, does the harness row become "the app you talk to" with
+selection moving to `Agent`, or does it keep a picker? The founder's answer was that this
+is the assistant's job to decide. **Decision: the Harness row keeps its picker.**
+
+Reasoning, for whoever picks this up:
+
+- The picker is not the problem. **The URL in the harness row is the problem.** Today the
+  row reads `osaurus · http://127.0.0.1:1337/v1` — an *identity* and an *endpoint* collapsed
+  into one string, so the row answers two different questions at once and neither cleanly.
+- Switching harness is a **real, working, already-shipped action** (it pins
+  `SEASTAR_BASE_URL` + `SEASTAR_RUNTIME` and clears the model override, because the old
+  model may not exist on the new endpoint). Moving that selection onto the `Agent` row would
+  delete a working control to fix a wording problem. That is the wrong trade.
+- So the fix is a **move, not a removal**: the endpoint descends to the new `Inference` row,
+  where it belongs, and `Harness` keeps only the name of the app you are talking to. The
+  picker stays exactly where it is and keeps working.
+- `Agent` is therefore **additive** — a persona inside the harness, shown when one exists
+  and degrading honestly (rung shown, never a rung claimed) when the harness has none.
+
+Resulting row set: **Vault** (where the notes are) → **Harness** (which app answers; picker
+kept) → **Agent** (which persona inside it) → **Inference** (the endpoint *and* the model,
+the two things that used to be smeared together). `Working now` sits underneath as its own
+section, carrying only observed facts.
+
+**Also this session — nothing built yet, and this is deliberate**
+
+The founder gave the direction for the next stretch, and it is recorded here so the next
+session does not have to be told again. **None of the following is built.** It is the plan,
+not a report:
+
+- **The panel gets built as two comparable variants** rather than one, at the founder's
+  request, so the layout can be judged by looking rather than by argument. Both will carry
+  the same four rows and the same `Working now` list; they will differ in presentation only,
+  with a header toggle that switches between them and remembers the choice.
+- **`Working now` will be observation-only.** It shows what the engine can *prove right now*
+  — server state, a harness answering, the model last reported — and each line will say how
+  it is known. It will show **no prompts, no model output, no tool arguments**: that is the
+  foundation's Tier 1 privacy envelope, and the activity-event stream is what will later add
+  real events *inside* that envelope.
+- **The 3D graph is wanted and approved** (founder, 2026-09-28), to be built *after* the
+  panel. His reasoning is sound and is recorded as the justification to build on: this graph
+  has ~10 nodes, not the thousands that make 3D unreadable, so occlusion and projection are
+  not the blocker they would be for a `codebase-memory`-scale graph. He also judged the
+  binary cost acceptable — SceneKit is a system framework, so it adds no meaningful weight.
+  Readability must be protected by keeping hover text and click inspection on every node and
+  honouring Reduce Motion.
+- **Live/used entities will carry the orange-green nudibranch bars**, animated. The honest
+  limit to build in from the start: with no activity probe yet, "live" can only mean
+  *answering on a port* (observed) — **not** "recently used by a person" (unobserved). The
+  bar may only take the stronger claim once the activity stream exists.
+
+**Verified**
+
+- `uv run pytest` → **76 passed**; `uv run ruff check .` → clean.
+- `xcodegen generate` then `xcodebuild … build` → **BUILD SUCCEEDED**;
+  `xcodebuild … test` → **29 Swift Testing cases in 8 suites passed**.
+- (The XCTest layer prints `Executed 0 tests` — that is expected; the suite is Swift Testing,
+  not XCTest. The 29-case figure above is the real one.)
+
+**Open — carry into the next session**
+
+- **Build the panel**: the four rows above, `Working now`, and the A/B toggle. This is the
+  founder's stated next piece of product work and supersedes the older "repair unknown-harness
+  discovery first" single-next-step, which the founder explicitly redirected.
+- **The activity-event stream is the piece after the panel**, and the panel is being built to
+  receive it. Until then `Working now` is limited to state the engine already knows.
+- **`harnesses.py` still violates foundation §1.** Unchanged by this session and still the
+  clearest gap between what the document promises and what the code keeps. The new panel is
+  where a degraded row would become visible, so it is cheap to fix alongside it.
+- **`.trae/specs/mac-app/spec.md` is still the old panel** (`Vault / Harness / Model / Go`).
+  It needs amending for the foundation, the four-row ontology, `Working now` and the 3D
+  graph — the spec is the implementation contract and is behind the code.
+- **Telemetry must be reconciled with Tier 1 before any continuous collection.** The
+  foundation's §4 keeps "no telemetry, no background monitoring". Activity records are scoped
+  to *who / what route / when / how we know* — never *what was said*. Any activity stream must
+  be built inside that envelope, or the founder amends §4 explicitly.
+
+**Single next step**
+
+- Build the panel: `Vault / Harness / Agent / Inference` with `Working now`, in two
+  comparable variants behind a toggle.
