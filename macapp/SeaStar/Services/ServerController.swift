@@ -11,6 +11,33 @@ struct HarnessOption: Identifiable, Equatable, Sendable {
     let models: [String]
 }
 
+/// A persona the person built in a harness (an Osaurus agent). Identity is its
+/// name — the one thing that is unique on their roster — with the bound model
+/// optional, since an agent may ride whatever model the harness is set to.
+struct AgentOption: Identifiable, Equatable, Sendable {
+    var id: String { name }
+    let name: String
+    let model: String?
+    let description: String
+
+    /// The harness a qualified model id names (``omlx/…`` -> ``omlx``), if any.
+    var provider: String? {
+        guard let model, let slash = model.firstIndex(of: "/") else { return nil }
+        let head = String(model[model.startIndex..<slash])
+        return head.isEmpty ? nil : head
+    }
+}
+
+/// A known harness app installed on this Mac but not answering on a port — an
+/// IDE or runtime app that carries its own model loop. Identity is its bundle id,
+/// the one thing stable across a rename or a move between Applications folders.
+struct LatentHarnessOption: Identifiable, Equatable, Sendable {
+    var id: String { bundleID }
+    let name: String
+    let bundleID: String
+    let path: String
+}
+
 /// Owns the app's view of the engine: the last decoded report, any fail-loud
 /// message, and the running/stopped state of the MCP server.
 ///
@@ -42,6 +69,15 @@ final class ServerController {
 
     private static let seenHarnessesKey = "SeaStar.seenHarnesses"
 
+    /// Bundle ids of latent harnesses the person has switched *off*. Detected
+    /// harnesses float by default, so the starfield shows at a glance where this
+    /// machine could work rather than hiding every idle app until it is asked
+    /// for; the person takes away the ones they do not want in view.
+    private(set) var hiddenLatentHarnesses: Set<String>
+
+    private static let hiddenLatentHarnessesKey = "SeaStar.latentHarnessesOff"
+    private static let legacyEnabledLatentHarnessesKey = "SeaStar.latentHarnesses"
+
     private let command: EngineCommand?
     private var serveProcess: Process?
     /// The write end of the server's stdin. `serve` is a stdio MCP server: the
@@ -62,6 +98,12 @@ final class ServerController {
         self.seenHarnesses = Set(
             UserDefaults.standard.stringArray(forKey: Self.seenHarnessesKey) ?? []
         )
+        self.hiddenLatentHarnesses = Set(
+            UserDefaults.standard.stringArray(forKey: Self.hiddenLatentHarnessesKey) ?? []
+        )
+        // The old key stored the *enabled* ones, so it is now meaningless and
+        // would otherwise linger as a stale preference forever.
+        UserDefaults.standard.removeObject(forKey: Self.legacyEnabledLatentHarnessesKey)
     }
 
     var isReady: Bool { report?.ready ?? false }
@@ -161,6 +203,50 @@ final class ServerController {
             options.insert(report.model, at: 0)
         }
         return options
+    }
+
+    /// The personas the person built in their harness (spec §8.7). They are not
+    /// scoped to the active harness — a roster the person made is theirs to see
+    /// whichever harness the engine is talking to.
+    var agentOptions: [AgentOption] {
+        report?.detectedAgents.map {
+            AgentOption(name: $0.name, model: $0.model, description: $0.description)
+        } ?? []
+    }
+
+    /// Every installed-but-idle harness the engine found, in the engine's stable
+    /// order. These are togglable rather than autodetected: an app on the disk is
+    /// not a connection, so the person decides which ones float on the graph.
+    var latentHarnessOptions: [LatentHarnessOption] {
+        report?.detectedLatentHarnesses.map {
+            LatentHarnessOption(name: $0.name, bundleID: $0.bundleID, path: $0.path)
+        } ?? []
+    }
+
+    /// The latent harnesses the person has kept in view — every detected one
+    /// that has not been switched off.
+    var visibleLatentHarnesses: [LatentHarnessOption] {
+        latentHarnessOptions.filter { isLatentHarnessEnabled($0.bundleID) }
+    }
+
+    /// Whether an installed-but-idle harness is currently floating on the graph.
+    /// Everything detected is in view until the person takes it off.
+    func isLatentHarnessEnabled(_ bundleID: String) -> Bool {
+        !hiddenLatentHarnesses.contains(bundleID)
+    }
+
+    /// Float a latent harness on the graph, or take it back off. The choice is a
+    /// durable preference — an idle harness the person wanted to keep out of view
+    /// should stay out the next time the cockpit opens.
+    func toggleLatentHarness(_ bundleID: String) {
+        if hiddenLatentHarnesses.contains(bundleID) {
+            hiddenLatentHarnesses.remove(bundleID)
+        } else {
+            hiddenLatentHarnesses.insert(bundleID)
+        }
+        UserDefaults.standard.set(
+            Array(hiddenLatentHarnesses), forKey: Self.hiddenLatentHarnessesKey
+        )
     }
 
     /// Ask the engine what it found. Either a report lands or a plain-language

@@ -46,6 +46,38 @@ struct DoctorReport: Decodable, Sendable, Equatable {
         }
     }
 
+    /// One persona the person built in a harness (Osaurus agents). It is a
+    /// thing they *talk to*, as opposed to a ``RuntimeInfo`` which is the
+    /// machine serving a model. The bound model is optional: an agent may ride
+    /// whatever model the harness is currently set to.
+    struct AgentInfo: Decodable, Sendable, Equatable {
+        let name: String
+        let model: String?
+        let description: String
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case model
+            case description
+        }
+    }
+
+    /// A known harness app installed on this Mac but not answering on a port —
+    /// an IDE or runtime app that carries its own model loop (Xcode, OpenCode).
+    /// It is not connected, but the person may still want it floating on the
+    /// graph, so the cockpit toggles it on and off rather than hiding it.
+    struct LatentHarnessInfo: Decodable, Sendable, Equatable {
+        let name: String
+        let bundleID: String
+        let path: String
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case bundleID = "bundle_id"
+            case path
+        }
+    }
+
     let schemaVersion: Int
     let ready: Bool
     let version: String
@@ -55,6 +87,8 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     let model: String
     let models: [String]
     let runtimes: [RuntimeInfo]?
+    let agents: [AgentInfo]?
+    let latentHarnesses: [LatentHarnessInfo]?
     let server: ServerState
     let servers: [BridgedServer]
 
@@ -68,6 +102,8 @@ struct DoctorReport: Decodable, Sendable, Equatable {
         case model
         case models
         case runtimes
+        case agents
+        case latentHarnesses = "latent_harnesses"
         case server
         case servers
     }
@@ -75,6 +111,14 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     /// Every live harness the engine found, oldest bridge first. Empty when the
     /// engine predates multi-harness detection (`runtimes` absent).
     var detectedRuntimes: [RuntimeInfo] { runtimes ?? [] }
+
+    /// Every agent the engine found. Empty when the engine predates agent
+    /// discovery (`agents` absent), so the app degrades to the old graph.
+    var detectedAgents: [AgentInfo] { agents ?? [] }
+
+    /// Every installed-but-idle harness the engine found. Empty when the engine
+    /// predates latent-harness scanning (`latent_harnesses` absent).
+    var detectedLatentHarnesses: [LatentHarnessInfo] { latentHarnesses ?? [] }
 }
 
 /// The bridge answers with either the report or a fail-loud error object.

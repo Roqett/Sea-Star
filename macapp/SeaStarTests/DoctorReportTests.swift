@@ -162,6 +162,20 @@ struct ServerControllerTests {
         let controller = ServerController(command: nil)
         #expect(controller.currentIcon == IconRoster.first)
     }
+
+    @Test("an idle harness floats by default, and stays off once taken off")
+    func latentHarnessesDefaultToVisible() {
+        let controller = ServerController(command: nil)
+        // An app on the disk is not a connection, but it is still somewhere this
+        // machine can work, so it is in view until the person says otherwise.
+        #expect(controller.isLatentHarnessEnabled("com.example.OpenCode"))
+
+        controller.toggleLatentHarness("com.example.OpenCode")
+        #expect(!controller.isLatentHarnessEnabled("com.example.OpenCode"))
+
+        controller.toggleLatentHarness("com.example.OpenCode")
+        #expect(controller.isLatentHarnessEnabled("com.example.OpenCode"))
+    }
 }
 
 @Suite("Version comparison")

@@ -99,7 +99,7 @@ struct CockpitPopoverView: View {
             controls
         }
         .padding(18)
-        .frame(width: panelWidth)
+        .frame(width: panelWidth, alignment: .topLeading)
         .background(Palette.canvas)
         .task { await controller.refresh() }
         .fileImporter(
@@ -304,6 +304,24 @@ struct CockpitPopoverView: View {
                 display: { $0 }
             )
             .help(Strings.Actions.chooseModel)
+
+            if !controller.latentHarnessOptions.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(Strings.Rows.latent)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Palette.inkMuted)
+
+                    ForEach(controller.latentHarnessOptions) { latent in
+                        LatentRow(
+                            name: latent.name,
+                            path: latent.path,
+                            isFloating: controller.isLatentHarnessEnabled(latent.bundleID),
+                            toggle: { controller.toggleLatentHarness(latent.bundleID) }
+                        )
+                    }
+                }
+                .help(Strings.Rows.latentHelp)
+            }
         }
     }
 
@@ -579,6 +597,39 @@ private struct PickerRow: View {
             .disabled(options.count <= 1 && onChooseFolder == nil)
 
             Spacer(minLength: 0)
+        }
+    }
+}
+
+/// One installed-but-idle harness (spec §8.3): its name, and a word that floats
+/// it onto the graph or takes it back off. The path is only ever a tooltip —
+/// the row stays as quiet as the rest of the panel.
+private struct LatentRow: View {
+    let name: String
+    let path: String
+    let isFloating: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            AccentBar(color: Palette.harnessGlow)
+
+            Text(name)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Palette.ink)
+                .lineLimit(1)
+                .truncationMode(.middle)
+
+            Spacer(minLength: 8)
+
+            Button(action: toggle) {
+                Text(isFloating ? Strings.Actions.sinkHarness : Strings.Actions.floatHarness)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(isFloating ? Palette.harnessGlow : Palette.inkMuted)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(path)
         }
     }
 }

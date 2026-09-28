@@ -44,6 +44,10 @@ enum Palette {
     static let harnessGlow = electricBlue
     static let vaultGlow = teal
     static let modelGlow = neonGreen
+    /// Agents are the person's own personas — the crew *they* built — so they
+    /// glow warm, apart from the cool infrastructure (vault, harness, model)
+    /// they run on (spec §8.7).
+    static let agentGlow = orange
 
     /// Log ink and ground, drawn from the blue-white nudibranch strip and
     /// adaptive alongside the panel they sit in.

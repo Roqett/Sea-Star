@@ -31,6 +31,10 @@ enum Strings {
         static let harness = "Harness"
         static let model = "Model"
         static let notes = "Notes"
+        /// The label for the row of installed-but-idle harnesses — apps that
+        /// carry their own model loop but are not answering on a port.
+        static let latent = "Idle"
+        static let latentHelp = "Installed but not connected — all float by default; take any off the graph to quiet it."
     }
 
     enum States {
@@ -51,6 +55,8 @@ enum Strings {
         static let chooseHarness = "Switch harness…"
         static let openFolder = "Open folder…"
         static let checkNow = "Check now"
+        static let floatHarness = "Float on the graph"
+        static let sinkHarness = "Take off the graph"
     }
 
     /// The rolling log: what the engine said, kept short-lived on purpose
@@ -83,7 +89,11 @@ enum Strings {
         /// The hint a person reads on the starfield. Names both the trackpad
         /// gestures and the mouse ones, so neither device is left guessing.
         static let panHint =
-            "Drag to drift, scroll or pinch to zoom, ⌥-drag or twist to turn — click a star to inspect it"
+            "Left-drag to move · scroll to zoom · right-drag to rotate in 2D · click a star to inspect · double-click to focus"
+        /// The tide-out chip that appears while a star is focused: names what you
+        /// are zoomed into and returns the pool to its whole reading (spec §8.7).
+        static let exitFocus = "Exit focus"
+        static let exitFocusHelp = "Show the whole pool again"
     }
 
     /// The card that blooms when a starfish is clicked (spec §8.7): the plain
@@ -93,16 +103,24 @@ enum Strings {
         static let vault = "Vault"
         static let harness = "Harness"
         static let model = "Model"
+        /// A persona the person built in their harness; the thing they actually
+        /// talk to, as opposed to the model it runs on (spec §8.7).
+        static let agent = "Agent"
         static let notes = "Notes"
         static let found = "Found via"
         static let nearby = "Nearby"
         static let endpoint = "Endpoint"
         static let models = "Models"
         static let servedBy = "Served by"
+        static let uses = "Uses"
+        static let provider = "Provider"
         static let path = "Path"
         static let status = "Status"
         static let current = "Current"
         static let available = "Available"
+        /// A latent harness: installed, but nothing is answering on its port.
+        static let latent = "Idle"
+        static let notConnected = "Not connected"
         static func nearbyVaults(_ count: Int) -> String {
             count == 1 ? "1 other" : "\(count) others"
         }
