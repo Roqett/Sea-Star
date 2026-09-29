@@ -12,6 +12,57 @@ Model: unknown (the active harness does not report its own model id to this sess
 
 Routing: omlx → Dirk-Qwen3.8-27B-MLX-oQ6e (per `sea-star doctor` on this machine)
 
+Date: 2026-09-30
+
+Summary of Changes:
+- **The two-window game plan, executed (D-002).** The cockpit now has two windows with one
+  independent axis each: the text window arranges the four rows behind
+  `SeaStar.panelLayout` — **Stack** (default), **Chain** (connected request-path cards),
+  **Both** (side by side; 360pt column, 660pt for the comparison) — and the graph window
+  picks its renderer behind `SeaStar.graphDepth` — **Flat** (default 2D starfield),
+  **Deep** (3D), **Both** — at 600pt wide (960pt for the comparison), 560pt tall (600pt
+  Deep). Comparison is opt-in per window and the defaults show one design each, so nobody
+  lands on both-of-each at once.
+- **The four-row panel's observation made honest.** The endpoint no longer prints twice —
+  it lives under *Inference*, and the Working-now band keeps it as a hover help string
+  only; the redundant liveness word is off the row; the header bar tightened 555→54pt.
+  `Working now` stays probe-evidence only (D-001): never a prompt, an output, or a persona
+  acting.
+- **One shared graph model for both renderings.** A new renderer-independent
+  `EntityGraphModel` feeds the 2D starfield and the 3D room, so the readings can never
+  disagree with each other or with the rows.
+- **2D nodes are colour-coded by kind, glow only when active, and identify themselves on
+  hover.** Vault teal / harness+latent electric blue / model neon green / agent orange,
+  each hue-shifted deterministically from its own id so a kind reads as a genre with
+  variation (the C-star treatment) instead of clones; full glow only when active or
+  selected, a dim breath when live, plain definition when idle; the hover readout card
+  names every node — discovery without clicking ("people don't like clicking").
+- **The 3D room got a legibility pass.** Bloom, body emission, additive glyphs and label
+  weight pulled back, motes thinned 0.30→0.20, camera brought closer — its star shells
+  keep their definition beside the flat drawing instead of blowing out.
+- **Animation now runs only while the panel is open.** The popover delegate writes
+  `SeaStar.cockpitOpen` (default false) into the environment; caustics, grain, the 2D
+  timeline, the SceneKit render loop and the liveness drift all gate on it — closing the
+  panel stops exactly the repaint-and-drift surfaces the ~23% CPU diagnosis identified.
+  No delegate signal means *still* (the safe failure), and the server/MCP connections are
+  untouched: close it, the motion shuts, the connections hold.
+- **The orange/green liveness bars are visibly alive now.** Sweep doubled (2× scale, 8pt
+  travel) with no new timers or repaints — amplitude, not frequency. Blue-white strips
+  remain the resting treatment everywhere else.
+- **Agent roster reporting (Python engine).** `displayName` fallback so Osaurus agents
+  keep their friendly names, the harness's default agent (the orchestrator) ordered first,
+  and new `detect_agent_roster` / `AgentRoster.source` reporting *which harness* a roster
+  belongs to.
+- **Verified:** 68 Swift tests in 13 suites; 84 pytest in 0.47s; ruff clean; Release
+  bundle 4.4MB vs the 3.6MB baseline — Resources unchanged at 136KB, growth is compiled 3D
+  code only.
+
+Harness: TRAE
+
+Model: unknown (the active harness does not report its own model id to this session)
+
+Routing: omlx → Dirk-Qwen3.8-27B-MLX-oQ6e (per `sea-star doctor` on this machine)
+
 Date: 2026-09-26 (late — a **backfill**, see note)
 
 Summary of Changes:

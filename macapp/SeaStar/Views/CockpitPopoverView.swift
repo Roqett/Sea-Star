@@ -2,6 +2,17 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+private struct SeaStarCockpitOpenKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var seaStarCockpitOpen: Bool {
+        get { self[SeaStarCockpitOpenKey.self] }
+        set { self[SeaStarCockpitOpenKey.self] = newValue }
+    }
+}
+
 /// Which way the cockpit is read (spec §8.7): the starfield graph, or the plain
 /// "letterface" list of rows. The raw value is what persists as the person's
 /// preference; an empty stored value means they have not chosen yet.
@@ -64,6 +75,34 @@ struct CockpitPopoverView: View {
     private var mode: CockpitMode { CockpitMode.resolved(from: modeRaw) }
     private var hasChosenMode: Bool { CockpitMode(rawValue: modeRaw) != nil }
 
+    /// Which of the panel's readings the plain rows are drawn in
+    /// (DECISIONS.md D-001). This lives here rather than inside the panel so the
+    /// header toggle and the panel share one source of truth — two `@AppStorage`s
+    /// on one key would agree by luck, not by design.
+    @AppStorage("SeaStar.panelLayout") private var layoutRaw = PanelLayout.stack.rawValue
+
+    private var layout: PanelLayout { PanelLayout.resolved(from: layoutRaw) }
+
+    /// How deep the *graph* is read (spec §8.7): the flat pool, the 3D deep, or
+    /// the two side by side.
+    ///
+    /// Deliberately its own key rather than another case of `panelLayout`. The
+    /// two answer genuinely different questions — one is "how many dimensions
+    /// is this drawing in", the other is "how are the rows arranged" — and
+    /// folding them together would mean picking Stack/Chain/Both *means*
+    /// abandoning the 3D pool, which is not a trade anybody asked to make.
+    /// Separate keys also mean the depth you chose in the graph survives a trip
+    /// to the rows and back.
+    @AppStorage("SeaStar.graphDepth") private var depthRaw = Strings.Views.Depth.flat.rawValue
+
+    private var depth: Strings.Views.Depth { Strings.Views.Depth.resolved(from: depthRaw) }
+
+    /// Whether the popover is on screen. Written by the AppKit host through the
+    /// popover delegate; every animated surface inside the cockpit gates on it
+    /// so the reading runs live while open and holds still once it shuts. The
+    /// engine's own connections are untouched — only the drawing stops.
+    @AppStorage("SeaStar.cockpitOpen") private var isOpen = false
+
     /// The most the whole cockpit may occupy before it would run off the screen.
     /// The reading is only open for a moment, so it can be large — we give it as
     /// much room as the display allows and clamp only to keep the bottom on-screen
@@ -78,7 +117,15 @@ struct CockpitPopoverView: View {
     /// wide so the vault, the harnesses on the right edge and the tip note beside
     /// the active starfish all have room and nothing crowds or clips — the visual
     /// reading opens a big panel, the text one a comfortable column.
-    private var panelWidth: CGFloat { mode == .graph ? 600 : 360 }
+    private var panelWidth: CGFloat {
+        if mode == .graph {
+            // Side by side, the two readings each get a real half rather than
+            // one being squeezed into a sliver — the whole point of the
+            // comparison is that both are actually readable at once.
+            return depth == .both ? 960 : 600
+        }
+        return layout.isWide ? 660 : 360
+    }
 
     /// The pool's height for the visual reading. The starfield wants room, so it
     /// takes a fixed, generous one — but it is clamped so the whole panel (header,
@@ -87,7 +134,10 @@ struct CockpitPopoverView: View {
     /// needs to be and never shows a half-empty void.
     private var graphHeight: CGFloat {
         let chrome: CGFloat = 250 + (isLogsExpanded ? 190 : 0)
-        let desired: CGFloat = 560
+        // The deep pool is a room you fly a camera around in, so it asks for
+        // more height than the flat drawing, which is read at a glance and is
+        // happy in a shallower box.
+        let desired: CGFloat = depth == .flat ? 560 : 600
         return max(240, min(desired, maxPopoverHeight - chrome))
     }
 
@@ -101,6 +151,7 @@ struct CockpitPopoverView: View {
         .padding(18)
         .frame(width: panelWidth, alignment: .topLeading)
         .background(Palette.canvas)
+        .environment(\.seaStarCockpitOpen, isOpen)
         .task { await controller.refresh() }
         .fileImporter(
             isPresented: $isImportingVault,
@@ -126,12 +177,37 @@ struct CockpitPopoverView: View {
             }
             switch mode {
             case .graph:
-                EntityGraphView(controller: controller, height: graphHeight)
+                graph
             case .list:
                 details
             }
             if let message = controller.message {
                 guidance(message)
+            }
+        }
+    }
+
+    /// The graph, at whichever depth was chosen (spec §8.7).
+    ///
+    /// All three branches read the *same* `EntityGraphModel` through the two
+    /// renderers, so changing depth can only ever change what you are looking
+    /// at — never what is true. The side-by-side branch builds two independent
+    /// views on purpose: sharing one selection between them would couple the
+    /// readings together, and the whole value of the comparison is being able to
+    /// hover one thing here and a different thing there without them fighting.
+    @ViewBuilder
+    private var graph: some View {
+        switch depth {
+        case .flat:
+            EntityGraphView(controller: controller, height: graphHeight)
+        case .deep:
+            GraphSceneView(controller: controller, height: graphHeight)
+        case .both:
+            HStack(alignment: .top, spacing: 10) {
+                EntityGraphView(controller: controller, height: graphHeight)
+                    .frame(maxWidth: .infinity)
+                GraphSceneView(controller: controller, height: graphHeight)
+                    .frame(maxWidth: .infinity)
             }
         }
     }
@@ -157,6 +233,14 @@ struct CockpitPopoverView: View {
             statePill
 
             modeToggle
+
+            if mode == .graph {
+                depthToggle
+            }
+
+            if mode == .list {
+                layoutToggle
+            }
 
             if let onOpenSettings {
                 Button(action: onOpenSettings) {
@@ -259,68 +343,111 @@ struct CockpitPopoverView: View {
         .background(Palette.electricBlue.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
     }
 
+    /// The plain reading: the four rows (Vault / Harness / Agent / Inference) in
+    /// whichever layout the person prefers, the `Working now` band beneath
+    /// them, and the idle-harness toggles after that (DECISIONS.md D-001).
     private var details: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            PickerRow(
-                label: Strings.Rows.vault,
-                value: vaultValue,
-                accent: Palette.teal,
-                options: controller.vaultOptions,
-                selection: Binding(
-                    get: { controller.report?.vault.path ?? "" },
-                    set: { controller.selectVault($0) }
-                ),
-                display: Self.vaultName,
-                onChooseFolder: { isImportingVault = true }
-            )
-            .help(Strings.Actions.chooseVault)
-
-            if controller.harnessOptions.count > 1 {
-                PickerRow(
-                    label: Strings.Rows.harness,
-                    value: harnessValue,
-                    accent: Palette.electricBlue,
-                    options: controller.harnessOptions.map(\.baseURL),
-                    selection: Binding(
-                        get: { controller.report?.baseURL ?? "" },
-                        set: { controller.selectHarness($0) }
-                    ),
-                    display: harnessLabel
-                )
-                .help(Strings.Actions.chooseHarness)
-            } else {
-                StatusRow(label: Strings.Rows.harness, value: harnessValue, accent: Palette.electricBlue)
+        VStack(alignment: .leading, spacing: 14) {
+            CockpitPanel(controller: controller, layout: layoutBinding) {
+                isImportingVault = true
             }
 
-            PickerRow(
-                label: Strings.Rows.model,
-                value: modelValue,
-                accent: Palette.neonGreen,
-                options: controller.modelOptions,
-                selection: Binding(
-                    get: { controller.report?.model ?? "" },
-                    set: { controller.selectModel($0) }
-                ),
-                display: { $0 }
-            )
-            .help(Strings.Actions.chooseModel)
+            latentHarnesses
+        }
+    }
 
-            if !controller.latentHarnessOptions.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(Strings.Rows.latent)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Palette.inkMuted)
+    /// The one binding both the header toggle and the panel read and write, so
+    /// tapping either side redraws both.
+    private var layoutBinding: Binding<PanelLayout> {
+        Binding(
+            get: { PanelLayout.resolved(from: layoutRaw) },
+            set: { chooseLayout($0) }
+        )
+    }
 
-                    ForEach(controller.latentHarnessOptions) { latent in
-                        LatentRow(
-                            name: latent.name,
-                            path: latent.path,
-                            isFloating: controller.isLatentHarnessEnabled(latent.bundleID),
-                            toggle: { controller.toggleLatentHarness(latent.bundleID) }
-                        )
-                    }
+    private func chooseLayout(_ option: PanelLayout) {
+        withAnimation(.easeInOut(duration: 0.18)) { layoutRaw = option.rawValue }
+    }
+
+    /// Installed-but-idle harnesses. These sit below the four rows rather than
+    /// inside them, because they are not part of the request chain — nothing is
+    /// currently talking to them.
+    @ViewBuilder
+    private var latentHarnesses: some View {
+        if !controller.latentHarnessOptions.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(Strings.Rows.latent)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Palette.inkMuted)
+
+                ForEach(controller.latentHarnessOptions) { latent in
+                    LatentRow(
+                        name: latent.name,
+                        path: latent.path,
+                        isFloating: controller.isLatentHarnessEnabled(latent.bundleID),
+                        toggle: { controller.toggleLatentHarness(latent.bundleID) }
+                    )
                 }
-                .help(Strings.Rows.latentHelp)
+            }
+            .help(Strings.Rows.latentHelp)
+        }
+    }
+
+    /// How deep the graph is drawn: the flat pool, the 3D deep, or the two
+    /// together (spec §8.7).
+    ///
+    /// Built exactly like `layoutToggle` and for the same reason: the depth is
+    /// only meaningful once you are in the graph, so like the layout toggle it
+    /// only appears in that mode. Two toggles in the header, never three — the
+    /// one for the mode you are not in is a control for something invisible.
+    private var depthToggle: some View {
+        HStack(spacing: 2) {
+            ForEach(Strings.Views.Depth.allCases) { option in
+                Button {
+                    chooseDepth(option)
+                } label: {
+                    Image(systemName: option.symbol)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(depth == option ? Palette.ink : Palette.inkMuted)
+                        .frame(width: 24, height: 20)
+                        .background(
+                            depth == option ? Palette.ink.opacity(0.12) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 5)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
+                .help("\(option.label) — \(option.help)")
+            }
+        }
+    }
+
+    private func chooseDepth(_ option: Strings.Views.Depth) {
+        withAnimation(.easeInOut(duration: 0.18)) { depthRaw = option.rawValue }
+    }
+
+    /// The A/B toggle for the two readings, plus the side-by-side that exists
+    /// only to help choose between them (DECISIONS.md D-001). It sits in the
+    /// header beside the mode toggle and looks like it: the same pair of symbols,
+    /// the active one lit, no text menu.
+    private var layoutToggle: some View {
+        HStack(spacing: 2) {
+            ForEach(PanelLayout.allCases) { option in
+                Button {
+                    chooseLayout(option)
+                } label: {
+                    Image(systemName: option.symbol)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(layout == option ? Palette.ink : Palette.inkMuted)
+                        .frame(width: 24, height: 20)
+                        .background(
+                            layout == option ? Palette.ink.opacity(0.12) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 5)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
+                .help("\(option.label) — \(option.help)")
             }
         }
     }
@@ -482,32 +609,12 @@ struct CockpitPopoverView: View {
         if controller.isRefreshing { return Palette.working }
         return controller.isReady ? Palette.neonGreen : Palette.offline
     }
-
-    private var vaultValue: String {
-        controller.report?.vault.path ?? Strings.States.unknown
-    }
-
-    private var harnessValue: String {
-        guard let report = controller.report else { return Strings.States.unknown }
-        return "\(report.runtime) · \(report.baseURL)"
-    }
-
-    /// A harness is its name plus where it lives — the URL alone can't say which
-    /// app is answering on a shared port.
-    private func harnessLabel(_ baseURL: String) -> String {
-        guard let option = controller.harnessOptions.first(where: { $0.baseURL == baseURL }) else {
-            return baseURL
-        }
-        return "\(option.name) · \(baseURL)"
-    }
-
-    private var modelValue: String {
-        controller.report?.model ?? Strings.States.unknown
-    }
 }
 
 /// The palette accent bar: same idea, same colour, every time (spec §7).
-private struct AccentBar: View {
+/// Not file-private — the chain layout draws the same bar, and one definition
+/// keeps the two layouts from drifting.
+struct AccentBar: View {
     let color: Color
 
     var body: some View {
@@ -515,89 +622,6 @@ private struct AccentBar: View {
             .fill(color)
             .frame(width: 3, height: 14)
             .shadow(color: color.opacity(0.6), radius: 4)
-    }
-}
-
-/// One labelled fact. The accent bar carries the palette colour so the same
-/// idea always glows the same (spec §7).
-private struct StatusRow: View {
-    let label: String
-    let value: String
-    let accent: Color
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            AccentBar(color: accent)
-
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Palette.inkMuted)
-                .frame(width: 60, alignment: .leading)
-
-            Text(value)
-                .font(.caption)
-                .foregroundStyle(Palette.ink)
-                .lineLimit(2)
-                .truncationMode(.middle)
-
-            Spacer(minLength: 0)
-        }
-    }
-}
-
-/// A labelled fact whose value is a picker (spec §8.1, §8.3). The row shows the
-/// full current choice; the menu lists the alternatives. Disabled when there is
-/// nothing to switch to, so a single-vault or single-model machine stays quiet.
-private struct PickerRow: View {
-    let label: String
-    let value: String
-    let accent: Color
-    let options: [String]
-    let selection: Binding<String>
-    let display: (String) -> String
-    /// Optional extra menu entry — the vault row uses it to adopt any folder.
-    var onChooseFolder: (() -> Void)?
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            AccentBar(color: accent)
-
-            Text(label)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Palette.inkMuted)
-                .frame(width: 60, alignment: .leading)
-
-            Menu {
-                Picker(label, selection: selection) {
-                    ForEach(options, id: \.self) { option in
-                        Text(display(option)).tag(option)
-                    }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-
-                if let onChooseFolder {
-                    Divider()
-                    Button(Strings.Actions.openFolder, action: onChooseFolder)
-                }
-            } label: {
-                HStack(spacing: 4) {
-                    Text(value)
-                        .font(.caption)
-                        .foregroundStyle(Palette.ink)
-                        .lineLimit(2)
-                        .truncationMode(.middle)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 8, weight: .semibold))
-                        .foregroundStyle(Palette.inkMuted)
-                }
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .disabled(options.count <= 1 && onChooseFolder == nil)
-
-            Spacer(minLength: 0)
-        }
     }
 }
 

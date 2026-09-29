@@ -1,18 +1,6 @@
 import AppKit
 import SwiftUI
 
-/// One thing in the rockpool: a vault, a harness, a model, an agent, or a
-/// latent harness — one installed but not answering on a port.
-private struct GraphNode: Identifiable {
-    enum Kind { case vault, harness, model, agent, latent }
-
-    let id: String
-    let kind: Kind
-    let title: String
-    let subtitle: String?
-    let accent: Color
-}
-
 /// A sea-star drawn as anatomy, not as a spiky polygon. Eight slender arms
 /// taper from a soft central disc out to rounded tips, with webbing dipping
 /// between them — the leggy silhouette of a *Meridiastra* carpet sea-star
@@ -118,7 +106,12 @@ struct SeaStarShape: Shape {
 /// given vault, harness or model always spins the same unique blend around
 /// its own entity colour. Only the tint and the rotation differ between
 /// nodes, which is what makes each read as its own thing (spec §8.7).
-private struct SeaStarGlyph: View {
+///
+/// Internal rather than file-private, because the 3D scene rasterises *this*
+/// view into a texture and maps it onto a billboard. Rendering the actual
+/// glyph rather than a second, hand-built 3D creature is the reason the deep
+/// cannot drift away from the pool: there is only one sea-star, drawn twice.
+struct SeaStarGlyph: View {
     let accent: Color
     let seed: Double
     let isActive: Bool
@@ -259,22 +252,10 @@ private struct SeaStarGlyph: View {
     }
 
     /// Rotate a colour's hue by `delta` (0…1 = a full turn), keeping its
-    /// saturation and brightness. Gives the arm-to-arm shimmer its palette.
+    /// saturation and brightness. Gives the arm-to-arm shimmer its palette, and
+    /// defers to the shared seed so the 3D spheres spin their hues the same way.
     private static func shift(_ color: Color, by delta: Double) -> Color {
-        let ns = NSColor(color).usingColorSpace(.sRGB) ?? .white
-        var hue: CGFloat = 0
-        var saturation: CGFloat = 0
-        var brightness: CGFloat = 0
-        var alpha: CGFloat = 0
-        ns.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha)
-        var shifted = (hue + CGFloat(delta)).truncatingRemainder(dividingBy: 1)
-        if shifted < 0 { shifted += 1 }
-        return Color(
-            hue: Double(shifted),
-            saturation: Double(saturation),
-            brightness: Double(min(1, brightness * 1.06)),
-            opacity: Double(alpha)
-        )
+        GraphSeed.shifted(color, by: delta)
     }
 }
 
@@ -417,6 +398,7 @@ struct EntityGraphView: View {
     var height: CGFloat = 190
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.seaStarCockpitOpen) private var isOpen
     @State private var hovered: String?
     @State private var selected: String?
     /// How far the connection ribbon has grown out of the vault, 0…1. Reset and
@@ -451,7 +433,7 @@ struct EntityGraphView: View {
 
     var body: some View {
         Group {
-            if reduceMotion {
+            if reduceMotion || !isOpen {
                 pool(at: 0, animated: false)
             } else {
                 TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
@@ -519,7 +501,7 @@ struct EntityGraphView: View {
         guard animated else { return points }
         var result: [String: CGPoint] = [:]
         for (id, point) in points {
-            let phase = Self.phase(for: id)
+            let phase = GraphSeed.phase(for: id)
             result[id] = CGPoint(
                 x: point.x + sin(time * 0.22 + phase) * 2.4,
                 y: point.y + cos(time * 0.17 + phase * 1.3) * 2.0
@@ -531,10 +513,12 @@ struct EntityGraphView: View {
     /// A stable 0…2π phase from a node id, so the same entity always drifts the
     /// same way and nothing jitters between redraws. Also seeds each node's star
     /// colours and its own slight turn.
+    ///
+    /// Held in `GraphSeed` rather than here, because the 3D deep tints and
+    /// jitters from the same seed. One entity must be the same creature in both
+    /// bodies, not two things that happen to agree.
     private static func phase(for id: String) -> Double {
-        var hash: UInt64 = 1469598103934665603
-        for byte in id.utf8 { hash = (hash ^ UInt64(byte)) &* 1099511628211 }
-        return Double(hash % 6283) / 1000.0
+        GraphSeed.phase(for: id)
     }
 
     private func growConnection() {
@@ -548,69 +532,21 @@ struct EntityGraphView: View {
 
     // MARK: - Model
 
-    private var nodes: [GraphNode] {
-        var nodes: [GraphNode] = []
-        if let vault = controller.report?.vault.path {
-            nodes.append(GraphNode(
-                id: "vault",
-                kind: .vault,
-                title: (vault as NSString).lastPathComponent,
-                subtitle: vault,
-                accent: Palette.vaultGlow
-            ))
-        }
-        for harness in controller.harnessOptions {
-            nodes.append(GraphNode(
-                id: "harness:\(harness.baseURL)",
-                kind: .harness,
-                title: harness.name,
-                subtitle: harness.baseURL,
-                accent: Palette.harnessGlow
-            ))
-        }
-        for model in controller.modelOptions {
-            nodes.append(GraphNode(
-                id: "model:\(model)",
-                kind: .model,
-                title: model,
-                subtitle: nil,
-                accent: Palette.modelGlow
-            ))
-        }
-        for agent in controller.agentOptions {
-            nodes.append(GraphNode(
-                id: "agent:\(agent.name)",
-                kind: .agent,
-                title: agent.name,
-                subtitle: agent.model,
-                accent: Palette.agentGlow
-            ))
-        }
-        // Latent harnesses the person has floated on. They are peers of a live
-        // harness — same colour, same ring — but they wear a dimmer glow, because
-        // nothing is answering on their port (spec §8.7).
-        for latent in controller.visibleLatentHarnesses {
-            nodes.append(GraphNode(
-                id: "latent:\(latent.bundleID)",
-                kind: .latent,
-                title: latent.name,
-                subtitle: latent.path,
-                accent: Palette.harnessGlow
-            ))
-        }
-        return nodes
-    }
+    /// The shared model. The 2D pool and the 3D deep read the *same* struct, so
+    /// switching between them changes the drawing and the camera and nothing
+    /// else. That is the whole point of pulling this out: there is no longer a
+    /// second place where the roster can be described, and so no way for the two
+    /// readings to drift apart and tell you different things.
+    private var model: EntityGraphModel { EntityGraphModel(controller: controller) }
+
+    private var nodes: [GraphNode] { model.nodes }
 
     /// The majors: everything that is not a satellite. These wear the star. A
     /// satellite is a model or an agent — a thing that orbits the active harness
     /// rather than a peer of the vault and its harnesses.
-    private var majors: [GraphNode] {
-        nodes.filter { $0.kind != .model && $0.kind != .agent }
-    }
+    private var majors: [GraphNode] { model.majors }
 
-    private var activeHarnessID: String? {
-        controller.report.map { "harness:\($0.baseURL)" }
-    }
+    private var activeHarnessID: String? { model.activeHarnessID }
 
     /// The node the card describes. A click or a hover wins, so inspecting
     /// something else still works; but with neither, this falls back to the
@@ -618,10 +554,8 @@ struct EntityGraphView: View {
     /// what is running without hunting for it, so the state is on screen the
     /// moment the popover opens.
     private var subject: GraphNode? {
-        if let id = selected ?? hovered {
-            return nodes.first { $0.id == id }
-        }
-        return nodes.first { $0.id == activeHarnessID }
+        if let id = selected ?? hovered { return model.node(id) }
+        return activeHarnessID.flatMap { model.node($0) }
     }
 
     /// The ids that belong to the focused neighbourhood — the focused node and
@@ -629,7 +563,7 @@ struct EntityGraphView: View {
     /// whole-pool reading is untouched.
     private var focusSet: Set<String> {
         guard let focused else { return [] }
-        return neighbours(of: focused).union([focused])
+        return model.neighbours(of: focused).union([focused])
     }
 
     /// Nodes in draw order: the focused star last, so its glow and label sit over
@@ -639,57 +573,12 @@ struct EntityGraphView: View {
         return nodes.filter { $0.id != focused } + nodes.filter { $0.id == focused }
     }
 
-    /// Everything directly related to one entity, by id — the company a focus
-    /// reading keeps lit. Each kind wires to what the report already knows: the
-    /// vault to the harness it is on, a harness to the models it offers, a model
-    /// to the harnesses that serve it and the agents bound to it, an agent to its
-    /// model and its provider. A latent harness answers on no port, so it touches
-    /// nothing. Only ids that are actually drawn survive.
+    /// Everything directly related to one entity, by id. Thinly forwarded to
+    /// the shared model rather than re-derived here — the pool and the deep
+    /// describe relationships from one place, so a focus reading in one and a
+    /// focus reading in the other are the same company.
     private func neighbours(of id: String) -> Set<String> {
-        guard let node = nodes.first(where: { $0.id == id }) else { return [] }
-        var related: Set<String> = []
-        switch node.kind {
-        case .vault:
-            if let active = activeHarnessID { related.insert(active) }
-        case .harness:
-            if id == activeHarnessID { related.insert("vault") }
-            if let harness = controller.harnessOptions
-                .first(where: { "harness:\($0.baseURL)" == id }) {
-                for model in harness.models { related.insert("model:\(model)") }
-            }
-            if id == activeHarnessID, let current = controller.report?.model {
-                related.insert("model:\(current)")
-            }
-        case .model:
-            let name = node.title
-            for harness in controller.harnessOptions where harness.models.contains(name) {
-                related.insert("harness:\(harness.baseURL)")
-            }
-            if controller.report?.model == name, let active = activeHarnessID {
-                related.insert(active)
-            }
-            for agent in controller.agentOptions where agent.model == name {
-                related.insert("agent:\(agent.name)")
-            }
-        case .agent:
-            if let model = node.subtitle {
-                related.insert("model:\(model)")
-                for harness in controller.harnessOptions where harness.models.contains(model) {
-                    related.insert("harness:\(harness.baseURL)")
-                }
-            }
-            if let provider = controller.agentOptions
-                .first(where: { "agent:\($0.name)" == id })?.provider {
-                for harness in controller.harnessOptions
-                where harness.name.lowercased().contains(provider.lowercased()) {
-                    related.insert("harness:\(harness.baseURL)")
-                }
-            }
-        case .latent:
-            break
-        }
-        let known = Set(nodes.map(\.id))
-        return related.intersection(known).subtracting([id])
+        model.neighbours(of: id)
     }
 
     // MARK: - Layout
@@ -838,7 +727,15 @@ struct EntityGraphView: View {
             let dx = target.x - vault.x
             let dy = target.y - vault.y
             let length = max(sqrt(dx * dx + dy * dy), 1)
-            NudiStrip(style: .blueWhite, height: 3, expands: false)
+            // The orange-to-green art means one thing only: the endpoint this
+            // link reaches answered during the latest read. Selection alone
+            // does not earn it — a harness picked but not answering stays
+            // blue-white wiring, so the ribbon never claims a probe result.
+            NudiStrip(
+                style: model.node(active)?.isLive == true ? .greenOrange : .blueWhite,
+                height: 3,
+                expands: false
+            )
                 .frame(width: length, height: 3)
                 // Reveal from the vault end, so the ribbon grows *out of* the
                 // vault toward the harness it just connected to.
@@ -854,8 +751,13 @@ struct EntityGraphView: View {
 
     /// The links out of a focused star: a nudibranch strip runs from it to each
     /// neighbour, so the reading shows not just *what* is near but *how* it is
-    /// bound. Same art, same meaning as the vault-to-harness ribbon — a strip is
-    /// an edge between two entities, drawn once per relationship the report knows.
+    /// bound. A strip is an edge between two entities, drawn once per
+    /// relationship the report knows.
+    ///
+    /// These stay blue-white whatever the neighbour is. The edge is a binding
+    /// the report states; whether the far end answered is a separate fact the
+    /// neighbour's own liveness bar already carries. Colouring the wire too
+    /// would say it twice, and say it for the whole fan of neighbours at once.
     @ViewBuilder
     private func focusEdgeLayer(_ points: [String: CGPoint]) -> some View {
         if let focused, let origin = points[focused] {
@@ -946,14 +848,18 @@ struct EntityGraphView: View {
         // nothing is answering on its port, and the eye should read that at once.
         // Unrelated stars, when something is focused, fade almost away.
         let presence: Double = (node.kind == .latent ? 0.5 : 1) * (faded ? 0.12 : 1)
-        // A slow breath in the glow, each orb on its own phase.
+        // A slow breath in the glow, each orb on its own phase. Only a node that
+        // actually answered breathes — a still one is telling you nothing is on
+        // its port, which is a fact, not a lack of decoration.
         let phase = Self.phase(for: node.id)
-        let pulse = animated ? 0.5 + 0.5 * sin(time * 1.1 + phase) : 0.5
-        let glyph = SeaStarGlyph(accent: node.accent, seed: phase, isActive: isActive)
+        let pulse = (animated && node.isLive) ? 0.5 + 0.5 * sin(time * 1.1 + phase) : 0.5
+        let accent = GraphSeed.shifted(node.accent, by: GraphSeed.hue(for: node.id) * 0.25)
+        let glow = isActive ? 0.95 : (node.isLive ? 0.35 + 0.3 * pulse : 0)
+        let glyph = SeaStarGlyph(accent: accent, seed: phase, isActive: isActive || node.isLive)
             .frame(width: size, height: size)
             .shadow(
-                color: node.accent.opacity((isActive ? 0.95 : 0.35 + 0.3 * pulse) * presence),
-                radius: isActive ? 10 : 4 + 3 * pulse
+                color: accent.opacity(glow * presence),
+                radius: isActive ? 10 : (node.isLive ? 4 + 3 * pulse : 1)
             )
 
         return Group {
@@ -973,6 +879,23 @@ struct EntityGraphView: View {
                     .lineLimit(1)
                     .fixedSize()
                     .offset(y: size / 2 + 12)
+            }
+        }
+        // The nudge of green on a node that answered. Only drawn when it *is*
+        // live, so the bar never shows its idle face inside a star — a still
+        // grey bar over a glowing body would read as "broken", and there is a
+        // real reading for that: the star is simply not on a port, and it is
+        // already drawn dimmer. Deliberately quiet rather than a full nudibranch
+        // ribbon per node, because "live" means only that a probe got an answer
+        // back. The loud orange-and-green bar lives in the panel, where there
+        // is one bar and one thing to say about it.
+        .overlay(alignment: .top) {
+            if node.isLive {
+                LivenessBar(isLive: true, height: 2)
+                    .frame(width: size * 0.72)
+                    .offset(y: -size / 2 - 7)
+                    .opacity(isActive || inFocus ? 0.95 : 0.6)
+                    .transition(.opacity)
             }
         }
         .position(point)
@@ -1011,134 +934,36 @@ struct EntityGraphView: View {
     /// the plain facts the engine already handed us, laid out so a node is
     /// inspectable at a glance. Nothing here needs a second call to the engine —
     /// it is all in the report we already hold. Empty until something is chosen.
+    ///
+    /// The card body itself is `GraphReadoutCard`, shared with the 3D scene, so
+    /// the two renderings can never drift into showing different facts for the
+    /// same entity. Only *where* the card sits is this view's business.
     @ViewBuilder
     private var readout: some View {
         if let subject {
-            let rows = facts(for: subject)
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(kindLabel(subject.kind).uppercased())
-                        .font(.system(size: 8, weight: .bold, design: .monospaced))
-                        .foregroundStyle(subject.accent)
-                    Text(subject.title)
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(Palette.bone)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                }
-                if !rows.isEmpty {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text(row.label)
-                                    .font(.system(size: 8, design: .monospaced))
-                                    .foregroundStyle(Palette.mauve)
-                                    .frame(width: 56, alignment: .leading)
-                                Text(row.value)
-                                    .font(.system(size: 9, design: .monospaced))
-                                    .foregroundStyle(Palette.bone.opacity(0.92))
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .frame(width: 240, alignment: .leading)
-            .background(Palette.pool.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(subject.accent.opacity(0.4), lineWidth: 1)
+            GraphReadoutCard(
+                node: subject,
+                rows: facts(for: subject),
+                kindLabel: kindLabel(subject.kind)
             )
-            .shadow(color: .black.opacity(0.28), radius: 7, y: 2)
             .padding(9)
             .transition(.opacity)
         }
     }
 
     private func kindLabel(_ kind: GraphNode.Kind) -> String {
-        switch kind {
-        case .vault: return Strings.Detail.vault
-        case .harness: return Strings.Detail.harness
-        case .model: return Strings.Detail.model
-        case .agent: return Strings.Detail.agent
-        case .latent: return Strings.Detail.latent
-        }
+        model.kindLabel(kind)
     }
 
     /// What a clicked sea-star can tell you, all of it already in the report: a
     /// vault says how much is in it and how Sea-Star found it; a harness says its
     /// endpoint and how many models it serves; a model says which harness offers
     /// it. Ordered most-useful first, and rows that would say nothing are left out.
+    ///
+    /// Asked of the shared model, so hovering a star in the pool and hovering a
+    /// sphere in the deep bring up the *same* card. Two renderings, one truth.
     private func facts(for node: GraphNode) -> [(label: String, value: String)] {
-        guard let report = controller.report else { return [] }
-        switch node.kind {
-        case .vault:
-            var rows: [(label: String, value: String)] = [
-                (Strings.Detail.notes, report.vault.noteCount.formatted()),
-                (Strings.Detail.found, Strings.Detail.source(report.vault.source)),
-            ]
-            let others = max(controller.vaultOptions.count - 1, 0)
-            if others > 0 {
-                rows.append((Strings.Detail.nearby, Strings.Detail.nearbyVaults(others)))
-            }
-            if let path = node.subtitle {
-                rows.append((Strings.Detail.path, path))
-            }
-            return rows
-
-        case .harness:
-            var rows: [(label: String, value: String)] = [
-                (Strings.Detail.endpoint, node.subtitle ?? Strings.States.unknown),
-            ]
-            if let harness = controller.harnessOptions
-                .first(where: { "harness:\($0.baseURL)" == node.id }) {
-                rows.append((
-                    Strings.Detail.models,
-                    Strings.Detail.modelCount(harness.models.count)
-                ))
-            }
-            rows.append((
-                Strings.Detail.status,
-                node.id == activeHarnessID ? Strings.Detail.current : Strings.Detail.available
-            ))
-            return rows
-
-        case .model:
-            var rows: [(label: String, value: String)] = []
-            let servers = controller.harnessOptions
-                .filter { $0.models.contains(node.title) }
-                .map(\.name)
-            if !servers.isEmpty {
-                rows.append((Strings.Detail.servedBy, servers.joined(separator: ", ")))
-            }
-            rows.append((
-                Strings.Detail.status,
-                node.title == report.model ? Strings.Detail.current : Strings.Detail.available
-            ))
-            return rows
-
-        case .agent:
-            var rows: [(label: String, value: String)] = [
-                (Strings.Detail.uses, node.subtitle ?? Strings.States.unknown),
-            ]
-            if let provider = controller.agentOptions
-                .first(where: { "agent:\($0.name)" == node.id })?.provider {
-                rows.append((Strings.Detail.provider, provider))
-            }
-            return rows
-
-        case .latent:
-            var rows: [(label: String, value: String)] = [
-                (Strings.Detail.status, Strings.Detail.notConnected),
-            ]
-            if let path = node.subtitle {
-                rows.append((Strings.Detail.path, path))
-            }
-            return rows
-        }
+        model.facts(for: node)
     }
 
     // MARK: - Handling the object

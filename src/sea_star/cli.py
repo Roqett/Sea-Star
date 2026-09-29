@@ -20,7 +20,7 @@ from rich.markup import escape
 
 from . import __version__
 from .agent import build_agent
-from .agents import detect_agents
+from .agents import detect_agent_roster
 from .config import (
     ConfigError,
     detect_vault_candidates,
@@ -62,6 +62,7 @@ async def _build_report() -> dict:
     # fresh probe of the same endpoint would not.
     live = next((probe for probe in probes if probe.base_url == config.base_url), None)
     models = list(live.models) if live is not None else await probe_base_url(config.base_url)
+    roster = detect_agent_roster(vault_path)
     return {
         "schema_version": BRIDGE_SCHEMA_VERSION,
         "ready": bool(models),
@@ -82,8 +83,13 @@ async def _build_report() -> dict:
                 "model": spec.model,
                 "description": spec.description,
             }
-            for spec in detect_agents(vault_path)
+            for spec in roster.specs
         ],
+        # Which adapter produced ``agents`` above. A roster belongs to the app it
+        # was read from, so the app can say so instead of implying it is the
+        # machine's roster. ``None`` means no roster was found at all, which is
+        # a different fact from "found, and empty".
+        "agent_source": roster.source,
         "latent_harnesses": [
             {
                 "name": spec.name,

@@ -63,9 +63,18 @@ def _agent_from_entry(entry: dict, *, fallback_name: str | None = None) -> Agent
 
     Tolerant by design: Osaurus spells the model ``model`` in an export and
     ``defaultModel`` in the live store, and an entry may carry either key or none.
+    The name is read the same way — ``name`` in an export, ``displayName`` in the
+    default-agent file — because an orchestrator the harness knows by one key and
+    the file writes by another is still a real agent, and dropping it would leave
+    the cockpit short a persona.
     """
 
-    raw_name = entry.get("name") or entry.get("id") or fallback_name
+    raw_name = (
+        entry.get("name")
+        or entry.get("displayName")
+        or entry.get("id")
+        or fallback_name
+    )
     if not isinstance(raw_name, str) or not raw_name.strip():
         return None
     raw_model = entry.get("model") or entry.get("defaultModel") or entry.get("default_model")
@@ -97,9 +106,22 @@ def _agents_from_document(data: object) -> list[AgentSpec]:
 
 
 def _agents_from_home(root: Path) -> list[AgentSpec]:
-    """Every agent the live ``.osaurus`` store exposes, best-effort."""
+    """Every agent the live ``.osaurus`` store exposes, best-effort.
+
+    The default-agent file is read before the per-agent directory so the
+    orchestrator leads, which is the order ``osaurus config export`` reports and
+    the order a person reading the cockpit expects: the persona the harness
+    boots into first, then the rest of the roster.
+    """
 
     specs: list[AgentSpec] = []
+    default = root / "config" / "default-agent.json"
+    if default.is_file():
+        data = _read_json(default)
+        if isinstance(data, dict):
+            spec = _agent_from_entry(data)
+            if spec is not None:
+                specs.append(spec)
     for filename in OSAURUS_EXPORT_FILENAMES:
         exported = root / filename
         if exported.is_file():
@@ -112,13 +134,6 @@ def _agents_from_home(root: Path) -> list[AgentSpec]:
                 spec = _agent_from_entry(data, fallback_name=file.stem)
                 if spec is not None:
                     specs.append(spec)
-    default = root / "config" / "default-agent.json"
-    if default.is_file():
-        data = _read_json(default)
-        if isinstance(data, dict):
-            spec = _agent_from_entry(data)
-            if spec is not None:
-                specs.append(spec)
     return specs
 
 
@@ -190,8 +205,46 @@ def detect_agents(
 ) -> tuple[AgentSpec, ...]:
     """The person's Osaurus agents, from the first source that yields any."""
 
+    return detect_agent_roster(
+        vault_path, home=home, volumes_dir=volumes_dir
+    ).specs
+
+
+@dataclass(frozen=True, slots=True)
+class AgentRoster:
+    """A roster, and the adapter that produced it.
+
+    The source matters as much as the roster. ``agents`` is currently read from
+    Osaurus' files, so a roster is **Osaurus'**, not the machine's — the cockpit
+    has to be able to say which harness it belongs to rather than presenting one
+    app's personas as everyone's. ``source`` is ``None`` when nothing was found,
+    which is different from a roster found in the default location.
+    """
+
+    specs: tuple[AgentSpec, ...]
+    source: str | None
+    path: Path | None
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.specs
+
+
+#: The only adapter implemented today. Named rather than hardcoded at the call
+#: site so the bridge can report scope without importing a private constant.
+AGENT_ADAPTER = "osaurus"
+
+
+def detect_agent_roster(
+    vault_path: Path | None = None,
+    *,
+    home: Path | None = None,
+    volumes_dir: Path | None = None,
+) -> AgentRoster:
+    """The person's agents plus which adapter they came from."""
+
     for source in candidate_agent_sources(vault_path, home=home, volumes_dir=volumes_dir):
         specs = _dedupe(list(read_agents(source)))
         if specs:
-            return tuple(specs)
-    return ()
+            return AgentRoster(specs=tuple(specs), source=AGENT_ADAPTER, path=source)
+    return AgentRoster(specs=(), source=None, path=None)

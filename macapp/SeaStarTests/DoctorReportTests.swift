@@ -95,6 +95,108 @@ struct DoctorReportTests {
         }
         #expect(message == "No vault found.")
     }
+
+    /// The roster and the fact that *someone* vouched for it are two separate
+    /// fields, and the panel's four Agent states are read straight off them. So
+    /// the pair has to survive the bridge intact, in both directions.
+    @Test("decodes an agent roster and names its source")
+    func decodesAgentRoster() throws {
+        let response = try decode(
+            """
+            {
+              "schema_version": 1,
+              "ready": true,
+              "version": "0.1.0",
+              "vault": { "path": "/v", "source": "obsidian", "note_count": 1, "candidates": [] },
+              "runtime": "osaurus",
+              "base_url": "http://127.0.0.1:1337/v1",
+              "model": "qwen3",
+              "models": ["qwen3"],
+              "agents": [
+                { "name": "Mariner", "model": "qwen3", "description": "reads and answers" }
+              ],
+              "agent_source": "osaurus",
+              "server": { "state": "stopped" },
+              "servers": []
+            }
+            """
+        )
+
+        guard case .report(let report) = response else {
+            Issue.record("expected a report, got a failure")
+            return
+        }
+
+        #expect(report.detectedAgents.map(\.name) == ["Mariner"])
+        #expect(report.detectedAgents.first?.model == "qwen3")
+        #expect(report.agentSource == "osaurus")
+        #expect(report.hasKnownAgentSource)
+    }
+
+    /// An engine that has never heard of agents omits the field entirely. It
+    /// must decode to "no source" rather than to an empty roster — the app shows
+    /// those two states differently, and guessing here would be the lie the
+    /// foundation exists to prevent.
+    @Test("an older engine decodes to an unknown scope, not an empty one")
+    func decodesWithoutAgentSource() throws {
+        let response = try decode(
+            """
+            {
+              "schema_version": 1,
+              "ready": true,
+              "version": "0.1.0",
+              "vault": { "path": "/v", "source": "obsidian", "note_count": 1, "candidates": [] },
+              "runtime": "osaurus",
+              "base_url": "http://127.0.0.1:1337/v1",
+              "model": "qwen3",
+              "models": ["qwen3"],
+              "server": { "state": "stopped" },
+              "servers": []
+            }
+            """
+        )
+
+        guard case .report(let report) = response else {
+            Issue.record("expected a report, got a failure")
+            return
+        }
+
+        #expect(report.detectedAgents.isEmpty)
+        #expect(report.agentSource == nil)
+        #expect(!report.hasKnownAgentSource)
+    }
+
+    /// A source that looked and found nothing is a *different fact* from a
+    /// source that was never consulted, and the panel says so in words.
+    @Test("an empty roster still names its source")
+    func decodesEmptyRosterWithSource() throws {
+        let response = try decode(
+            """
+            {
+              "schema_version": 1,
+              "ready": true,
+              "version": "0.1.0",
+              "vault": { "path": "/v", "source": "obsidian", "note_count": 1, "candidates": [] },
+              "runtime": "osaurus",
+              "base_url": "http://127.0.0.1:1337/v1",
+              "model": "qwen3",
+              "models": ["qwen3"],
+              "agents": [],
+              "agent_source": "osaurus",
+              "server": { "state": "stopped" },
+              "servers": []
+            }
+            """
+        )
+
+        guard case .report(let report) = response else {
+            Issue.record("expected a report, got a failure")
+            return
+        }
+
+        #expect(report.detectedAgents.isEmpty)
+        #expect(report.hasKnownAgentSource)
+    }
 }
 
 @Suite("Engine invocation")
@@ -314,6 +416,49 @@ struct IconRosterTests {
         for _ in 0..<50 {
             #expect(IconRoster.all.contains(IconRoster.next(after: nil)))
         }
+    }
+}
+
+@Suite("Panel layout")
+struct PanelLayoutTests {
+    /// An unset or corrupt stored value must land on the reading this panel has
+    /// always been, never on a blank screen.
+    @Test("an unset preference opens the stack")
+    func unsetDefaultsToStack() {
+        #expect(PanelLayout.resolved(from: "") == .stack)
+        #expect(PanelLayout.resolved(from: "nonsense") == .stack)
+    }
+
+    @Test("a stored preference is honoured every way")
+    func storedPreferenceRoundTrips() {
+        for option in PanelLayout.allCases {
+            #expect(PanelLayout.resolved(from: option.rawValue) == option)
+        }
+    }
+
+    @Test("every reading carries a symbol, a label and a help line")
+    func everyReadingIsLabelled() {
+        for option in PanelLayout.allCases {
+            #expect(!option.symbol.isEmpty)
+            #expect(!option.label.isEmpty)
+            #expect(!option.help.isEmpty)
+        }
+    }
+
+    /// Only the side-by-side needs the room; widening it unconditionally would
+    /// make the ordinary column a stranded strip of ink in a wide panel.
+    @Test("only the side-by-side asks for a wide panel")
+    func onlyCompareIsWide() {
+        #expect(PanelLayout.both.isWide)
+        #expect(!PanelLayout.stack.isWide)
+        #expect(!PanelLayout.chain.isWide)
+    }
+
+    /// The two designs plus the way to compare them. If this ever drops a case,
+    /// the header toggle silently loses a button.
+    @Test("there are three readings")
+    func threeReadings() {
+        #expect(PanelLayout.allCases.count == 3)
     }
 }
 

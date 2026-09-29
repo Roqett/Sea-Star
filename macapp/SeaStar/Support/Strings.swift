@@ -29,12 +29,94 @@ enum Strings {
     enum Rows {
         static let vault = "Vault"
         static let harness = "Harness"
+        static let agent = "Agent"
+        static let inference = "Inference"
         static let model = "Model"
         static let notes = "Notes"
         /// The label for the row of installed-but-idle harnesses — apps that
         /// carry their own model loop but are not answering on a port.
         static let latent = "Idle"
         static let latentHelp = "Installed but not connected — all float by default; take any off the graph to quiet it."
+
+        /// Help for each of the four rows, naming what the row is *for* so the
+        /// split is readable without a manual.
+        static let vaultHelp =
+            "The notes Sea-Star reads. Everything it knows starts here."
+        static let harnessHelp =
+            "Which app answers. Switch it here; the endpoint and model move with it."
+        static let agentHelp =
+            "Which persona inside that harness you are talking to."
+        static let inferenceHelp =
+            "Where the model call actually goes — the endpoint and the model."
+
+        /// The honest states the Agent row can be in. These are deliberately
+        /// separate strings: a roster that was never found is not the same as a
+        /// roster that was found and turned out to be empty, and neither is the
+        /// same as a harness that has no concept of agents at all.
+        static let agentNoneFound = "No roster found"
+        static let agentRosterEmpty = "Roster is empty"
+        static let agentScopeUnknown = "Scope unknown"
+        static func agentRosterFrom(_ source: String) -> String {
+            "\(source) roster"
+        }
+        static func agentCount(_ count: Int) -> String {
+            count == 1 ? "1 agent" : "\(count) agents"
+        }
+    }
+
+    /// The `Working now` band: what the cockpit can see happening *right now*.
+    ///
+    /// It is observation-only by design. Nothing here is a prompt, an output, or
+    /// a claim that a person used anything — only what a probe actually reached.
+    enum WorkingNow {
+        static let title = "Working now"
+        static let idle = "Nothing in flight"
+        static let endpoint = "Endpoint"
+        static let server = "Server"
+        static let harness = "Harness"
+        /// Proven reachable: a probe answered on this port during the last read.
+        static let answering = "Answering"
+        /// Configured and known, but nothing is answering it right now.
+        static let notAnswering = "Not answering"
+        /// The server this app started and is holding open.
+        static let serving = "Serving"
+        static let notServing = "Stopped"
+
+        /// The evidence line under the band. It names *how far* the claim was
+        /// proven, which is the whole point: "live" here means "answered a
+        /// probe", never "a person used it".
+        static let evidenceProbe = "Live means a probe answered, just now."
+        static let evidenceNone = "No probe has answered yet."
+    }
+
+    /// The ways to lay the same four rows out, so the choice is a picture
+    /// rather than an argument (DECISIONS.md D-001).
+    enum PanelVariant {
+        /// A vertical list of rows — the familiar reading, everything scannable.
+        static let stack = "Stack"
+        static let stackHelp = "Four rows, one under the next"
+        /// Connected cards that read as a chain of cause: each row hands off to
+        /// the one below it, which is what actually happens to a request.
+        static let chain = "Chain"
+        static let chainHelp = "Linked cards, reading top to bottom"
+        /// Not a third design — the two of them at once, so choosing between them
+        /// is a single look rather than a memory test.
+        static let both = "Both"
+        static let bothHelp = "Side by side, to compare"
+        static func label(_ variant: PanelLayout) -> String {
+            switch variant {
+            case .stack: return stack
+            case .chain: return chain
+            case .both: return both
+            }
+        }
+        static func help(_ variant: PanelLayout) -> String {
+            switch variant {
+            case .stack: return stackHelp
+            case .chain: return chainHelp
+            case .both: return bothHelp
+            }
+        }
     }
 
     enum States {
@@ -94,6 +176,61 @@ enum Strings {
         /// are zoomed into and returns the pool to its whole reading (spec §8.7).
         static let exitFocus = "Exit focus"
         static let exitFocusHelp = "Show the whole pool again"
+
+        /// The same hint for the deep pool. Different verbs, because the deep
+        /// hands orbit to the camera rather than implementing them itself: you
+        /// turn the *water*, not the stars. Saying "drag to pan" here would be a
+        /// small lie the first time someone tried it.
+        static let orbitHint =
+            "Drag to orbit · scroll or pinch to zoom · right-drag to pan · click a sphere to inspect · double-click to focus"
+
+        /// The three depths the graph can be read at. One switch, three
+        /// readings, all off the same model — the depth changes the camera and
+        /// the drawing, never the facts (spec §8.7).
+        enum Depth: String, CaseIterable, Identifiable {
+            case flat
+            case deep
+            case both
+
+            var id: String { rawValue }
+
+            /// A person who has not chosen gets the flat pool, which is the
+            /// reading the cockpit has always opened in.
+            static func resolved(from raw: String) -> Depth {
+                Depth(rawValue: raw) ?? .flat
+            }
+
+            var symbol: String {
+                switch self {
+                case .flat: return "square.grid.2x2"
+                case .deep: return "cube.transparent"
+                case .both: return "rectangle.split.2x1"
+                }
+            }
+
+            var label: String {
+                switch self {
+                case .flat: return Strings.Views.flat
+                case .deep: return Strings.Views.deep
+                case .both: return Strings.Views.both
+                }
+            }
+
+            var help: String {
+                switch self {
+                case .flat: return Strings.Views.flatHelp
+                case .deep: return Strings.Views.deepHelp
+                case .both: return Strings.Views.bothHelp
+                }
+            }
+        }
+
+        static let flat = "Pool"
+        static let deep = "Deep"
+        static let both = "Both"
+        static let flatHelp = "Read the graph as a flat pool"
+        static let deepHelp = "Read the graph in three dimensions"
+        static let bothHelp = "Read the flat pool and the deep side by side"
     }
 
     /// The card that blooms when a starfish is clicked (spec §8.7): the plain
@@ -207,6 +344,22 @@ enum Strings {
         static let noVault = "No vault found. Point Sea-Star at your Obsidian vault, or set SEASTAR_VAULT."
         static let noRuntime = "No local model server answered. Start osaurus, Ollama or oMLX, then refresh."
         static let noCandidates = "No other Obsidian vaults were found."
+    }
+
+    /// Longer asides, shown on hover, for the places where the short label has
+    /// to give up something. They exist so the panel can be brief on screen and
+    /// still be honest underneath.
+    enum Advice {
+        /// Shown when the engine found no roster at all. Names the reason
+        /// rather than implying the person has no personas.
+        static let agentScopeHint =
+            "Sea-Star looks for a roster where a harness keeps one. None was found, so there is no agent to show — that is not the same as having none."
+        /// Shown against an engine too old to report a roster's scope. The app
+        /// refuses to guess whose agents these are.
+        static let agentScopeUnconfirmed =
+            "This engine does not say whose roster these are, so the cockpit will not claim they are yours. Update Sea-Star's engine to have it say."
+        /// The Inference row's fuller reading.
+        static let inferenceReading = "The endpoint and the model are both properties of the call, so they live together."
     }
 
     enum Errors {

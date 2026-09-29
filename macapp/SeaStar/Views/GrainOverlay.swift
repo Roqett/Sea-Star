@@ -12,9 +12,10 @@ private struct GrainOverlay: ViewModifier {
     let size: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.seaStarCockpitOpen) private var isOpen
 
     func body(content: Content) -> some View {
-        if reduceMotion {
+        if reduceMotion || !isOpen {
             content.colorEffect(grain(at: 0))
         } else {
             TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { timeline in

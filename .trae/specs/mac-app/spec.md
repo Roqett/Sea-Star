@@ -240,16 +240,43 @@ On launch / on click of the menu-bar item:
 1. **Vault** (§8.1) → show the detected vault; offer the other Obsidian-known vaults to
    switch, filterable, plus **Open folder…** to adopt any folder at all.
 2. **Harness** (§8.2) → run autodetect and show what answered ("oMLX — found", "Ollama — found").
-3. **Model** (§8.3) → list the models the *selected harness* reports; click to choose.
-4. **Go** → one button to start/stop the server; show state at a glance.
+3. **Agent** → the persona the selected harness reports — additive, degrading to an honest
+   "none configured" when the harness reports no roster, with the harness's own default (the
+   orchestrator) listed first (D-001).
+4. **Inference** (§8.3) → the endpoint *and* the selected model; the model list still follows
+   the *selected harness*, and start/stop of the server lives with the controls beneath the rows.
 
-The popover is a **column with a scrolling body**: the header and the start/stop controls stay
-pinned, and everything between them scrolls when there is more to say than fits. The reading the
-person chose sets the column's rooms — the **rows** stay in a 340pt column, while the **starfield
-opens wider and taller (~460pt square)** so the harnesses on its right edge and the tip note beside
-the active starfish have space (§8.7). The reading is only open for a moment, so it may be large;
-the middle gets a definite height (not a flexible max) so the popover opens whole rather than
-clipping itself, and it is clamped only to keep the bottom on-screen.
+Beneath the four rows sits **Working now** — observation-only evidence from probes (D-001):
+it may show what the engine actually knows (a probe answered, an endpoint live), never a
+prompt, an output, or a persona acting, because no activity stream proves those yet.
+
+The popover is a **column with a scrolling body**: the header and the controls stay
+pinned, and everything between them scrolls when there is more to say than fits. There are
+**two windows**, and each has exactly one axis, deliberately independent of the other
+(D-002):
+
+- the **text window** (`SeaStar.cockpitMode == list`) arranges the four rows with
+  `SeaStar.panelLayout`: **Stack** (default — the rows one under the next), **Chain**
+  (the rows as connected cards showing the request path), or **Both** (the two designs
+  side by side under their own labels). It is a **360pt** column, widening to **660pt**
+  only for the side-by-side.
+- the **graph window** (`SeaStar.cockpitMode == graph`) picks its renderer with
+  `SeaStar.graphDepth`: **Flat** (default — the 2D starfield, §8.7), **Deep** (the 3D
+  room), or **Both** (the two renderings side by side). It opens **600pt** wide
+  (**960pt** for the side-by-side) and takes a definite **560pt** height (600pt for Deep)
+  so the popover opens whole rather than clipping itself.
+
+One key answers "how many dimensions", the other "how are the rows arranged"; a person may
+compare on either axis without the other changing under them, and the defaults show one
+design each. The popover is clamped only to keep the bottom on-screen
+(`maxPopoverHeight`).
+
+**Everything animated runs only while the popover is open** (D-002). The popover's
+delegate writes `SeaStar.cockpitOpen` (default false) and an environment value carries it
+to every animated surface — caustics, grain, the 2D pool's timeline, the SceneKit render
+loop, the liveness drift. No signal means *still*, which is the safe failure; closing the
+panel stops the motion and the repaint while the MCP server and its connections stay up.
+Reduce Motion stills the same surfaces regardless.
 
 **The server must be held open.** `sea-star serve` speaks MCP over **stdin/stdout** — the instant
 its stdin reaches EOF it exits, silently. So the app must give the child a **pipe it keeps open**
@@ -323,16 +350,23 @@ fine) and remembers the answer in `UserDefaults` (`SeaStar.cockpitMode`); therea
 icons swap between the two readings of the same facts. Until a preference exists, the graph is
 shown behind the question and neither icon is pressed.
 
-The starfield opens a **larger panel than the rows do** — roughly 460pt square against the rows'
-340pt column. It needs the width so the harnesses down the right edge and the tip note beside the
-active starfish stop crowding the frame, and the height so the orbs have room to drift (spec §8).
+The starfield opens a **larger panel than the rows do** — 600pt wide against the text window's
+360pt column, and a definite 560pt tall (600pt in Deep). It needs the width so the harnesses down
+the right edge and the tip note beside the active starfish stop crowding the frame, and the height
+so the orbs have room to drift; the side-by-side comparison widens to 960pt so both readings stay
+readable at once (spec §8, D-002).
 
 The graph draws the roster as glowing nodes on a dark backdrop — the **vault** off to the
 left, each **harness** down the right edge, and the active harness's **models** ringing it.
-Colour is meaning, not decoration: vault `teal`, harness `electricBlue`, model `neonGreen`
-(the same accents the list rows carry). Hovering or selecting a node reveals its name and
-detail; tapping a node selects it through the same `selectVault` / `selectHarness` /
-`selectModel` calls the list uses, so the two views can never disagree.
+Colour is meaning, not decoration: vault `teal`, harness and latent `electricBlue`, model
+`neonGreen`, agent `orange` (the same accents the list rows carry), and each node shifts its
+kind's hue by a **deterministic fraction of its own id** — so one kind reads as a genre with
+variation, the way the C-stars do, rather than as clones. Glow is earned, never decorative:
+full glow only when the node is active or selected, a dim breath when it is live, plain
+definition when idle — so even the idle, greyed-out nodes stay colour-coded by kind.
+**Hover reveals what every node is** — name and kind without a click, because people do not
+like clicking to discover — and selecting a node still goes through the same `selectVault` /
+`selectHarness` / `selectModel` calls the list uses, so the two views can never disagree.
 
 The **connection** between the vault and the active harness is drawn as a nudibranch strip
 (`NudiStrip.expands == false`, fixed length), rotated to sit between the two nodes — the 3px
@@ -347,6 +381,21 @@ this"); failing that, **other vaults nearby** raise a wrong-vault nudge; failing
 ready harness gets the quiet "connected — *n* models on offer" line. Seen harnesses are remembered
 in `UserDefaults` (`SeaStar.seenHarnesses`, keyed by endpoint) and a fresh hint is acknowledged
 with **Got it**, after which the note settles into the connected line.
+
+**Deep** (spec §8, `SeaStar.graphDepth`) is the same roster in a SceneKit room, fed by the
+*same* renderer-independent `EntityGraphModel` this view consumes — so Flat, Deep and the
+rows can never disagree with one another. The room is free to orbit, zoom and pan, with
+hover text and click inspection over a fixed, deterministic layout: the camera moves, the
+nodes do not. It is tuned for legibility over spectacle — restrained bloom, dim body
+emission, opaque glyphs, readable labels — so its star shells hold their definition beside
+the flat drawing instead of blowing out.
+
+Discovery is hover-first for the reason above, and the further input routes are planned to
+reach the **same** actions the pointer already reaches (neither may become a precondition
+for understanding the graph): a **keyboard** path — focus a node, then cycle, e.g. step
+through the models the selected server offers — and a **voice** path, in the founder's
+words, "show me what servers we're using, cycle through the models available". Both are
+roadmap, not yet built (D-002).
 
 ### 8.8 Logs (kept short on purpose)
 

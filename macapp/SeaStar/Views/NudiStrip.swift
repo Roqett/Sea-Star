@@ -10,6 +10,17 @@ import SwiftUI
 struct NudiStrip: View {
     /// The strips the founder has supplied so far. Named for their colours, not
     /// their file names — the files carry a `:` that plays badly with tooling.
+    ///
+    /// The two carry different meanings, and keeping them apart is what makes
+    /// the second one readable at a glance:
+    ///
+    /// - `blueWhite` is **wiring** — rules, panel edges, chain links, and graph
+    ///   edges. Cool, structural, says nothing about whether anything answered.
+    /// - `greenOrange` is **liveness** — an endpoint that answered during the
+    ///   latest read, or the ribbon toward one that did. Used in the graph and
+    ///   in the liveness bar, nowhere else. A still, desaturated copy of it is
+    ///   the idle state, so the colour is never the only thing carrying the
+    ///   claim.
     enum Style: String, CaseIterable {
         case blueWhite = "NudiBlueWhite"
         case greenOrange = "NudiGreenOrange1"

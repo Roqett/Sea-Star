@@ -788,3 +788,77 @@ not a report:
 
 - Build the panel: `Vault / Harness / Agent / Inference` with `Working now`, in two
   comparable variants behind a toggle.
+
+## Handoff — 2026-09-30 (two-window stocktake, legibility, animation gate)
+
+**Why this session existed**
+
+The founder called the cockpit "a cascading cluster of misunderstanding": he had asked to
+compare two *text* structures, agreed in passing to also show both *graph* types, and ended
+up with both-of-each in both windows. He asked for a coherent stocktake and game plan for
+both instances — covering idle 2D nodes that hid their kind, a 3D room that was "blown
+out" beside the flat star shells, animation burning CPU while nobody was watching,
+liveness bars too subtle to notice, and input (hover, keyboard, voice) planned flexibly
+for down the track. This session made that game plan real in code, tests, and docs, and
+supersedes the previous note's "Single next step — build the panel": the panel is built.
+
+**Done — the game plan, executed**
+
+- **Axes settled (D-002):** text window = `SeaStar.panelLayout` Stack (default) / Chain /
+  Both, 360pt (660pt Both); graph window = `SeaStar.graphDepth` Flat (default) / Deep /
+  Both, 600pt/960pt wide, 560pt/600pt tall. Keys independent; comparison opt-in per
+  window; stored prefs reset so the founder lands on flat + stack.
+- **Text-window duplication pruned:** endpoint prints once (under *Inference*; the
+  Working-now band keeps it as a `.help` string only), the redundant liveness word is off
+  the row, header bar tightened 555→54pt.
+- **2D identity:** nodes colour-coded by kind (teal / electric blue / neon green / orange)
+  with a deterministic per-id hue shift so each kind is a genre; glow only when active or
+  selected (dim breath when live, plain when idle); hover readout card names every node.
+- **3D legibility:** bloom/emission/additive glyphs pulled back, motes 0.30→0.20, labels
+  readable, camera home brought closer (0, 70, 240) — `poolFitsTheOpeningView` passes.
+- **Animation scoped to visibility:** `SeaStar.cockpitOpen` environment (default false)
+  written by the popover delegate, gating caustics, grain, the 2D timeline, SceneKit
+  `isPlaying`, and the liveness drift. Server/MCP untouched — connections stay up when
+  closed ("They close it, it shuts, and the MCP connections maintain").
+- **Liveness bars legible:** orange/green active-connection strip at scale ×2 / 8pt sweep,
+  no new timers; blue-white remains the resting strip everywhere else.
+- **Engine roster:** `displayName` fallback, default-agent (the orchestrator) ordered
+  first, `AgentRoster.source` reports the owning harness.
+- **Docs:** spec §8 and §8.7 amended to the real panel, both axes, the colour/glow/hover
+  rules, the 3D sibling, the animation gate and the input roadmap; DECISIONS **D-002**;
+  CHANGELOG entry dated 2026-09-30; this handoff.
+
+**Verified**
+
+- `xcodegen generate` then `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar
+  -configuration Debug build` → **BUILD SUCCEEDED**.
+- `xcodebuild … test` → **68 Swift Testing cases in 13 suites passed**. (The XCTest layer
+  prints `Executed 0 tests` — expected; the suite is Swift Testing. 68 is the real
+  figure.)
+- `uv run pytest -q` → **84 passed in 0.47s**; `uv run ruff check .` → clean.
+- Release bundle **4.4MB** vs the 3.6MB baseline; Resources unchanged at 136KB — the
+  growth is compiled 3D code only.
+- App relaunched live: pid **15130**.
+
+**Open — carry into the next session**
+
+- **The activity-event stream is next in line** (unchanged from the previous note):
+  `Working now` and the glow still rest on endpoint probes, not usage. Build it inside the
+  telemetry envelope — *who / what route / when / how we know*, never *what was said* — or
+  the founder amends foundation §4 explicitly first.
+- **`harnesses.py` still violates foundation §1.** Still the clearest gap between the
+  document and the code; the four-row panel is now where a degraded row becomes visible,
+  so it is cheap to fix alongside.
+- **Voice + keyboard input are roadmap only** (spec §8.7): hover-first is shipped;
+  "cycle through the models on the selected server" by key or voice is not built.
+- **Brighter orange/green strip variants** were promised by the founder for graph active
+  connections — art swap only; the amplitude rule stays (D-002).
+- **Stray `plain`** (a 524KB `sample` CPU dump) sits untracked at the repo root — delete
+  or move it out of the tree; it must not be committed.
+- **Telemetry must be reconciled with Tier 1** before any continuous collection (unchanged).
+
+**Single next step**
+
+- Build the activity-event stream — *who / what route / when / how we know*, never *what
+  was said* — inside foundation §4's envelope, so `Working now` and the graph's glow can
+  rest on evidence instead of endpoints. Voice/keyboard model-cycling rides after it.

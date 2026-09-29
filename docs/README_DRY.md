@@ -1,7 +1,6 @@
 # Sea-Star — reference sheet
 
-> **Not a README.** A distillation for cross-checking with other models — chiefly about
-> the **Omarchy (Linux) port**. Kept in `docs/`, git-tracked locally / on Codeberg,
+> **Not a README.** A distillation for cross-checking with other models — **. Kept in `docs/`, git-tracked locally / on Codeberg,
 > **not pushed to the GitHub repo**.
 
 ## What it is
@@ -10,7 +9,7 @@ A local-first AI agent over an Obsidian vault. It is an **MCP server that is als
 MCP client**.
 
 - **MCP server** — exposes one tool, `ask_seastar`, to any MCP host.
-- **MCP client** — consumes other MCP servers (including Obsidian MCPs) as its own tools.
+- **MCP client** — can consume other MCP servers as its own tools.
 - **Engine** — Python. Talks to any OpenAI-compatible local endpoint. No cloud, no telemetry.
 
 ## What it does
@@ -21,6 +20,7 @@ MCP client**.
 - Finds a local runtime and a vault with zero config.
 
 ## What it solves
+**A central MAC OS Menu bar AI agentic Cockpit : WHOs running , with WHAT  model , WHERE and WHEN ..** TRACKING AT a place , GRAPHICALLY OR TEXTually 
 
 - **Setup cost** — local agents today are a weekend of YAML and silent failures. Here it's one command.
 - **Privacy** — frontier agents are cloud and read your notes. This runs on your machine.

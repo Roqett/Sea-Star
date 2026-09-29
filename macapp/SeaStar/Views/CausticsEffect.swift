@@ -10,9 +10,10 @@ private struct CausticsEffect: ViewModifier {
     let size: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.seaStarCockpitOpen) private var isOpen
 
     func body(content: Content) -> some View {
-        if reduceMotion {
+        if reduceMotion || !isOpen {
             content
         } else {
             TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in

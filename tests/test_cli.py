@@ -8,6 +8,7 @@ import pytest
 from typer.testing import CliRunner
 
 from sea_star import __version__
+from sea_star.agents import AGENT_ADAPTER, AgentRoster, AgentSpec
 from sea_star.cli import app
 from sea_star.config import RuntimeProbe
 from sea_star.harnesses import HarnessSpec
@@ -22,6 +23,11 @@ def _clean_env(monkeypatch):
     # Latent-harness discovery reads the real /Applications; keep every bridge
     # test hermetic unless a test opts back in by re-patching.
     monkeypatch.setattr("sea_star.cli.detect_latent_harnesses", lambda **kwargs: ())
+    # Agent discovery reads the real ~/.osaurus; same reasoning.
+    monkeypatch.setattr(
+        "sea_star.cli.detect_agent_roster",
+        lambda *args, **kwargs: AgentRoster(specs=(), source=None, path=None),
+    )
 
 
 def _async_return(value):
@@ -146,6 +152,58 @@ def test_doctor_json_reports_latent_harnesses(tmp_path, monkeypatch):
         {"name": "Xcode", "bundle_id": "com.apple.dt.Xcode", "path": "/Applications/Xcode.app"},
         {"name": "Goose", "bundle_id": "com.electron.goose", "path": "/Applications/Goose.app"},
     ]
+
+
+def test_doctor_json_reports_agent_scope_with_the_roster(tmp_path, monkeypatch):
+    """A roster must say whose roster it is.
+
+    The cockpit shows an Agent row. Without ``agent_source`` the app would have
+    to present one adapter's personas as though they were the machine's, which
+    is the overclaim the foundation forbids. So the scope travels with the list.
+    """
+    _write_vault(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sea_star.cli.probe_base_url", _async_return(["test-model"]))
+    monkeypatch.setattr("sea_star.cli.probe_runtimes", _async_return(()))
+    monkeypatch.setattr("sea_star.cli.detect_vault_candidates", lambda home=None: ())
+    monkeypatch.setattr(
+        "sea_star.cli.detect_agent_roster",
+        lambda *args, **kwargs: AgentRoster(
+            specs=(AgentSpec(name="Scout", model="omlx/Dirk", description="digs"),),
+            source=AGENT_ADAPTER,
+            path=tmp_path / ".osaurus",
+        ),
+    )
+
+    result = runner.invoke(app, ["doctor", "--json"])
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert report["agents"] == [
+        {"name": "Scout", "model": "omlx/Dirk", "description": "digs"}
+    ]
+    assert report["agent_source"] == AGENT_ADAPTER
+
+
+def test_doctor_json_reports_no_agent_source_when_there_is_no_roster(tmp_path, monkeypatch):
+    """An absent roster and an empty one are different facts, and the key says which.
+
+    ``null`` here means "nothing was found" — not "a source answered with no
+    agents" — so the app can say the difference out loud rather than showing a
+    blank row.
+    """
+    _write_vault(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sea_star.cli.probe_base_url", _async_return(["test-model"]))
+    monkeypatch.setattr("sea_star.cli.probe_runtimes", _async_return(()))
+    monkeypatch.setattr("sea_star.cli.detect_vault_candidates", lambda home=None: ())
+
+    result = runner.invoke(app, ["doctor", "--json"])
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert report["agents"] == []
+    assert report["agent_source"] is None
 
 
 def test_doctor_json_fails_loud_with_one_object(tmp_path, monkeypatch):

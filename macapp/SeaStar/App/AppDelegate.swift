@@ -11,7 +11,7 @@ import SwiftUI
 /// the smallest AppKit bridge that closes that gap — and hosts the existing
 /// SwiftUI cockpit and settings views unchanged.
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     let controller = ServerController()
 
     private var statusItem: NSStatusItem?
@@ -67,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let popover = NSPopover()
         popover.behavior = .transient
         popover.animates = true
+        popover.delegate = self
 
         let hosting = NSHostingController(
             rootView: CockpitPopoverView(controller: controller, onOpenSettings: { [weak self] in
@@ -87,6 +88,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             popover.contentViewController?.view.window?.makeKey()
             NSApp.activate()
         }
+    }
+
+    func popoverDidShow(_ popover: NSPopover) {
+        UserDefaults.standard.set(true, forKey: "SeaStar.cockpitOpen")
+    }
+
+    func popoverDidClose(_ popover: NSPopover) {
+        UserDefaults.standard.set(false, forKey: "SeaStar.cockpitOpen")
     }
 
     // MARK: - Click routing

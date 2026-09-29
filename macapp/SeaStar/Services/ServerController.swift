@@ -28,6 +28,25 @@ struct AgentOption: Identifiable, Equatable, Sendable {
     }
 }
 
+/// What the cockpit can honestly say about the agent roster.
+///
+/// These four are genuinely different facts, and collapsing them into one
+/// "No agent" string would be a small lie in three of the four cases. The
+/// split exists because the foundation's degradation contract asks the panel to
+/// show the highest rung it proved *and* which rung that was.
+enum AgentState: Equatable, Sendable {
+    /// A roster was found, and the engine named whose it is.
+    case roster([AgentOption])
+    /// A source answered and reported no agents.
+    case empty
+    /// No roster was found anywhere.
+    case notFound
+    /// Agents arrived without a source — an engine too old to say. The app
+    /// will not guess, because guessing means claiming a roster belongs to the
+    /// machine when it demonstrably belongs to one app.
+    case unconfirmed
+}
+
 /// A known harness app installed on this Mac but not answering on a port — an
 /// IDE or runtime app that carries its own model loop. Identity is its bundle id,
 /// the one thing stable across a rename or a move between Applications folders.
@@ -214,6 +233,51 @@ final class ServerController {
         } ?? []
     }
 
+    /// Whose roster the agents belong to, as the engine reported it. `nil`
+    /// means the engine could not say, and the panel must not fill the gap with
+    /// a guess.
+    var agentSource: String? {
+        report?.agentSource
+    }
+
+    /// A display label for the roster's owner, capitalised for reading in a row.
+    /// An unnameable roster gets a word that admits it rather than a name the
+    /// app invented.
+    var agentScopeLabel: String {
+        guard let source = report?.agentSource, !source.isEmpty else {
+            return Strings.Rows.agentScopeUnknown
+        }
+        return source.prefix(1).uppercased() + source.dropFirst()
+    }
+
+    /// The Agent row's state, derived rather than stored, so it can never drift
+    /// out of step with the report it describes.
+    var agentState: AgentState {
+        let options = agentOptions
+        guard !options.isEmpty else {
+            // No agents at all. Whether that is "empty" or "not found" depends
+            // on whether the engine told us it looked — a roster source that
+            // exists and is empty is a different fact from no source at all.
+            return report?.hasKnownAgentSource == true ? .empty : .notFound
+        }
+        return report?.hasKnownAgentSource == true ? .roster(options) : .unconfirmed
+    }
+
+    /// The persona the person has chosen, if any. Kept in memory only: an
+    /// agent is a reading of the cockpit, not a server setting, so it is not
+    /// persisted and not sent to the engine as an override.
+    private(set) var selectedAgentName: String?
+
+    /// Choose which persona the panel reads. This deliberately does *not*
+    /// restart the server or set an environment override — the engine has no
+    /// knob for "talk to this agent", and pretending otherwise would make the
+    /// control look load-bearing when it is not. What it genuinely changes is
+    /// what the panel shows.
+    func selectAgent(_ name: String) {
+        guard agentOptions.contains(where: { $0.name == name }) else { return }
+        selectedAgentName = name
+    }
+
     /// Every installed-but-idle harness the engine found, in the engine's stable
     /// order. These are togglable rather than autodetected: an app on the disk is
     /// not a connection, so the person decides which ones float on the graph.
@@ -264,8 +328,7 @@ final class ServerController {
             let response = try await EngineClient(command: command).doctor(environment: environment)
             switch response {
             case .report(let report):
-                self.report = report
-                self.message = nil
+                adopt(report)
                 logs.append("refresh · \(report.runtime) · \(report.model.isEmpty ? "no model" : report.model)")
             case .failure(let failure):
                 apply(failure: failure)
@@ -273,6 +336,19 @@ final class ServerController {
         } catch {
             apply(failure: error.localizedDescription)
         }
+    }
+
+    /// Take a report as the current reading, clearing any stale guidance.
+    ///
+    /// Pulled out of `refresh` so the one place that *accepts* a report is named
+    /// rather than inlined, and so the graph's liveness rules can be tested
+    /// against a real report without a live engine behind it. Everything the
+    /// graph draws is a function of this value, so being able to set it is the
+    /// difference between testing the honesty contract and only testing that the
+    /// plumbing compiles.
+    func adopt(_ report: DoctorReport) {
+        self.report = report
+        self.message = nil
     }
 
     /// Switch vault and re-read. A running server is restarted so the new choice

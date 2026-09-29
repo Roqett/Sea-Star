@@ -88,6 +88,10 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     let models: [String]
     let runtimes: [RuntimeInfo]?
     let agents: [AgentInfo]?
+    /// Which adapter produced ``agents`` — `"osaurus"` today. `nil` means no
+    /// roster was found, which is a *different fact* from "found, and empty",
+    /// so the panel can say the difference rather than showing a blank row.
+    let agentSource: String?
     let latentHarnesses: [LatentHarnessInfo]?
     let server: ServerState
     let servers: [BridgedServer]
@@ -103,6 +107,7 @@ struct DoctorReport: Decodable, Sendable, Equatable {
         case models
         case runtimes
         case agents
+        case agentSource = "agent_source"
         case latentHarnesses = "latent_harnesses"
         case server
         case servers
@@ -115,6 +120,11 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     /// Every agent the engine found. Empty when the engine predates agent
     /// discovery (`agents` absent), so the app degrades to the old graph.
     var detectedAgents: [AgentInfo] { agents ?? [] }
+
+    /// Whether the engine can name whose roster ``agents`` is. An older engine
+    /// omits the key, and then the app must *not* assume a global roster — the
+    /// panel says the scope is unconfirmed rather than guessing.
+    var hasKnownAgentSource: Bool { agentSource != nil }
 
     /// Every installed-but-idle harness the engine found. Empty when the engine
     /// predates latent-harness scanning (`latent_harnesses` absent).
