@@ -34,13 +34,22 @@ struct NudiStrip: View {
     var expands: Bool = true
 
     var body: some View {
-        Image(style.rawValue)
-            .resizable()
-            .interpolation(.high)
-            .aspectRatio(contentMode: .fill)
-            .frame(height: height)
-            .frame(maxWidth: expands ? .infinity : nil)
-            .clipped()
-            .accessibilityHidden(true)
+        Group {
+            if expands {
+                Image(style.rawValue)
+                    .resizable()
+                    .interpolation(.high)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(height: height)
+                    .frame(maxWidth: .infinity)
+            } else {
+                Image(style.rawValue)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(height: height)
+            }
+        }
+        .clipped()
+        .accessibilityHidden(true)
     }
 }

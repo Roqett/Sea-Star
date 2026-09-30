@@ -470,6 +470,7 @@ struct EntityGraphView: View {
             let points = drifted(focusAwareLayout(in: geo.size), at: time, animated: animated)
             ZStack {
                 starBackdrop(in: geo.size)
+                    .opacity(focused == nil ? 1 : 0)
                 if focused == nil {
                     connectionLayer(points, time: time, animated: animated)
                 } else {

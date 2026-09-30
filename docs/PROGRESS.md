@@ -862,3 +862,51 @@ supersedes the previous note's "Single next step — build the panel": the panel
 - Build the activity-event stream — *who / what route / when / how we know*, never *what
   was said* — inside foundation §4's envelope, so `Working now` and the graph's glow can
   rest on evidence instead of endpoints. Voice/keyboard model-cycling rides after it.
+
+## Handoff — 2026-09-30 (connectors must connect)
+
+**Why this session existed**
+
+The founder sent a screenshot of the 2D graph in focus mode: the strips were "stylistically
+cool but I would like it to actually look more functionally cool where the actual connectors
+connect and don't go through to oblivion or to wide space. So all connecting graphics have
+to actually connect to something." Before the pending push of 7828ada, fix it.
+
+**Diagnosis (measured, not guessed)**
+
+- `NudiBlueWhite` art is **743×3px**; `NudiGreenOrange1` is **375×3px** (1x universal).
+- `NudiStrip`'s old body ended `.frame(height:).frame(maxWidth: expands ? .infinity : nil)`
+  — with `maxWidth: nil` the caller's `.frame(width: length)` proposal never reached the
+  Image, so it sized from native aspect: **~495pt wide at 2pt tall** regardless of the
+  requested length. Each focus-edge strip overshot its node *and* the centre → rays to
+  oblivion. Spec §8.7 already promised "fixed length"; the code silently violated it.
+- `starBackdrop`'s hairlines are pinned to the *resting* star geometry, but focus mode
+  rearranges nodes — so rays pointed at empty space and radiated from the focused node to
+  non-neighbours (implying edges that don't exist).
+
+**Done**
+
+- `NudiStrip` branches: `expands == true` keeps the old fill behaviour; `expands == false`
+  drops `.aspectRatio(.fill)` so the image honours the caller's width exactly; both paths
+  `.clipped()`. Fixes the graph's connection strip, every focus edge, and `ChainLink`'s 18pt
+  rule in the chain panel — one fix, three surfaces.
+- `starBackdrop(in:)` in `pool(at:)` now carries `.opacity(focused == nil ? 1 : 0)` — the
+  decorative star dissolves on focus (existing spring on `value: focused`) and returns on
+  unfocus; in focus the only lines are real node→node edges.
+
+**Verified**
+
+- `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'macOS' test` →
+  **68 tests in 13 suites passed**, TEST EXECUTE SUCCEEDED (pre-existing warnings only).
+- Relaunched: the bundle is **`Sea-Star.app`** (hyphenated) under
+  `DerivedData/…/Build/Products/Debug/` — `pkill -x Sea-Star; open …/Sea-Star.app`.
+  `cockpitOpen` never auto-opens; the founder clicks the status item.
+
+**Docs**
+
+- CHANGELOG 2026-09-30 entry gained the connector bullet; spec §8.7 now records the
+  terminate-on-a-node rule and the focus-mode backdrop stand-down; this handoff.
+
+**Open / single next step** — unchanged from the note above: the activity-event stream;
+`harnesses.py` §1 debt; voice/keyboard roadmap; brighter strip art; stray `plain` dump;
+telemetry vs Tier 1. Push/merge of 7828ada + this fix still awaits explicit approval.

@@ -49,11 +49,18 @@ Summary of Changes:
 - **The orange/green liveness bars are visibly alive now.** Sweep doubled (2× scale, 8pt
   travel) with no new timers or repaints — amplitude, not frequency. Blue-white strips
   remain the resting treatment everywhere else.
+- **Connectors now actually connect.** The 2D starfield's strips overshot both endpoints:
+  `NudiStrip(expands: false)` swallowed the caller's fixed width and sized itself from the
+  743×3px art (~495pt wide at 2pt tall), so focus-mode edges shot past their nodes "to
+  oblivion". It now honours the caller's width exactly — the fixed length spec §8 always
+  promised — and the decorative star backdrop dissolves in focus mode, so every line on
+  screen in focus is a real node→node edge and no ray points at empty space.
 - **Agent roster reporting (Python engine).** `displayName` fallback so Osaurus agents
   keep their friendly names, the harness's default agent (the orchestrator) ordered first,
   and new `detect_agent_roster` / `AgentRoster.source` reporting *which harness* a roster
   belongs to.
-- **Verified:** 68 Swift tests in 13 suites; 84 pytest in 0.47s; ruff clean; Release
+- **Verified:** 68 Swift tests in 13 suites (re-passed after the connector fix); 84 pytest
+  in 0.47s; ruff clean; Release
   bundle 4.4MB vs the 3.6MB baseline — Resources unchanged at 136KB, growth is compiled 3D
   code only.
 

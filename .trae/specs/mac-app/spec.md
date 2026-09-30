@@ -372,7 +372,11 @@ The **connection** between the vault and the active harness is drawn as a nudibr
 (`NudiStrip.expands == false`, fixed length), rotated to sit between the two nodes — the 3px
 ribbon grown up into the wiring of the app. It *grows out of the vault* whenever the active
 harness changes, so the strip visibly shoots at the thing it just connected to. The orbs drift on
-a slow current and their glow breathes; all of that stills under Reduce Motion.
+a slow current and their glow breathes; all of that stills under Reduce Motion. Every connecting
+graphic must **terminate on an actual node** — no strip overshoots into empty space. In focus mode
+(double-click) the decorative star backdrop (outline and centre→tip hairlines, which are pinned
+to the resting layout) stands down to opacity 0, so the only lines on screen are the real
+node→node edges; it fades back when focus exits.
 
 A short **note** grows beside the active starfish, and tapping that starfish expands and contracts
 it. `HarnessTips.tip` (pure, unit-tested) decides what, if anything, to say, in priority order: a
