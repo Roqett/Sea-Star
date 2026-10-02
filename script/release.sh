@@ -69,14 +69,23 @@ if [ "${DRY_RUN}" -eq 0 ]; then
   # Saying so here, in plain words, is the difference between a five-minute fix
   # and an afternoon of confusion.
   if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "Developer ID Application"; then
-    fail "No 'Developer ID Application' certificate in your keychain.
+    # The private key and the certificate request are already prepared, so this
+    # is two clicks on Apple's website rather than a trip through Xcode. The key
+    # is in the login keychain and trusted by codesign; when the certificate
+    # comes back it pairs with the key automatically.
+    fail "No 'Developer ID Application' certificate on this Mac.
 
-  This is the one thing a Mac cannot do for itself. You need:
-    1. a paid Apple Developer Program membership (developer.apple.com)
-    2. Xcode > Settings > Accounts > your Apple ID > Manage Certificates
-       > + > Developer ID Application
+  A Developer Program membership is not a certificate — signing needs the
+  certificate itself, and it is not here. The request for it is already made:
 
-  Then set your Team ID and run this again:
+    1. developer.apple.com > Certificates, Identifiers & Profiles
+       > Certificates > + > Developer ID > Developer ID Application
+    2. When it asks for a CSR, upload:
+         ${HOME}/.seastar/signing/developerID.certSigningRequest
+    3. Download the .cer it gives you, then say so — one command finishes it:
+         security import <downloaded>.cer -k ~/Library/Keychains/login.keychain-db -T /usr/bin/codesign
+
+  Then set your Team ID (developer.apple.com > Membership) and run this again:
     export SEASTAR_TEAM_ID=XXXXXXXXXX
     ./script/release.sh
 
