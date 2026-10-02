@@ -13,12 +13,19 @@ enum Strings {
     /// The right-click menu on the menu-bar glyph (the standard app menu an
     /// accessory app otherwise has nowhere to put).
     enum Menu {
+        static let onboarding = "Set up Sea-Star…"
         static let settings = "Settings…"
         static let checkForUpdates = "Check for Updates…"
         static let help = "Help & Comments"
         static let patchdog = "Patchdog"
         static let quit = "Quit Sea-Star"
         static func version(_ value: String) -> String { "Version \(value)" }
+    }
+
+    enum Onboarding {
+        static let title = "Set up Sea-Star"
+        static let subtitle = "Here is what is on this machine — and what to call it."
+        static let done = "Done"
     }
 
     enum Header {
@@ -33,9 +40,18 @@ enum Strings {
         static let inference = "Inference"
         static let model = "Model"
         static let notes = "Notes"
-        /// The label for the row of installed-but-idle harnesses — apps that
-        /// carry their own model loop but are not answering on a port.
-        static let latent = "Idle"
+        /// The list of installed harnesses and whether each floats on the graph.
+        /// Lived under the heading "Idle" once; the heading lied the moment the
+        /// list started carrying running apps, so it now names the question the
+        /// list actually answers.
+        static let onGraph = "On your graph"
+        static let onGraphHelp = "Installed harnesses float on the graph by default; take any off to quiet it."
+        static let nothingToReport = "Nothing to report — no app is doing anything Sea-Star can see."
+        static let nothingToDecide = "Nothing to decide — everything on this machine has been named."
+        static let noHarnessesInstalled = "No other harness apps are installed."
+        static func noteCount(_ count: Int) -> String {
+            count == 1 ? "1 note" : "\(count) notes"
+        }
         /// The register's question (D-005): what the engine found and has not
         /// been told about. Asked once per thing, ever.
         static let newHere = "New on this machine"
@@ -58,8 +74,6 @@ enum Strings {
         }
         static let behaviourHelp =
             "Read from what is running and connected on this machine. Facts only — no app is described by its intentions."
-        static let latentHelp = "Installed but not connected — all float by default; take any off the graph to quiet it."
-
         /// Help for each of the four rows, naming what the row is *for* so the
         /// split is readable without a manual.
         static let vaultHelp =
@@ -326,6 +340,10 @@ enum Strings {
         static let rungListening = "Answering on its port"
         static let rungRunning = "Up, not answering yet"
         static let rungPresent = "Installed, not running"
+        /// The second line of the Harness card when no app is attached at all.
+        /// Said as a sentence, so it cannot be confused with a rung, which is a
+        /// fact about some particular app.
+        static let nobodyAttached = "No app is driving Sea-Star right now"
 
         static func nearbyVaults(_ count: Int) -> String {
             count == 1 ? "1 other" : "\(count) others"
@@ -386,6 +404,8 @@ enum Strings {
         static let model = "Model"
         static let updates = "Updates"
         static let links = "Links"
+        static let version = "Version"
+        static let status = "Status"
     }
 
     /// The update-check alerts (spec §8.5).

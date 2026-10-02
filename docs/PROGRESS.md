@@ -1656,3 +1656,32 @@ fails loudly.
 
 **Next step** — bundle the engine into the app, which is the last thing standing between this and a
 notarised DMG worth handing to someone.
+
+### Three surfaces, one job each (`D-012`) — 2026-10-02 late
+
+The founder opened the app and found Frankenstein: the ledger, the idle list and the register were
+all welded into the cockpit popover, which had no height cap — so it outgrew the display, macOS
+moved it up, and the header with the graph/text switch went off the top of the screen. The graph
+was one click away and the click was off-screen. His verdict: those three things are onboarding,
+and the idle list is a graph control.
+
+**Built.** The cockpit is a reading again — list mode is the four rows, graph mode is the starfield
+with the float/take-off list beneath it. A new `OnboardingView` window holds the ledger, the full
+register and the graph cast, opens once on first launch, and lives in the menu bar afterwards.
+The whole popover has a hard height ceiling with one scroll region. Settings was re-skinned from a
+generic grouped form into the house style. Two lying detail lines fixed (Vault said "Notes" instead
+of a count; Harness borrowed a rung while saying "None attached").
+
+**A dormant bug flushed out along the way:** `SeaStar.cockpitOpen` was never set — the delegate used
+the old `popoverDidShow(_ popover: NSPopover)` signature, which the macOS 26 SDK silently no longer
+calls. The starfield's open-state was permanently false. Fixed to the `Notification` signature and
+verified end to end. **Measured:** list mode 386×574, graph mode 626×786, both on-screen.
+
+**Not verified by eye:** the session's model has no vision, so the restructured surfaces were
+verified through the window system (frames, flags, delegates) rather than by looking. The first
+thing with the founder is to open it together.
+
+**Verified:** 76 Swift tests, 149 Python tests, ruff clean, xcodebuild clean.
+
+**Next step** — the founder opens the cockpit (left in graph/flat mode deliberately, so the graph
+is what he sees first) and reads the three surfaces.

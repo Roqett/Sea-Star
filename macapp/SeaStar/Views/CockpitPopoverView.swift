@@ -66,9 +66,6 @@ struct CockpitPopoverView: View {
 
     @State private var isImportingVault = false
     @State private var isLogsExpanded = false
-    /// Whether the whole register backlog is unfolded. Folded by default: the
-    /// panel is a cockpit, not a to-do list.
-    @State private var showingAllCandidates = false
     @State private var isLogsHovering = false
 
     /// Which reading of the cockpit the person prefers (spec §8.7). Empty until
@@ -144,12 +141,19 @@ struct CockpitPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
-            content
+            ScrollView {
+                content
+            }
             logs
             controls
         }
         .padding(18)
         .frame(width: panelWidth, alignment: .topLeading)
+        // The whole panel may never exceed what the display allows. The header
+        // and the controls sit *outside* the scroll region, so when the middle
+        // outgrows its room it scrolls rather than pushing the mode switch off
+        // the top of the screen — the failure this cap exists to make impossible.
+        .frame(maxHeight: maxPopoverHeight)
         .background(Palette.canvas)
         .environment(\.seaStarCockpitOpen, isOpen)
         .task { await controller.refresh() }
@@ -164,11 +168,9 @@ struct CockpitPopoverView: View {
     }
 
     /// The middle of the cockpit: the first-run choice, the chosen reading, and
-    /// any guidance line. It is deliberately *not* wrapped in a scroll view — a
-    /// scroll view has no natural height, so the popover could never size itself
-    /// to its content and the panel showed a half-empty void, nested frames and
-    /// clipped edges. Without it the pool carries its own definite height and the
-    /// rows simply hug theirs, so the panel is exactly as tall as it needs to be.
+    /// any guidance line. It is the *only* part that scrolls, and it only scrolls
+    /// when it must: the reading hugs its content until the display cannot take
+    /// any more, and then gives way without ever moving the header above it.
     @ViewBuilder
     private var content: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -187,17 +189,23 @@ struct CockpitPopoverView: View {
         }
     }
 
-    /// The graph, at whichever depth was chosen (spec §8.7).
+    /// The graph, at whichever depth was chosen (spec §8.7), with the controls
+    /// that decide what appears on it directly beneath — a switch that floats
+    /// harnesses onto the pool belongs next to the pool it changes, not in the
+    /// text reading where it can have no visible effect.
     ///
     /// Both branches read the *same* `EntityGraphModel`, so changing depth can
     /// only ever change what you are looking at — never what is true.
     @ViewBuilder
     private var graph: some View {
-        switch depth {
-        case .flat:
-            EntityGraphView(controller: controller, height: graphHeight)
-        case .deep:
-            GraphSceneView(controller: controller, height: graphHeight)
+        VStack(alignment: .leading, spacing: 10) {
+            switch depth {
+            case .flat:
+                EntityGraphView(controller: controller, height: graphHeight)
+            case .deep:
+                GraphSceneView(controller: controller, height: graphHeight)
+            }
+            HarnessVisibilityList(controller: controller)
         }
     }
 
@@ -333,102 +341,15 @@ struct CockpitPopoverView: View {
     }
 
     /// The plain reading: the four rows (Vault / Harness / Agent / Inference) in
-    /// whichever layout the person prefers, the `Working now` band beneath
-    /// them, and the idle-harness toggles after that (DECISIONS.md D-001).
+    /// whichever layout the person prefers, and the `Working now` band beneath
+    /// them (DECISIONS.md D-001). Nothing else — the ledger and the register are
+    /// onboarding, and live in their own window, not in the everyday reading.
     private var details: some View {
         VStack(alignment: .leading, spacing: 14) {
             CockpitPanel(controller: controller, layout: layoutBinding) {
                 isImportingVault = true
             }
-
-            whatEachAppIsDoing
-            latentHarnesses
-            newOnThisMachine
         }
-    }
-
-    /// The ledger (D-008): what each harness is doing with models, read from
-    /// sockets and the process table rather than from anything an app says about
-    /// itself. It reads as a sentence list because it is one — a claim, and the
-    /// observations it stands on are the same line.
-    @ViewBuilder
-    private var whatEachAppIsDoing: some View {
-        if !controller.appBehaviour.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(Strings.Rows.behaviour)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Palette.inkMuted)
-
-                ForEach(controller.appBehaviour) { row in
-                    BehaviourRow(row: row)
-                }
-            }
-            .help(Strings.Rows.behaviourHelp)
-        }
-    }
-
-    /// What the engine found and has not been told about (D-005). The question
-    /// is asked here rather than in a wizard because the answer is a fact about
-    /// the machine the person is looking at, and it is asked **once**: an answer
-    /// goes into the register and the row never returns.
-    ///
-    /// The evidence sits above the buttons on purpose. A candidate that arrived
-    /// without it would be a demand for trust, and this app does not make those.
-    @ViewBuilder
-    private var newOnThisMachine: some View {
-        if !controller.candidates.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(Strings.Rows.newHere)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(Palette.inkMuted)
-
-                    Spacer(minLength: 8)
-
-                    // Tidy by default: the register is a backlog, not the panel.
-                    // A first run can have a dozen things to decide about, and
-                    // showing all of them buries the cockpit underneath its own
-                    // housekeeping. Three are shown; the rest wait behind one
-                    // quiet word, and nothing is hidden.
-                    if controller.candidates.count > Self.candidatesShown {
-                        Button(showingAllCandidates ? Strings.Actions.showFewer : Strings.Actions.showAll) {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                showingAllCandidates.toggle()
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(Palette.inkMuted)
-                    }
-                }
-
-                Text(Strings.Rows.newHereCount(controller.candidates.count))
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Palette.inkMuted)
-
-                ForEach(visibleCandidates) { candidate in
-                    NewCandidateRow(
-                        candidate: candidate,
-                        isBusy: controller.isDeciding,
-                        adopt: { name in
-                            Task { await controller.adoptCandidate(candidate.identity, name: name) }
-                        },
-                        dismiss: {
-                            Task { await controller.dismissCandidate(candidate.identity) }
-                        }
-                    )
-                }
-            }
-            .help(Strings.Rows.newHereHelp)
-        }
-    }
-
-    /// How many undecided things are shown before the rest are folded away.
-    private static let candidatesShown = 3
-
-    private var visibleCandidates: [DoctorReport.CandidateInfo] {
-        guard !showingAllCandidates else { return controller.candidates }
-        return Array(controller.candidates.prefix(Self.candidatesShown))
     }
 
     /// The one binding both the header toggle and the panel read and write, so
@@ -442,33 +363,6 @@ struct CockpitPopoverView: View {
 
     private func chooseLayout(_ option: PanelLayout) {
         withAnimation(.easeInOut(duration: 0.18)) { layoutRaw = option.rawValue }
-    }
-
-    /// Harness apps the engine found that are not attached over stdio. These sit
-    /// below the four rows rather than inside them, because they are not part of
-    /// the request chain — nothing is driving Sea-Star through them. Each one
-    /// still says how far it got: an app that is up but not answering is a
-    /// different fact from one that is merely installed.
-    @ViewBuilder
-    private var latentHarnesses: some View {
-        if !controller.latentHarnessOptions.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(Strings.Rows.latent)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Palette.inkMuted)
-
-                ForEach(controller.latentHarnessOptions) { latent in
-                    LatentRow(
-                        name: latent.name,
-                        path: latent.path,
-                        rung: latent.rung,
-                        isFloating: controller.isLatentHarnessEnabled(latent.bundleID),
-                        toggle: { controller.toggleLatentHarness(latent.bundleID) }
-                    )
-                }
-            }
-            .help(Strings.Rows.latentHelp)
-        }
     }
 
     /// How deep the graph is drawn: the flat pool, the 3D deep, or the two
@@ -700,169 +594,6 @@ struct AccentBar: View {
             .fill(color)
             .frame(width: 3, height: 14)
             .shadow(color: color.opacity(0.6), radius: 4)
-    }
-}
-
-/// One installed-but-idle harness (spec §8.3): its name, and a word that floats
-/// it onto the graph or takes it back off. The path is only ever a tooltip —
-/// the row stays as quiet as the rest of the panel.
-/// One harness and what it is observed to be doing with models.
-///
-/// The distinction that earns this row its place: an app that ships a model
-/// server *and* is reaching outside the machine while not using it is doing
-/// something a person would want to know about, and would otherwise never see.
-/// The wording states the two observations and stops there — no motive is
-/// attributed, because the engine did not observe one.
-private struct BehaviourRow: View {
-    let row: DoctorReport.HarnessBehaviourInfo
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                AccentBar(color: row.ownsIdleServer ? Palette.agentGlow : Palette.inferenceGlow)
-
-                Text(row.name)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Palette.ink)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Spacer(minLength: 8)
-
-                Text(summary)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(row.ownsIdleServer ? Palette.agentGlow : Palette.inkMuted)
-                    .lineLimit(1)
-            }
-
-            if row.ownsIdleServer {
-                Text(Strings.Rows.idleServer(row.serves))
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Palette.inkMuted)
-                    .padding(.leading, 18)
-            }
-        }
-    }
-
-    /// The line, built from the observations in the order they matter.
-    ///
-    /// A port that never answered is reported as a port, never as a server:
-    /// "listening on 8888, not answering" is honest, where "serves models on
-    /// 8888" was a guess that a real machine proved wrong.
-    private var summary: String {
-        var parts: [String] = []
-        if !row.serves.isEmpty {
-            let ports = row.serves.map(String.init).joined(separator: ", ")
-            parts.append("serves \(ports)")
-            if row.usingOwnServer { parts.append("using it") }
-        } else if !row.unconfirmed.isEmpty {
-            let ports = row.unconfirmed.map(String.init).joined(separator: ", ")
-            parts.append("listening \(ports), not answering")
-        }
-        if row.reachesOut > 0 {
-            parts.append("reaching \(row.reachesOut) outside")
-        }
-        return parts.isEmpty ? Strings.States.unknown : parts.joined(separator: " · ")
-    }
-}
-
-/// One undecided thing, with the evidence for it and the two answers available.
-///
-/// The name is pre-filled from the scan when the scan had one, so answering is a
-/// click rather than a typing exercise; it stays editable because the label a
-/// person gives a thing is the label they will look for on the graph afterwards.
-private struct NewCandidateRow: View {
-    let candidate: DoctorReport.CandidateInfo
-    let isBusy: Bool
-    let adopt: (String) -> Void
-    let dismiss: () -> Void
-
-    @State private var name: String = ""
-    @State private var hasEditedName = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                AccentBar(color: Palette.harnessGlow)
-
-                TextField(candidate.suggestedName ?? candidate.name, text: $name)
-                    .textFieldStyle(.plain)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Palette.ink)
-                    .onAppear {
-                        if !hasEditedName {
-                            name = candidate.suggestedName ?? candidate.name
-                        }
-                    }
-                    .onChange(of: name) { _, _ in hasEditedName = true }
-
-                Spacer(minLength: 8)
-
-                Button(Strings.Actions.itIsAHarness) {
-                    adopt(name.isEmpty ? candidate.name : name)
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Palette.harnessGlow)
-                .disabled(isBusy)
-
-                Button(Strings.Actions.notAHarness, action: dismiss)
-                    .buttonStyle(.plain)
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Palette.inkMuted)
-                    .disabled(isBusy)
-            }
-
-            // Every line here is something the engine observed, not a guess.
-            ForEach(candidate.evidence, id: \.self) { line in
-                Text(line)
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Palette.inkMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 18)
-            }
-        }
-    }
-}
-
-private struct LatentRow: View {
-    let name: String
-    let path: String
-    /// How far this app got. Shown beside the name rather than hidden in a
-    /// tooltip, because "up, not answering yet" is the single most useful thing
-    /// to know about a harness that is not driving Sea-Star.
-    let rung: HarnessRung?
-    let isFloating: Bool
-    let toggle: () -> Void
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            AccentBar(color: Palette.harnessGlow)
-
-            Text(name)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Palette.ink)
-                .lineLimit(1)
-                .truncationMode(.middle)
-
-            if let rung, rung != .present {
-                Text(rung.label)
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundStyle(rung == .running ? Palette.ready : Palette.inkMuted)
-                    .lineLimit(1)
-            }
-
-            Spacer(minLength: 8)
-
-            Button(action: toggle) {
-                Text(isFloating ? Strings.Actions.sinkHarness : Strings.Actions.floatHarness)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(isFloating ? Palette.harnessGlow : Palette.inkMuted)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(path)
-        }
     }
 }
 

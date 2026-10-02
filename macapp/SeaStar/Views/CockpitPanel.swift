@@ -233,13 +233,18 @@ struct CockpitPanel: View {
             accent = Palette.vaultGlow
             title = Strings.Rows.vault
             value = Self.vaultName(controller.report?.vault.path ?? Strings.States.unknown)
-            detail = Strings.Detail.notes
+            // The count, not the word "Notes": the detail line is where the fact
+            // of how much is in the vault belongs, and a label is not a fact.
+            detail = controller.report.map { Strings.Rows.noteCount($0.vault.noteCount) }
+                ?? Strings.States.unknown
         case .harness:
             accent = Palette.harnessGlow
             title = Strings.Rows.harness
             value = harnessValue
+            // A rung is a fact about some app; "nothing is attached" is a fact
+            // about no app at all. The two must not share one line.
             detail = controller.attachedHarnesses.isEmpty
-                ? Strings.Detail.rungPresent
+                ? Strings.Detail.nobodyAttached
                 : HarnessRung.connected.label
         case .agent:
             accent = Palette.agentGlow

@@ -17,11 +17,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
     private var settingsWindow: NSWindow?
+    private var onboardingWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureStatusItem()
         configurePopover()
         observeIcon()
+        // The first-run window needs the launch sequence to finish before it can
+        // order itself front: at this exact moment the app is not yet active,
+        // and a window shown now can be swallowed by the remaining launch work.
+        DispatchQueue.main.async { [weak self] in
+            self?.showOnboardingOnFirstRun()
+        }
     }
 
     // MARK: - Status item
@@ -94,11 +101,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
-    func popoverDidShow(_ popover: NSPopover) {
+    // The SDK's NSPopoverDelegate takes a Notification (macOS 14+). The old
+    // `popoverDidShow(_ popover: NSPopover)` signature is not a delegate method
+    // any more, so it compiled and never fired — which silently kept
+    // `SeaStar.cockpitOpen` false and the starfield still. Written as a
+    // notification handler on purpose, and worth a comment because a wrong
+    // signature here fails without a single warning.
+    func popoverDidShow(_ notification: Notification) {
         UserDefaults.standard.set(true, forKey: "SeaStar.cockpitOpen")
     }
 
-    func popoverDidClose(_ popover: NSPopover) {
+    func popoverDidClose(_ notification: Notification) {
         UserDefaults.standard.set(false, forKey: "SeaStar.cockpitOpen")
     }
 
@@ -124,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let menu = NSMenu()
         menu.addItem(item(Strings.Menu.checkForUpdates, #selector(checkForUpdates), symbol: "arrow.triangle.2.circlepath"))
         menu.addItem(.separator())
+        menu.addItem(item(Strings.Menu.onboarding, #selector(openOnboarding), symbol: "sparkles"))
         menu.addItem(item(Strings.Menu.settings, #selector(openSettings), symbol: "gearshape", key: ","))
         menu.addItem(item(Strings.Menu.help, #selector(openHelp), symbol: "questionmark.circle"))
         menu.addItem(item(Strings.Menu.patchdog, #selector(openPatchdog), symbol: "ladybug"))
@@ -172,6 +186,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     @objc private func quit() {
         NSApp.terminate(nil)
     }
+
+    /// The onboarding window: the machine's ledger, the register's questions,
+    /// and which harnesses float on the graph. Opened once on first launch, and
+    /// reachable afterwards from the menu and from Settings. It is its own
+    /// window on purpose — it is a desk you clear once, not a reading you take.
+    @objc func openOnboarding() {
+        if let window = onboardingWindow {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate()
+            markOnboardingShown()
+            return
+        }
+
+        let hosting = NSHostingController(
+            rootView: OnboardingView(controller: controller) { [weak self] in
+                self?.onboardingWindow?.close()
+            }
+        )
+        let window = NSWindow(contentViewController: hosting)
+        window.title = Strings.Onboarding.title
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.isReleasedWhenClosed = false
+        window.setContentSize(NSSize(width: 460, height: 640))
+        window.center()
+        onboardingWindow = window
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+        // The "seen" mark is written *after* the window is up, so a window that
+        // fails to appear can never be counted as one the person saw.
+        markOnboardingShown()
+    }
+
+    private func markOnboardingShown() {
+        UserDefaults.standard.set(true, forKey: Self.onboardingShownKey)
+    }
+
+    /// The first launch opens onboarding so the machine gets named before the
+    /// graph is asked to mean anything. Every launch after leaves it to the
+    /// menu, so the window can never ambush a person twice.
+    private func showOnboardingOnFirstRun() {
+        guard !UserDefaults.standard.bool(forKey: Self.onboardingShownKey) else { return }
+        openOnboarding()
+    }
+
+    private static let onboardingShownKey = "SeaStar.onboardingShown"
 
     @objc private func openSettings() {
         if let window = settingsWindow {

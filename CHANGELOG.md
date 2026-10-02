@@ -86,6 +86,13 @@ Summary of Changes:
 - `script/release.sh` — **new.** Build, sign, package, notarise, staple and verify, checking the certificate, Team ID and notary credential before the build rather than after it, and ending on Gatekeeper's own verdict via `spctl`. `--dry-run` proves the pipeline without an Apple account and labels its output as unsigned.
 - `docs/ship.md` — **new.** The one-time Apple setup in plain language, why the script does each step in that order, the two distribution routes and why the App Store is closed to this design, and the remaining packaging gap stated as the headline rather than a footnote.
 - `DECISIONS.md` — D-011.
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — the cockpit is a reading again: list mode is the four rows, graph mode is the starfield with the float/take-off list beneath it, and the whole panel has a hard height ceiling with one scroll region so the header can never be pushed off-screen (D-012). The ledger, register and idle sections leave the popover.
+- `macapp/SeaStar/Views/OnboardingView.swift` — **new.** The onboarding window: the behaviour ledger, the full register with evidence, and the graph's cast list, in the house style. `HarnessVisibilityList`, `LatentRow`, `BehaviourRow` and `NewCandidateRow` move here from the cockpit.
+- `macapp/SeaStar/App/AppDelegate.swift` — an onboarding window with a menu item ("Set up Sea-Star…") and one-shot first-run logic; the window is marked seen only after it is actually up. **Also fixes a dormant bug:** the popover open/close flag was never set because the delegate used the pre-macOS-14 `popoverDidShow(_ popover: NSPopover)` signature, which compiles silently and never fires; it now takes the SDK's `Notification` and is verified to round-trip.
+- `macapp/SeaStar/Views/CockpitPanel.swift` — the Vault card's second line is the note count rather than the word "Notes", and the Harness card says plainly that no app is driving Sea-Star instead of borrowing another app's rung.
+- `macapp/SeaStar/Views/SettingsView.swift` — the generic grouped form is replaced with the house style: canvas, ink, accent bars, mono headings and plain word buttons, plus a door to onboarding.
+- `macapp/SeaStar/Support/Strings.swift` — onboarding copy, the honest "On your graph" heading, empty states, and the note-count line.
+- `DECISIONS.md` — D-012.
 
 Harness: TRAE
 

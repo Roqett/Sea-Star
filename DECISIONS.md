@@ -794,3 +794,76 @@ target is **macOS 26.0**, so anyone on an earlier Mac cannot run it at all.
 - The engine is bundled: then flipping the repository public and attaching a notarised
   DMG to a GitHub release is the last step, and this entry should be updated with the
   first notarised version number.
+
+---
+
+## D-012 — Three surfaces, one job each: the cockpit is a reading, onboarding is a window, Settings wears the house style
+
+- **Date:** 2026-10-02
+- **Status:** Accepted
+- **Affects:** UX flow (a new window exists), architecture (view layer), product values
+- **Corrects:** part of D-005/D-006/D-008 as implemented — the register, the ledger and the
+  harness-visibility list were rendered *inside* the cockpit popover, which was never their place.
+- **Founder input:** *"that 'what each app is doing' and 'what's idle' and 'new on this machine',
+  all that shit is meant to be just part of an onboarding window, not part of the standard
+  mechanics of the app … the idle stuff, that was options for whether you want to see it on the
+  graph or not … there's no selector up the top as there was before … it is completely fucked up
+  right now."*
+
+### The problem
+
+Three additions in one day were each appended to the cockpit's list reading, because the app had
+only two surfaces (the popover and the Settings window) and no onboarding surface at all. The
+popover has a width cap and *no height cap* — the one height clamp that existed was applied only to
+the graph's pool — so list mode grew past the display, macOS kept the popover on screen by moving
+it up, and the header with the graph/text switch went above the top edge of the screen. The graph
+was one click away and the click was off-screen. The idle list, whose buttons say "Float on the
+graph", was sitting in the text reading where it could change nothing visible. The ledger and the
+register duplicated and contradicted each other four rows apart.
+
+### The decision
+
+1. **The cockpit is a reading, and only a reading.** List mode is the four rows and the
+   working-now band. Graph mode is the starfield with the float/take-off list directly beneath it,
+   because that list changes what the graph shows and belongs next to it.
+2. **Onboarding is its own window.** Home for the ledger, the register (all of it, unfolded — the
+   window *is* the backlog) and the graph's cast list. It opens once on first launch and is
+   reachable afterwards from the menu bar ("Set up Sea-Star…") and from Settings. Never inside the
+   popover.
+3. **A hard height ceiling with one scroll region.** The header, logs and controls sit outside the
+   scroll; the middle scrolls when it must. The panel can no longer push its own header off the
+   screen — the failure is impossible rather than merely repaired.
+4. **Settings wears the house style.** The generic grouped form is replaced by the cockpit's own
+   language: the canvas, the ink, the accent bars, the mono headings and the plain word buttons, so
+   the three surfaces read as one app.
+5. **Two detail lines that lied are fixed.** The Vault card's second line was the literal word
+   "Notes" (a label where the count belonged); the Harness card borrowed another app's rung
+   ("Installed, not running") while its own value said "None attached". It now says, plainly, that
+   no app is driving Sea-Star.
+
+### Consequences
+
+- New file `OnboardingView.swift`; `AppDelegate` gains an onboarding window, a menu item and the
+  one-shot first-run logic (`SeaStar.onboardingShown`, marked only after the window is actually up).
+- `CockpitPopoverView` loses the ledger, register and idle sections; the visibility list moves into
+  graph mode as a shared `HarnessVisibilityList`.
+- **A dormant bug this pass flushed out:** the popover open/close flag
+  (`SeaStar.cockpitOpen`) was *never being set*, because the delegate methods used the old
+  `popoverDidShow(_ popover: NSPopover)` signature while the macOS 26 SDK's `NSPopoverDelegate`
+  takes a `Notification`. It compiled silently and never fired, so the starfield's "open" state was
+  permanently false. Fixed by correcting the signature, and now verified end to end (flag reads 1
+  while open, 0 after closing).
+- Measured on this machine with the cap in place: list mode 386×574, graph mode 626×786 — both
+  within the display, header reachable in both.
+
+### Open
+
+- The onboarding window's *visual* pass has not happened (the session's model cannot see the
+  screen); sizes and behaviour are verified through the window system, not by eye.
+- The first-run moment is a window on launch; whether it should also present itself when the
+  cockpit first opens to graph mode is a small follow-up judgement call.
+
+### Revisit when
+
+- The founder has seen the restructured surfaces and confirms the register feels like a desk to
+  clear rather than a reading.
