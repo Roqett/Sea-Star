@@ -430,37 +430,33 @@ struct CockpitPopoverView: View {
         (path as NSString).lastPathComponent
     }
 
-    /// The control layer, stripped of its pill capsules (spec §8). Start sits in
-    /// the left corner and Refresh in the right, with a nudibranch strip above
-    /// and below the pair as the column reference — the 3px bar grown up.
+    /// The control layer, stripped of its pill capsules (spec §8). Start sits
+    /// in the left corner and Refresh in the right, plain words and nothing
+    /// else. The pair used to be framed by two nudibranch strips — pure
+    /// decoration inherited from the early visual spec — and the founder asked
+    /// for them off, so they are gone. The strip survives only where it says
+    /// something: the live-connection ribbon in the starfield, the liveness
+    /// bar, and the frame around an expanded log box.
     private var controls: some View {
-        VStack(spacing: 12) {
-            NudiStrip(style: .blueWhite)
-                .padding(.horizontal, 10)
-
-            HStack(alignment: .firstTextBaseline) {
-                actionButton(
-                    title: controller.isServerRunning ? Strings.Actions.stop : Strings.Actions.start,
-                    enabled: controller.isServerRunning || controller.isReady
-                ) {
-                    controller.toggleServer()
-                }
-
-                Spacer(minLength: 12)
-
-                actionButton(
-                    title: Strings.Actions.refresh,
-                    enabled: !controller.isRefreshing
-                ) {
-                    Task { await controller.refresh() }
-                }
+        HStack(alignment: .firstTextBaseline) {
+            actionButton(
+                title: controller.isServerRunning ? Strings.Actions.stop : Strings.Actions.start,
+                enabled: controller.isServerRunning || controller.isReady
+            ) {
+                controller.toggleServer()
             }
-            .padding(.horizontal, 2)
 
-            NudiStrip(style: .blueWhite)
-                .padding(.horizontal, 10)
+            Spacer(minLength: 12)
+
+            actionButton(
+                title: Strings.Actions.refresh,
+                enabled: !controller.isRefreshing
+            ) {
+                Task { await controller.refresh() }
+            }
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 2)
+        .padding(.vertical, 4)
     }
 
     /// A plain word where a pill used to be: mono, small, toned down, exactly as

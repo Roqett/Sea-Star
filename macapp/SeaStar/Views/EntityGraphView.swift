@@ -887,23 +887,11 @@ struct EntityGraphView: View {
                     .offset(y: size / 2 + 12)
             }
         }
-        // The nudge of green on a node that answered. Only drawn when it *is*
-        // live, so the bar never shows its idle face inside a star — a still
-        // grey bar over a glowing body would read as "broken", and there is a
-        // real reading for that: the star is simply not on a port, and it is
-        // already drawn dimmer. Deliberately quiet rather than a full nudibranch
-        // ribbon per node, because "live" means only that a probe got an answer
-        // back. The loud orange-and-green bar lives in the panel, where there
-        // is one bar and one thing to say about it.
-        .overlay(alignment: .top) {
-            if node.isLive {
-                LivenessBar(isLive: true, height: 2)
-                    .frame(width: size * 0.72)
-                    .offset(y: -size / 2 - 7)
-                    .opacity(isActive || inFocus ? 0.95 : 0.6)
-                    .transition(.opacity)
-            }
-        }
+        // Liveness is carried by the node's own glow — a live star breathes and
+        // an idle one sits dim. The little green bar that used to float above
+        // each live node is gone: the founder asked for those two floating
+        // strips off more than once, and every session defended them instead of
+        // removing them. They said nothing the glow did not already say.
         .position(point)
         .onHover { hovering in
             if hovering { hovered = node.id }

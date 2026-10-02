@@ -93,6 +93,8 @@ Summary of Changes:
 - `macapp/SeaStar/Views/SettingsView.swift` — the generic grouped form is replaced with the house style: canvas, ink, accent bars, mono headings and plain word buttons, plus a door to onboarding.
 - `macapp/SeaStar/Support/Strings.swift` — onboarding copy, the honest "On your graph" heading, empty states, and the note-count line.
 - `DECISIONS.md` — D-012.
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — the two nudibranch strips framing the Start/Refresh controls are removed. They were pure decoration from the early visual spec, and the founder asked for them off more than once; they survive only where the strip *says* something (the live-connection ribbon in the starfield, the liveness bar, the expanded log frame).
+- `macapp/SeaStar/Views/EntityGraphView.swift` — the two green-orange liveness bars floating above live nodes in the starfield are removed. The founder asked for them off across multiple sessions; every session defended them as information. They were redundant — the node's glow already says the same thing.
 
 Harness: TRAE
 
