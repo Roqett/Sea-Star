@@ -1,37 +1,49 @@
 <div align="center">
 
-<img src="assets/sea-star.png" alt="The Sea Star — the octopus with the martini glass" width="300">
+<img src="assets/sea-star.png" alt="Sea-Star" width="280">
 
 # ⭐ Sea-Star
 
 **A private, local-first AI agent that lives in your Obsidian vault.**
-One-click's ease. Nothing leaves your house.
+One click's ease. Nothing leaves your house.
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![Version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)](CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square)](https://www.python.org/)
+[![Local-first](https://img.shields.io/badge/local--first-no%20cloud-2F7FE0?style=flat-square)](#why-it-stays-sovereign)
+[![MCP](https://img.shields.io/badge/MCP-server%20%2B%20client-8BD450?style=flat-square)](docs/connect.md)
+
+A sea star holds on tight to its rock and doesn't let go.
+Sea-Star does the same with your notes — and helps you find the right one.
 
 </div>
 
 ***
 
-> *"Your own adventure to fair winds and following seas."*
-> — The Sea Star, 2289 3rd Street, Dogpatch, San Francisco
-> This cute snack also thanks Tom's dry dock around the corner. As it was.
+## At a glance
 
-A sea star holds on tight to its rock and doesn't let go.
-Sea-Star does the same with your notes — and helps you find the right one.
+- 🏠 **Local by default** — the reasoning runs on your machine, against your model.
+  No cloud, no telemetry, no account.
+- 🗂️ **Your vault *is* the memory** — it reads Obsidian notes directly and answers
+  **with citations** back to them.
+- 🔌 **MCP both ways** — it's a server *and* a client, so it drops into Osaurus,
+  Claude Desktop, Cursor or TRAE, and can borrow other MCP servers as its own tools.
+- ⚙️ **Runtime-agnostic** — any OpenAI-compatible endpoint works unchanged: Osaurus,
+  Ollama, LM Studio, llama.cpp, MLX, vLLM, Unsloth Studio.
+- 🖱️ **Two front doors** — a terminal-first CLI today, a native macOS app in build.
+  Anything you can click, you can also type.
 
 ***
 
 ## Documentation
 
-Four pages, one for wherever you're starting from. Start at the
+Five pages, one for wherever you're starting from. Start at the
 **[docs index](docs/README.md)** if you're unsure.
 
 | I want to…                                                   | Read                                               |
 | ------------------------------------------------------------ | -------------------------------------------------- |
 | Understand what this is, in plain English (no jargon)        | [docs/start-here.md](docs/start-here.md)           |
+| Run it day to day — by clicking or by typing                 | [docs/use-the-app.md](docs/use-the-app.md)         |
 | Connect Sea-Star to Osaurus / Claude Desktop / Cursor / TRAE | [docs/connect.md](docs/connect.md)                 |
 | See every command, tool, setting and runtime                 | [docs/reference.md](docs/reference.md)             |
 | Fix something that's broken                                  | [docs/troubleshooting.md](docs/troubleshooting.md) |
@@ -125,6 +137,10 @@ Desktop — **nothing above changes.** That flexibility is the point.
 
 ## Install
 
+Two ways in. Pick whichever suits you — neither one is the "advanced" one.
+
+### Terminal (available now)
+
 ```bash
 # Zero-install from source, if you have uv (recommended):
 uvx --from git+https://github.com/Roqett/Sea-Star sea-star serve
@@ -138,6 +154,28 @@ uv run sea-star serve
 
 > `pip install seastar-mcp` lands with the first PyPI release. Until then, the
 > `uvx --from git+...` form above is the one-liner to use.
+
+### App (coming)
+
+A native macOS app — no terminal at all — is in build. It wraps this same engine,
+so nothing you set up here changes when it lands. Until then, the terminal track
+above *is* the product.
+
+## Two ways to run it
+
+The same engine, two front doors. **Terminal-first** works today. **GUI-first** is
+the app in build. Every action maps both ways:
+
+| What you want to do            | GUI (coming)            | Terminal (now)                         |
+| ------------------------------ | ----------------------- | -------------------------------------- |
+| Detect vault / runtime / model | Detects on launch       | `uv run sea-star doctor`               |
+| Machine-readable status        | —                       | `uv run sea-star doctor --json`        |
+| Start the MCP server           | Starts with the app     | `uv run sea-star serve`                |
+| Create `seastar.toml`          | Choose folder in-app    | `uv run sea-star init`                 |
+| Ask the vault a question       | Type in the window      | `uv run sea-star ask "…"`              |
+| Keep the engine green          | —                       | `uv run ruff check . && uv run pytest` |
+
+The app never hides a capability: anything you can click, you can also type.
 
 ## Quickstart
 
@@ -260,7 +298,9 @@ args = ["-y", "obsidian-mcp", "/Users/you/Documents/MyVault"]
 ```
 
 Restart, and Sea-Star's agent loop can call `obsidian__*` tools alongside its own vault
-tools. That's how you give the agent more to work with.
+tools. That's how you give the agent more to work with. If a server offers dozens of
+tools, trim the menu with `include` / `exclude` (see Configuration) — the agent chooses
+better from a short list.
 
 ### Which do I start with?
 
@@ -295,6 +335,11 @@ temperature = 0.2
 name = "obsidian"
 command = "npx"
 args = ["-y", "obsidian-mcp", "/Users/you/Documents/MyVault"]
+# Optional tool allowlist. Empty (or absent) means "every tool the server offers".
+# Set it and only these tools reach the agent.
+include = ["search_notes", "read_note"]
+# Optional denylist. Always wins, even over `include`.
+exclude = ["delete_note"]
 ```
 
 > **Heads up:** a `seastar.toml` can hold a real `api_key`. If your vault is under
@@ -352,14 +397,8 @@ src/sea_star/
 
 - [ ] "Which local models actually work with MCP" conformance table
 
-## The name
-
-There's a bar called **The Sea Star** at 2289 3rd Street, in the Dogpatch
-district of San Francisco. Its sign was an orange octopus.
-In its own words: *"House Octopus overseeing the antics? We've got one of those too!"*
-
-That's the spirit. A sea star holds on tight to its rock and doesn't let go. Sea-Star
-does the same with your notes. The octopus is the house mascot.
+- [ ] **Omarchy port** — run on Arch Linux + Hyprland. The Python engine should carry
+  over unchanged; the GUI is a rewrite (the SwiftUI cockpit becomes a Linux-native shell).
 
 ## Contributing
 
@@ -372,6 +411,8 @@ MIT © Roqett / Up Periscope
 
 ***
 
+<div align="center">
+
 *Built by an Oz winemaker who bought an M4 Pro 64GB, got curious, and started a small
 software factory called* ***Up Periscope*** *to bump up diverse projects. Learned in public.*
 
@@ -379,3 +420,5 @@ software factory called* ***Up Periscope*** *to bump up diverse projects. Learne
 or insanity to anyone... but admitted they'd always worked for him — we took the
 parts worth keeping:* ***no dangerous drugs, only high-quality alcohol, no propellant weapons.*** *Mostly
 Swift, Python, sometimes Rust, mainly Swift.*
+
+</div>

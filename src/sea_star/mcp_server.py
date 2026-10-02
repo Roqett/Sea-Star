@@ -6,16 +6,24 @@ Contract:
   cited answer.
 - Direct vault tools (``vault_search``, ``vault_read``, ``vault_list``) are also
   exposed so a host can inspect notes without spending a model round-trip.
+- SeaStar is an MCP *client* as well as a server, and the symmetry clause of the
+  foundation asks that what the cockpit can see, a host can ask for. So
+  ``machine_report`` returns the same machine facts the cockpit draws. It is the
+  same read, through the other door.
 - The server never exposes an inference endpoint, a key, or an outbound request;
   it is a front door onto local capability only.
 """
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 from mcp.server import MCPServer
 
 from .agent import Agent
-from .config import Config
+from .config import Config, probe_runtimes
+from .recon import machine_summary
+from .register import recognised_names
 from .vault import Vault, VaultError
 
 INSTRUCTIONS = (
@@ -40,6 +48,25 @@ def create_server(config: Config, agent: Agent) -> MCPServer:
             return result.answer
         sources = ", ".join(f"[[{citation}]]" for citation in result.citations)
         return f"{result.answer}\n\nSources: {sources}"
+
+    @server.tool()
+    async def machine_report() -> str:
+        """Report what this machine is running: model servers, who owns them, and open connections.
+
+        Use this before choosing an endpoint: it says which servers are inbuilt in an app,
+        and therefore which ones stop when that app quits. Read-only, local, nothing kept.
+        """
+
+        # One definition of what this machine recognises, shared with the
+        # cockpit, so the answer a host gets and the graph a person sees cannot
+        # disagree about the same machine. The probe is awaited rather than
+        # wrapped: this tool runs inside the server's event loop, and a nested
+        # `asyncio.run` there fails at the first call.
+        probes = await probe_runtimes()
+        answering = {urlsplit(probe.base_url).port or 0 for probe in probes}
+        return "\n".join(
+            machine_summary(known_apps=recognised_names(), answering=answering)
+        )
 
     @server.tool()
     async def vault_search(query: str, limit: int = 10) -> str:

@@ -37,7 +37,7 @@ Never close, resolve, or implement any of these without the founder's explicit w
 
 Every project has a single foundation document in `docs/`. Read the sections you are about to touch before any non-trivial change. The onboarding file is a tripwire list, not a substitute for it. Amendments, `DECISIONS.md` (ADRs), and `docs/PROGRESS.md` (live state, parallel-agent file ownership) are also binding.
 
-For Sea-Star, until `docs/` exists, `README.md` is the foundation document.
+For Sea-Star the foundation document is [`docs/foundation.md`](docs/foundation.md).
 
 ## Locked paths — and how they bend
 
@@ -125,18 +125,14 @@ Every code-changing session appends an entry block to `CHANGELOG.md` in this exa
 ```
 Harness: <IDE / harness name>
 
-Model: <model identifier>
-
-Routing: <provider name> → <model identifier>
-
 Date: <YYYY-MM-DD HH:MM TZ>
 
 Summary of Changes:
 - `<file>` — <one-line description of what changed and why>
 ```
 
-- **Provenance is best-effort, not mandatory.** Record the harness, model and routing when the harness exposes them — it helps the factory understand cost and quality later. If a harness cannot report its own routing, leave those lines out. Never burn tokens hunting for it.
-- **Harness** = the IDE/host. **Routing** = where the model call actually goes. They are not the same field.
+- **Harness and date only.** Both are things the session knows about itself. Do **not** record a model identifier or routing: an agent cannot see the model serving it, so a plausible value is invented rather than observed. Never guess. If the model or routing is wanted for a specific investigation, it comes from `sea-star doctor`, recorded as diagnosed fact rather than self-reported provenance.
+- **Harness** = the IDE/host running the session.
 - Entries are append-only. Never edit a past entry — if a correction is needed, append a new dated entry that supersedes the earlier one.
 
 ## Fallback clause
@@ -161,7 +157,10 @@ Never edit this file unless the founder explicitly asks for a lasting rule. In t
 ## Project Tripwires (fill in per build)
 
 - **App name & one-line purpose:** Sea-Star — a private, local-first AI agent that lives in your Obsidian vault. It is an MCP server that is also an MCP client: hosts call `ask_seastar`, and Sea-Star consumes other MCP servers (including Obsidian ones) as its own tools.
-- **Foundation document:** `README.md` (moves to `docs/` once that directory exists).
+- **Foundation document:** [`docs/foundation.md`](docs/foundation.md) — binding from 2026-09-28.
+  Its lead clause, **"no name is ever a precondition,"** governs all discovery: known names
+  are additive hints, never gates on visibility. The repository front page (`README.md`) is
+  the shopfront, not the foundation.
 - **Language & build commands:** Python 3.11+ managed by `uv`.
   - Install/sync: `uv sync --extra dev`
   - Lint: `uv run ruff check .`
@@ -181,4 +180,5 @@ Never edit this file unless the founder explicitly asks for a lasting rule. In t
 - **Protocol access rules:** `inference.py` is the only permitted path to a model. `vault.py` is the only permitted path to a vault. The agent loop calls tools; it never reaches into a vault or an endpoint itself.
 - **Named exceptions:** none yet.
 - **Privacy/product-value clauses:** on-device by default; no cloud fallback unless the founder explicitly configures and approves one; nothing leaves the house quietly.
+- **No-go zones (founder rule, 2026-09-26):** The founder's **external drive and any mirror of it** (including its Obsidian vault) are off-limits. No agent or harness may read, index, embed, summarise, quote, or transmit anything from it to a cloud API or third-party model — local-only at most — unless the founder explicitly asks for a specific item in writing. This matches the standing default: don't go there unless asked.
 - **Mirrors:** `~/.trae/memory/user_profile.md`, `README.md`, `CHANGELOG.md`.

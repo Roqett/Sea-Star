@@ -1,0 +1,67 @@
+name: SeaStar
+options:
+  bundleIdPrefix: UpPeriscope
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  SeaStar:
+    type: application
+    platform: macOS
+    sources:
+      - path: SeaStar
+        excludes:
+          - "Support/Info.plist"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: UpPeriscope.Sea-Star
+        PRODUCT_NAME: Sea-Star
+        PRODUCT_MODULE_NAME: SeaStar
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+        ENABLE_HARDENED_RUNTIME: NO
+    info:
+      path: SeaStar/Support/Info.plist
+      properties:
+        CFBundleName: Sea-Star
+        CFBundleDisplayName: Sea-Star
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSUIElement: true
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
+        SeaStarRepositoryPath: "$(SRCROOT)/.."
+        NSHumanReadableCopyright: "MIT. Up Periscope."
+
+  SeaStarTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [SeaStarTests]
+    dependencies:
+      - target: SeaStar
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: UpPeriscope.Sea-StarTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Sea-Star.app/Contents/MacOS/Sea-Star"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
+schemes:
+  SeaStar:
+    build:
+      targets:
+        SeaStar: all
+        SeaStarTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [SeaStarTests]

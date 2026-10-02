@@ -29,10 +29,27 @@ async def test_server_exposes_expected_tools(tmp_path):
     tools = await server.list_tools()
     assert {tool.name for tool in tools} == {
         "ask_seastar",
+        "machine_report",
         "vault_search",
         "vault_read",
         "vault_list",
     }
+
+
+async def test_machine_report_answers_a_host(tmp_path):
+    """The symmetry clause: what the cockpit can see, a host can ask for.
+
+    A host attached to Sea-Star has no way to read this machine's sockets, so
+    without this tool it would have to guess where models come from. The answer
+    names the app an inbuilt server belongs to, because that is the fact that
+    decides whether the endpoint is still there tomorrow.
+    """
+
+    server = _server(tmp_path)
+    result = await server.call_tool("machine_report", {})
+    text = result if isinstance(result, str) else str(result)
+
+    assert "Model servers on this machine" in text or "No local model servers" in text
 
 
 def test_vault_is_reachable_from_config(tmp_path):

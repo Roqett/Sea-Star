@@ -12,9 +12,11 @@ schemas."* Pick the door that fits where you are right now.
 | If you are… | Read this | What you get |
 | --- | --- | --- |
 | Not technical, and you want to know *what this actually is* | **[Start here](start-here.md)** | Plain English. No jargon. What it is, what you need, and the three moves to run it. |
+| Running it day to day — by clicking, or by typing | **[Use the app](use-the-app.md)** | The menu-bar Cockpit on one side, the exact terminal commands on the other. Two tracks, kept in step. |
 | Trying to make it work *with your agent app* | **[Connect it](connect.md)** | The exact steps to wire Sea-Star into Osaurus, Claude Desktop, Cursor or TRAE — plus what to say to the agents. |
 | A developer who wants the facts | **[Reference](reference.md)** | Commands, MCP tools, config keys, runtimes, environment variables. |
 | Stuck on an error | **[Troubleshooting](troubleshooting.md)** | Every failure we know about, and the fix. |
+| A developer, or an agent, changing how Sea-Star behaves | **[Foundation](foundation.md)** | The binding rules — chiefly *"no name is ever a precondition"*, which keeps new harnesses working without new code. |
 
 ## The one-paragraph version
 
@@ -43,7 +45,9 @@ Sea-Star sits in the middle. The model and the vault connect to Sea-Star automat
 ```
 docs/
   README.md            ← you are here (index)
+  foundation.md        the binding rules for how Sea-Star must behave
   start-here.md        zero-jargon explainer + quickstart
+  use-the-app.md       the Cockpit (click) and the terminal (type), in step
   connect.md           wire Sea-Star into a host (Osaurus / Claude / Cursor / TRAE)
   reference.md         commands, tools, config, runtimes, env vars
   troubleshooting.md   errors and fixes
