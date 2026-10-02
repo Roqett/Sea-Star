@@ -13,6 +13,7 @@ import asyncio
 import json
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlsplit
 
 import typer
 from rich.console import Console
@@ -34,6 +35,22 @@ from .config import (
 from .connections import clear_client, live_clients, record_client
 from .harnesses import detect_latent_harnesses
 from .mcp_server import create_server
+from .recon import (
+    harness_behaviour,
+    listening_services,
+    model_like_services,
+    outbound_connections,
+)
+from .register import (
+    decide,
+    discover,
+    load_register,
+    recognised_names,
+    summarise,
+)
+from .register import (
+    forget as forget_verdict,
+)
 from .vault import Vault
 
 app = typer.Typer(
@@ -69,6 +86,17 @@ async def _build_report() -> dict:
     clients = live_clients()
     active = {probe.name for probe in probes}
     active.update(client.name for client in clients)
+    latent = detect_latent_harnesses(active=active)
+    # Which endpoints *proved* they serve models. Everything else that looks like
+    # one is reported as a port, not as a server — the difference between a fact
+    # and a hint, and the reason this set is threaded through by hand.
+    answered_ports = {urlsplit(probe.base_url).port or 0 for probe in probes}
+    # What the machine has already decided, which is what makes the register's
+    # question once-only — and what makes a loopback port that names no runtime
+    # still recognisable as inference.
+    register = load_register()
+    recognised = recognised_names(register)
+    pending = discover(register=register, workspace=None, home=None, include_vocabulary=False)
     return {
         "schema_version": BRIDGE_SCHEMA_VERSION,
         "ready": bool(models),
@@ -101,8 +129,11 @@ async def _build_report() -> dict:
                 "name": spec.name,
                 "bundle_id": spec.bundle_id,
                 "path": spec.path,
+                # How far it climbed: "present" (installed) or "running" (a
+                # process owns it now, but nothing answers on a port yet).
+                "rung": spec.rung,
             }
-            for spec in detect_latent_harnesses(active=active)
+            for spec in latent
         ],
         "mcp_clients": [
             {
@@ -132,7 +163,163 @@ async def _build_report() -> dict:
             }
             for spec in config.servers
         ],
+        # Reconnaissance, read once as part of this report. The caller caused
+        # this read by asking for a report; nothing here watches anything. Told
+        # apart on purpose: `listening` is everything answering, `model_like`
+        # is the subset Sea-Star is willing to call inference, and `outbound`
+        # is what is leaving the machine right now.
+        # What each harness is doing with models, as observations: what it
+        # serves, whether it is using its own, and what it reaches for. This is
+        # the ledger a person cannot get anywhere else, and it states facts
+        # rather than motives.
+        "behaviour": [
+            {
+                "name": row.name,
+                "app_path": row.app_path,
+                "serves": list(row.serves),
+                "using_own_server": row.using_own_server,
+                "reaches_out": len(row.reaches_out),
+                "owns_idle_server": row.owns_idle_server,
+            }
+            for row in harness_behaviour(recognised, answered_ports)
+        ],
+        "listening": [
+            {
+                "pid": service.pid,
+                "process": service.process,
+                "port": service.port,
+                "address": service.address,
+                "loopback": service.is_loopback,
+                "app_name": service.app_name,
+                "app_path": service.app_path,
+                "base_url": service.base_url if service.is_loopback else None,
+            }
+            for service in listening_services()
+        ],
+        "model_like": [
+            {
+                "port": service.port,
+                "app_name": service.app_name,
+                "app_path": service.app_path,
+                "base_url": service.base_url,
+                # Whether this port *answered* as a model server, or merely looks
+                # like one. Both are reported; only one may be stated as fact.
+                "answering": service.port in answered_ports,
+            }
+            for service in model_like_services(known_apps=recognised)
+        ],
+        "candidates": [
+            {
+                "identity": candidate.identity,
+                "name": candidate.name,
+                "bundle_id": candidate.bundle_id,
+                "path": candidate.path,
+                "evidence": list(candidate.evidence),
+                "suggested_name": candidate.suggested_name,
+            }
+            for candidate in pending
+        ],
+        "outbound": [
+            {
+                "pid": connection.pid,
+                "process": connection.process,
+                "app_name": connection.app_name,
+                "remote_host": connection.remote_host,
+                "remote_port": connection.remote_port,
+                "secure": connection.is_secure,
+                "local_link": connection.is_local_link,
+            }
+            for connection in outbound_connections()
+        ],
     }
+
+
+@app.command()
+def harnesses(
+    scan: Annotated[
+        bool,
+        typer.Option("--scan", help="Also read inside app bundles — slower, but finds new things."),
+    ] = False,
+    workspace: Annotated[
+        Path | None,
+        typer.Option("--workspace", "-w", help="A project to check for agent artefacts."),
+    ] = None,
+) -> None:
+    """Show what this machine has decided about its harnesses, and what is undecided."""
+
+    register = load_register()
+    if register:
+        console.print("[bold]Decided[/bold]")
+        for entry in sorted(register.values(), key=lambda item: item.name.casefold()):
+            mark = "harness" if entry.is_harness else "not a harness"
+            console.print(f"  {entry.name} — {mark}")
+        console.print("")
+    pending = discover(
+        register=register,
+        workspace=workspace,
+        include_vocabulary=scan,
+    )
+    console.print(f"[bold]{summarise(pending)}[/bold]")
+    for candidate in pending:
+        console.print(f"  [bold]{candidate.name}[/bold]")
+        for line in candidate.evidence:
+            console.print(f"      {line}")
+        console.print(f"      [dim]id: {candidate.identity}[/dim]")
+
+
+@app.command()
+def adopt(
+    identity: Annotated[str, typer.Argument(help="The id shown by `sea-star harnesses`.")],
+    name: Annotated[
+        str, typer.Option("--name", "-n", help="What to call it. Blank keeps the found name.")
+    ] = "",
+) -> None:
+    """Record something as a harness, so it is recognised from now on."""
+
+    entry = _decide(identity, name, is_harness=True)
+    console.print(f"[green]Recorded[/green] {entry.name} as a harness.")
+
+
+@app.command()
+def dismiss(
+    identity: Annotated[str, typer.Argument(help="The id shown by `sea-star harnesses`.")],
+) -> None:
+    """Record that something is *not* a harness, so it stops being proposed."""
+
+    entry = _decide(identity, "", is_harness=False)
+    console.print(f"[green]Recorded[/green] {entry.name} as not a harness.")
+
+
+@app.command()
+def forget(
+    identity: Annotated[str, typer.Argument(help="The id shown by `sea-star harnesses`.")],
+) -> None:
+    """Undo a verdict, so the question can be asked again."""
+
+    forget_verdict(identity)
+    console.print("[green]Forgotten.[/green]")
+
+
+def _decide(identity: str, name: str, *, is_harness: bool):
+    """Find the candidate behind an id and record the person's answer.
+
+    The candidate is looked up rather than trusted from the command line, so the
+    stored entry keeps the identity the scan actually observed — the path and the
+    bundle id — instead of whatever was typed.
+    """
+
+    found = next(
+        (candidate for candidate in discover() if candidate.identity == identity),
+        None,
+    )
+    chosen = name or (found.suggested_name if found else None) or (found.name if found else identity)
+    return decide(
+        identity,
+        name=chosen,
+        is_harness=is_harness,
+        bundle_id=found.bundle_id if found else None,
+        path=found.path if found else None,
+    )
 
 
 @app.command()
@@ -191,8 +378,8 @@ def doctor(
     console.print(f"Runtime:  {report['runtime']} -> {report['base_url']}")
     console.print(f"Model:    {report['model']}")
     if len(report["runtimes"]) > 1:
-        harnesses = ", ".join(f"{probe['name']} ({probe['base_url']})" for probe in report["runtimes"])
-        console.print(f"Harnesses: {harnesses}")
+        endpoints = ", ".join(f"{probe['name']} ({probe['base_url']})" for probe in report["runtimes"])
+        console.print(f"Inference: {endpoints}")
     if not report["ready"]:
         _die(f"Runtime at {report['base_url']} did not answer. Start it and retry.")
     console.print(f"Available: {', '.join(report['models'][:8])}")
@@ -207,9 +394,30 @@ def doctor(
     if report["mcp_clients"]:
         names = ", ".join(client["name"] for client in report["mcp_clients"])
         console.print(f"Connected: {names}")
+    if report["model_like"]:
+        serving = ", ".join(
+            f"{entry['app_name'] or 'unnamed'} ({entry['base_url']})"
+            for entry in report["model_like"]
+        )
+        console.print(f"Serving:  {serving}")
+    leaving = [
+        connection
+        for connection in report["outbound"]
+        if not connection["local_link"]
+    ]
+    if leaving:
+        hosts = sorted({f"{c['remote_host']}:{c['remote_port']}" for c in leaving})
+        apps = sorted({c["app_name"] or c["process"] for c in leaving})
+        console.print(f"Leaving:  {', '.join(apps)} -> {len(hosts)} host(s)")
     if report["latent_harnesses"]:
-        names = ", ".join(harness["name"] for harness in report["latent_harnesses"])
-        console.print(f"Latent:   {names}")
+        # A harness with a live process has climbed past "installed": say so,
+        # rather than filing a running app under the same word as a dormant one.
+        up = [h["name"] for h in report["latent_harnesses"] if h["rung"] == "running"]
+        latent = [h["name"] for h in report["latent_harnesses"] if h["rung"] != "running"]
+        if up:
+            console.print(f"Running:  {', '.join(up)} (up, not answering yet)")
+        if latent:
+            console.print(f"Latent:   {', '.join(latent)}")
     console.print("[green]Ready.[/green]")
 
 

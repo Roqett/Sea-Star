@@ -4,11 +4,19 @@ import Observation
 /// A local harness the person can switch between. Identity is its endpoint,
 /// because two names can describe the same address (oMLX and vLLM both default
 /// to port 8000).
-struct HarnessOption: Identifiable, Equatable, Sendable {
+struct InferenceOption: Identifiable, Equatable, Sendable {
     var id: String { baseURL }
     let name: String
     let baseURL: String
     let models: [String]
+
+    /// Whether this endpoint is off this machine. The ontology draws a local
+    /// runtime and a remote API as the same row but never as the same thing:
+    /// one is "about the machine", the other is "what is coming in".
+    var isRemote: Bool {
+        guard let host = URL(string: baseURL)?.host()?.lowercased() else { return false }
+        return !(host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "0.0.0.0")
+    }
 }
 
 /// A persona the person built in a harness (an Osaurus agent). Identity is its
@@ -50,11 +58,75 @@ enum AgentState: Equatable, Sendable {
 /// A known harness app installed on this Mac but not answering on a port — an
 /// IDE or runtime app that carries its own model loop. Identity is its bundle id,
 /// the one thing stable across a rename or a move between Applications folders.
+/// How far a harness got, in the foundation's own ladder words. The graph draws
+/// the rung rather than a yes/no "connected", because "installed", "up" and
+/// "answering" are three different facts and collapsing them is what makes a
+/// cockpit look like it knows more than it does.
+enum HarnessRung: String, Sendable, Equatable, CaseIterable {
+    /// A live `sea-star serve` process records it as the host that spawned it.
+    case connected
+    /// A port probe answers in its name.
+    case listening
+    /// A process owns the app right now, but nothing answers on a port.
+    case running
+    /// The app is installed; nothing is up.
+    case present
+
+    /// Whether Sea-Star can currently hand this harness a question.
+    var isAttached: Bool { self == .connected }
+
+    /// The rung as it should read to a person, not as a ladder number.
+    var label: String {
+        switch self {
+        case .connected: return Strings.Detail.rungConnected
+        case .listening: return Strings.Detail.rungListening
+        case .running: return Strings.Detail.rungRunning
+        case .present: return Strings.Detail.rungPresent
+        }
+    }
+}
+
+/// A harness app on this Mac that is not attached to the engine over stdio.
+/// Identity is its bundle id — stable across installs and renames — with the
+/// rung it reached carried alongside, so the graph can say "up, not answering"
+/// instead of flattening every unattached app to the same absence.
 struct LatentHarnessOption: Identifiable, Equatable, Sendable {
     var id: String { bundleID }
     let name: String
     let bundleID: String
     let path: String
+    private let rawRung: String?
+
+    init(name: String, bundleID: String, path: String, rung: String? = nil) {
+        self.name = name
+        self.bundleID = bundleID
+        self.path = path
+        self.rawRung = rung
+    }
+
+    /// How far this app climbed. An engine that could not say leaves it
+    /// unknown rather than assumed, so the graph says nothing instead of lying.
+    var rung: HarnessRung? {
+        guard let rawRung else { return nil }
+        switch rawRung.lowercased() {
+        case "connected", "caller-attributed": return .connected
+        case "listening": return .listening
+        case "running": return .running
+        case "present", "declared": return .present
+        default: return nil
+        }
+    }
+}
+
+/// A harness app that is attached to the engine over stdio *right now*: it
+/// spawned the `serve` process, so the engine knows which process is asking.
+/// This is the one harness state that is proof rather than presence.
+struct AttachedHarnessOption: Identifiable, Equatable, Sendable {
+    var id: String { bundleID ?? name }
+    let name: String
+    let bundleID: String?
+    let pid: Int
+    let startedAt: String
 }
 
 /// Owns the app's view of the engine: the last decoded report, any fail-loud
@@ -79,7 +151,7 @@ final class ServerController {
     /// engine autodetect" (env > TOML > Obsidian, config.py).
     private(set) var vaultOverride: String?
     private(set) var modelOverride: String?
-    private(set) var harnessOverride: HarnessOption?
+    private(set) var inferenceOverride: InferenceOption?
 
     /// Harness identities the person has already been on. A brand-new one gets a
     /// setting-up hint beside its starfish (spec §8.7), then drops out of the
@@ -139,33 +211,53 @@ final class ServerController {
         var overrides: [String: String] = [:]
         if let vaultOverride { overrides[EngineCommand.vaultOverrideKey] = vaultOverride }
         if let modelOverride { overrides[EngineCommand.modelOverrideKey] = modelOverride }
-        if let harnessOverride {
-            overrides[EngineCommand.baseURLOverrideKey] = harnessOverride.baseURL
-            overrides[EngineCommand.runtimeOverrideKey] = harnessOverride.name
+        if let inferenceOverride {
+            overrides[EngineCommand.baseURLOverrideKey] = inferenceOverride.baseURL
+            overrides[EngineCommand.runtimeOverrideKey] = inferenceOverride.name
         }
         return overrides
     }
 
-    /// Every harness the engine found, with the current one kept in the list even
-    /// when it came from env/TOML rather than detection (spec §8).
-    var harnessOptions: [HarnessOption] {
+    /// Every harness app attached to the engine over stdio right now. This is
+    /// the honest top rung: the engine recorded which process spawned its
+    /// `serve`, so an entry here is a live connection and not a guess from a
+    /// disk scan. It is also how a harness that *is* this machine's agent —
+    /// the one the person is talking to — ends up on the graph.
+    var attachedHarnesses: [AttachedHarnessOption] {
+        report?.attachedMcpClients.map {
+            AttachedHarnessOption(
+                name: $0.name,
+                bundleID: $0.bundleID,
+                pid: $0.pid,
+                startedAt: $0.startedAt
+            )
+        } ?? []
+    }
+
+    /// Every endpoint models can come from, with the one the report is
+    /// describing kept in the list even when it came from env/TOML rather than
+    /// detection (spec §8). This is the ontology's Inference row: an endpoint
+    /// is where models live, whereas a harness is what drives Sea-Star, and
+    /// filing the two as one thing is what made the cockpit unreadable.
+    var inferenceOptions: [InferenceOption] {
         guard let report else { return [] }
         var options = report.detectedRuntimes.map {
-            HarnessOption(name: $0.name, baseURL: $0.baseURL, models: $0.models)
+            InferenceOption(name: $0.name, baseURL: $0.baseURL, models: $0.models)
         }
         if !options.contains(where: { $0.baseURL == report.baseURL }) {
             options.insert(
-                HarnessOption(name: report.runtime, baseURL: report.baseURL, models: report.models),
+                InferenceOption(name: report.runtime, baseURL: report.baseURL, models: report.models),
                 at: 0
             )
         }
         return options
     }
 
-    /// The harness the report is currently describing, if it can be matched.
-    var currentHarness: HarnessOption? {
+    /// The inference endpoint the report is currently describing, if it can be
+    /// matched.
+    var currentInference: InferenceOption? {
         guard let report else { return nil }
-        return harnessOptions.first { $0.baseURL == report.baseURL }
+        return inferenceOptions.first { $0.baseURL == report.baseURL }
     }
 
     /// The note to grow beside the active starfish, or `nil` when there is
@@ -173,10 +265,10 @@ final class ServerController {
     var currentTip: HarnessTip? {
         guard let report else { return nil }
         return HarnessTips.tip(
-            harnessName: currentHarness?.name ?? report.runtime,
+            inferenceName: currentInference?.name ?? report.runtime,
             isNew: isCurrentHarnessNew,
             isReady: report.ready,
-            modelCount: modelOptions.count,
+            model: report.model,
             vaultName: (report.vault.path as NSString).lastPathComponent,
             otherVaults: max(vaultOptions.count - 1, 0)
         )
@@ -217,7 +309,7 @@ final class ServerController {
     /// Qwen model served only by oMLX).
     var modelOptions: [String] {
         guard let report else { return [] }
-        var options = currentHarness.map(\.models).flatMap { $0.isEmpty ? nil : $0 } ?? report.models
+        var options = currentInference.map(\.models).flatMap { $0.isEmpty ? nil : $0 } ?? report.models
         if !report.model.isEmpty, !options.contains(report.model) {
             options.insert(report.model, at: 0)
         }
@@ -278,17 +370,25 @@ final class ServerController {
         selectedAgentName = name
     }
 
-    /// Every installed-but-idle harness the engine found, in the engine's stable
-    /// order. These are togglable rather than autodetected: an app on the disk is
-    /// not a connection, so the person decides which ones float on the graph.
+    /// Every harness app the engine found that is not attached over stdio, in
+    /// the engine's stable order, each carrying the rung it reached. These are
+    /// togglable rather than autodetected: an app on the disk is not a
+    /// connection, so the person decides which ones float on the graph — but a
+    /// running one is drawn as running, not smeared into the same grey as a
+    /// dormant install.
     var latentHarnessOptions: [LatentHarnessOption] {
         report?.detectedLatentHarnesses.map {
-            LatentHarnessOption(name: $0.name, bundleID: $0.bundleID, path: $0.path)
+            LatentHarnessOption(
+                name: $0.name,
+                bundleID: $0.bundleID,
+                path: $0.path,
+                rung: $0.rung
+            )
         } ?? []
     }
 
-    /// The latent harnesses the person has kept in view — every detected one
-    /// that has not been switched off.
+    /// The harness apps the person has kept in view — every detected one that
+    /// has not been switched off.
     var visibleLatentHarnesses: [LatentHarnessOption] {
         latentHarnessOptions.filter { isLatentHarnessEnabled($0.bundleID) }
     }
@@ -351,6 +451,77 @@ final class ServerController {
         self.message = nil
     }
 
+    /// The app whose inbuilt server is answering on this endpoint, if any.
+    ///
+    /// Read from the port rather than assumed from a name: the reconnaissance
+    /// says which process owns the socket, and the parent chain says which app
+    /// owns the process. On this machine every endpoint is inbuilt, which means
+    /// the model Sea-Star thinks with can die because somebody quit a chat app —
+    /// a fact the cockpit has to be able to state plainly.
+    func bundledOwner(of baseURL: String) -> String? {
+        guard let url = URL(string: baseURL), let port = url.port else { return nil }
+        return report?.modelServers.first { $0.port == port }?.appName
+    }
+
+    /// Whether the endpoint Sea-Star is currently using belongs to another app.
+    var currentEndpointIsBundled: Bool {
+        guard let report else { return false }
+        return bundledOwner(of: report.baseURL) != nil
+    }
+
+    /// What each app is doing with models, as the engine observed it.
+    ///
+    /// The point of the whole cockpit, stated once: every harness on this machine
+    /// has a commercial interest in which endpoint a person uses, and none of
+    /// them volunteers which one they are using right now. This is the one place
+    /// that says it without a stake in the answer.
+    var appBehaviour: [DoctorReport.HarnessBehaviourInfo] {
+        report?.appBehaviour ?? []
+    }
+
+    // MARK: - The register
+
+    /// What is on this machine and has not been decided about. The engine does
+    /// the finding; the app only asks, so there is one place a thing can enter
+    /// the graph and one place a person can answer for it.
+    var candidates: [DoctorReport.CandidateInfo] {
+        report?.undecided ?? []
+    }
+
+    /// Whether a verdict is being written, so the buttons can go quiet rather
+    /// than accepting a second click on a question already answered.
+    private(set) var isDeciding = false
+
+    /// Record that something is a harness, under the name the person chose.
+    ///
+    /// The name matters: the register is what recognises this thing from now on,
+    /// and the label a person gives it is the one they will look for on the
+    /// graph. Re-reading afterwards is not a refresh for its own sake — it is
+    /// how the newly recognised harness stops being a question.
+    func adoptCandidate(_ identity: String, name: String) async {
+        await decide { command in command.adopt(identity, name: name) }
+    }
+
+    /// Record that something is *not* a harness, so it stops being proposed.
+    func dismissCandidate(_ identity: String) async {
+        await decide { command in command.dismiss(identity) }
+    }
+
+    private func decide(_ make: (EngineCommand) -> EngineCommand.Invocation) async {
+        guard let command else {
+            apply(failure: Strings.Errors.engineNotResolved)
+            return
+        }
+        isDeciding = true
+        defer { isDeciding = false }
+        do {
+            try await EngineClient(command: command).record(make(command))
+            await refresh()
+        } catch {
+            apply(failure: error.localizedDescription)
+        }
+    }
+
     /// Switch vault and re-read. A running server is restarted so the new choice
     /// takes effect — it was spawned with the previous environment.
     func selectVault(_ path: String) {
@@ -374,9 +545,9 @@ final class ServerController {
     /// Switch the harness the engine talks to and re-read. Any model chosen on
     /// the previous endpoint is cleared — it may not exist on the new one, so the
     /// engine picks that harness's first model instead.
-    func selectHarness(_ baseURL: String) {
-        guard let option = harnessOptions.first(where: { $0.baseURL == baseURL }) else { return }
-        harnessOverride = option
+    func selectInference(_ baseURL: String) {
+        guard let option = inferenceOptions.first(where: { $0.baseURL == baseURL }) else { return }
+        inferenceOverride = option
         modelOverride = nil
         applySelection()
     }

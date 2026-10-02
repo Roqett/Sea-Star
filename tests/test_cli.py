@@ -13,8 +13,28 @@ from sea_star.cli import app
 from sea_star.config import RuntimeProbe
 from sea_star.connections import ClientRecord
 from sea_star.harnesses import HarnessSpec
+from sea_star.recon import HarnessBehaviour
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def no_machine(monkeypatch):
+    """Keep every doctor test off the real machine.
+
+    The report reads sockets, the process table and the app folders. Left real,
+    these tests would pass or fail according to what happens to be open on the
+    machine running them — and they took seven seconds doing it. Each test that
+    cares about a machine fact sets its own stub after this one, so the default
+    is silence rather than somebody else's desktop.
+    """
+
+    monkeypatch.setattr("sea_star.cli.listening_services", lambda: ())
+    monkeypatch.setattr("sea_star.cli.model_like_services", lambda **kwargs: ())
+    monkeypatch.setattr("sea_star.cli.outbound_connections", lambda: ())
+    monkeypatch.setattr("sea_star.cli.harness_behaviour", lambda *args, **kwargs: ())
+    monkeypatch.setattr("sea_star.cli.discover", lambda **kwargs: ())
+    monkeypatch.setattr("sea_star.cli.recognised_names", lambda register=None: ())
 
 
 @pytest.fixture(autouse=True)
@@ -130,6 +150,54 @@ def test_doctor_json_reports_every_running_harness(tmp_path, monkeypatch):
     ]
 
 
+def test_doctor_json_reports_harness_behaviour_at_the_top_level(tmp_path, monkeypatch):
+    """The ledger belongs beside the other machine reads, not inside the vault.
+
+    Written because it was wrong first time: the insertion anchor matched the
+    vault's own `candidates` key, and the whole behaviour ledger shipped nested
+    inside the vault object where nothing could find it. A schema that puts
+    machine facts under an unrelated key is the kind of thing that only shows up
+    when somebody reads the JSON, so a test reads it.
+    """
+
+    _write_vault(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sea_star.cli.probe_base_url", _async_return(["test-model"]))
+    monkeypatch.setattr("sea_star.cli.probe_runtimes", _async_return(()))
+    monkeypatch.setattr("sea_star.cli.detect_vault_candidates", lambda home=None: ())
+    monkeypatch.setattr("sea_star.cli.detect_latent_harnesses", lambda **kwargs: ())
+    monkeypatch.setattr(
+        "sea_star.cli.harness_behaviour",
+        lambda *args, **kwargs: (
+            HarnessBehaviour(
+                name="Atomic Chat",
+                app_path="/Applications/Atomic Chat.app",
+                serves=(1337,),
+                using_own_server=False,
+                reaches_out=("93.184.216.34",),
+            ),
+        ),
+    )
+
+    result = runner.invoke(app, ["doctor", "--json"])
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert "behaviour" in report
+    assert "behaviour" not in report["vault"]
+    assert report["behaviour"] == [
+        {
+            "name": "Atomic Chat",
+            "app_path": "/Applications/Atomic Chat.app",
+            "serves": [1337],
+            "using_own_server": False,
+            "reaches_out": 1,
+            # Ships a server, is not using it, and is reaching outside anyway.
+            "owns_idle_server": True,
+        }
+    ]
+
+
 def test_doctor_json_reports_latent_harnesses(tmp_path, monkeypatch):
     _write_vault(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -153,8 +221,52 @@ def test_doctor_json_reports_latent_harnesses(tmp_path, monkeypatch):
     assert result.exit_code == 0
     report = json.loads(result.stdout)
     assert report["latent_harnesses"] == [
-        {"name": "Xcode", "bundle_id": "com.apple.dt.Xcode", "path": "/Applications/Xcode.app"},
-        {"name": "Goose", "bundle_id": "com.electron.goose", "path": "/Applications/Goose.app"},
+        {
+            "name": "Xcode",
+            "bundle_id": "com.apple.dt.Xcode",
+            "path": "/Applications/Xcode.app",
+            "rung": "present",
+        },
+        {
+            "name": "Goose",
+            "bundle_id": "com.electron.goose",
+            "path": "/Applications/Goose.app",
+            "rung": "present",
+        },
+    ]
+
+
+def test_doctor_json_states_how_far_a_harness_climbed(tmp_path, monkeypatch):
+    """A running harness is not a latent one: the rung travels with the report."""
+
+    _write_vault(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sea_star.cli.probe_base_url", _async_return(["test-model"]))
+    monkeypatch.setattr("sea_star.cli.probe_runtimes", _async_return(()))
+    monkeypatch.setattr("sea_star.cli.detect_vault_candidates", lambda home=None: ())
+    monkeypatch.setattr(
+        "sea_star.cli.detect_latent_harnesses",
+        lambda **kwargs: (
+            HarnessSpec(
+                name="DeepSeek Harness",
+                bundle_id="com.deepseek.dsh",
+                path="/Applications/DeepSeek Harness.app",
+                rung="running",
+            ),
+        ),
+    )
+
+    result = runner.invoke(app, ["doctor", "--json"])
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert report["latent_harnesses"] == [
+        {
+            "name": "DeepSeek Harness",
+            "bundle_id": "com.deepseek.dsh",
+            "path": "/Applications/DeepSeek Harness.app",
+            "rung": "running",
+        }
     ]
 
 

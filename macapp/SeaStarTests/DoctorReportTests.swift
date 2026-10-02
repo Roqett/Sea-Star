@@ -161,6 +161,138 @@ struct DoctorReportTests {
         #expect(report.attachedMcpClients.isEmpty)
     }
 
+    /// The ledger is the product's central claim, so its shape is pinned: an
+    /// app that ships a server and reaches outside instead must arrive as those
+    /// two facts, and the app must not have to re-derive them.
+    @Test("decodes what each app is doing with models")
+    func decodesBehaviour() throws {
+        let response = try decode(
+            """
+            {
+              "schema_version": 1,
+              "ready": true,
+              "version": "0.1.0",
+              "vault": { "path": "/v", "source": "obsidian", "note_count": 1, "candidates": [] },
+              "runtime": "remote",
+              "base_url": "http://127.0.0.1:1337/v1",
+              "model": "qwen3",
+              "models": ["qwen3"],
+              "behaviour": [
+                {
+                  "name": "Atomic Chat",
+                  "app_path": "/Applications/Atomic Chat.app",
+                  "serves": [1337],
+                  "using_own_server": false,
+                  "reaches_out": 0,
+                  "owns_idle_server": false
+                },
+                {
+                  "name": "Away App",
+                  "app_path": "/Applications/Away.app",
+                  "serves": [8009],
+                  "using_own_server": false,
+                  "reaches_out": 3,
+                  "owns_idle_server": true
+                }
+              ],
+              "server": { "state": "stopped" },
+              "servers": []
+            }
+            """
+        )
+
+        guard case .report(let report) = response else {
+            Issue.record("expected a report, got a failure")
+            return
+        }
+
+        #expect(report.appBehaviour.count == 2)
+        #expect(report.appBehaviour[0].serves == [1337])
+        #expect(report.appBehaviour[0].ownsIdleServer == false)
+        // Ships a server, is not using it, and is reaching outside anyway.
+        #expect(report.appBehaviour[1].ownsIdleServer == true)
+        #expect(report.appBehaviour[1].reachesOut == 3)
+    }
+
+    /// The register's question has to arrive with its evidence (D-005). A
+    /// candidate that reached the cockpit stripped of its reasons would be a
+    /// demand for trust, so the evidence list is load-bearing, not decoration.
+    @Test("decodes undecided candidates with the evidence for each")
+    func decodesCandidates() throws {
+        let response = try decode(
+            """
+            {
+              "schema_version": 1,
+              "ready": true,
+              "version": "0.1.0",
+              "vault": { "path": "/v", "source": "obsidian", "note_count": 1, "candidates": [] },
+              "runtime": "osaurus",
+              "base_url": "http://127.0.0.1:1337/v1",
+              "model": "qwen3",
+              "models": ["qwen3"],
+              "candidates": [
+                {
+                  "identity": "ai.unsloth.studio",
+                  "name": "Unsloth",
+                  "bundle_id": "ai.unsloth.studio",
+                  "path": "/Applications/Unsloth.app",
+                  "evidence": [
+                    "serving a model on http://127.0.0.1:8888/v1",
+                    "a harness app this build already recognises"
+                  ],
+                  "suggested_name": "Unsloth Studio"
+                }
+              ],
+              "server": { "state": "stopped" },
+              "servers": []
+            }
+            """
+        )
+
+        guard case .report(let report) = response else {
+            Issue.record("expected a report, got a failure")
+            return
+        }
+
+        #expect(report.undecided.count == 1)
+        let candidate = try #require(report.undecided.first)
+        #expect(candidate.identity == "ai.unsloth.studio")
+        #expect(candidate.suggestedName == "Unsloth Studio")
+        // The identity, not the display name, is what the answer is filed under.
+        #expect(candidate.id == "ai.unsloth.studio")
+        #expect(candidate.evidence.first == "serving a model on http://127.0.0.1:8888/v1")
+        #expect(candidate.evidence.count == 2)
+    }
+
+    /// An engine older than the register must produce no questions rather than
+    /// a crash, or the cockpit would nag about things already answered.
+    @Test("an engine without a register asks nothing")
+    func decodesWithoutCandidates() throws {
+        let response = try decode(
+            """
+            {
+              "schema_version": 1,
+              "ready": true,
+              "version": "0.1.0",
+              "vault": { "path": "/v", "source": "obsidian", "note_count": 1, "candidates": [] },
+              "runtime": "osaurus",
+              "base_url": "http://127.0.0.1:1337/v1",
+              "model": "qwen3",
+              "models": ["qwen3"],
+              "server": { "state": "stopped" },
+              "servers": []
+            }
+            """
+        )
+
+        guard case .report(let report) = response else {
+            Issue.record("expected a report, got a failure")
+            return
+        }
+
+        #expect(report.undecided.isEmpty)
+    }
+
     /// The roster and the fact that *someone* vouched for it are two separate
     /// fields, and the panel's four Agent states are read straight off them. So
     /// the pair has to survive the bridge intact, in both directions.
@@ -319,8 +451,8 @@ struct ServerControllerTests {
         let controller = ServerController(command: nil)
         #expect(controller.vaultOptions.isEmpty)
         #expect(controller.modelOptions.isEmpty)
-        #expect(controller.harnessOptions.isEmpty)
-        #expect(controller.currentHarness == nil)
+        #expect(controller.inferenceOptions.isEmpty)
+        #expect(controller.currentInference == nil)
         #expect(!controller.isReady)
     }
 
@@ -413,28 +545,39 @@ struct HarnessTipsTests {
     @Test("a fresh harness gets the setting-up hint, and it names the harness")
     func freshHarnessHint() {
         let tip = HarnessTips.tip(
-            harnessName: "oMLX", isNew: true, isReady: true,
-            modelCount: 3, vaultName: "Vault", otherVaults: 2
+            inferenceName: "oMLX", isNew: true, isReady: true,
+            model: "qwen3", vaultName: "Vault", otherVaults: 2
         )
         #expect(tip?.kind == .fresh)
         #expect(tip?.body.contains("oMLX") == true)
     }
 
-    @Test("a known harness with no other vaults just reports it is connected")
+    /// The founder's rule for the readouts applies to the note beside the active
+    /// star too: it names the model that answered rather than counting models.
+    @Test("a known harness with no other vaults names the model it is answering as")
     func connectedLine() {
         let tip = HarnessTips.tip(
-            harnessName: "Osaurus", isNew: false, isReady: true,
-            modelCount: 1, vaultName: "Brain", otherVaults: 0
+            inferenceName: "Osaurus", isNew: false, isReady: true,
+            model: "qwen3", vaultName: "Brain", otherVaults: 0
         )
         #expect(tip?.kind == .reconnected)
-        #expect(tip?.body.contains("1 model") == true)
+        #expect(tip?.body.contains("qwen3") == true)
+        #expect(tip?.body.contains("1 model") == false)
+
+        // An engine that could not report a model says only that it is connected,
+        // rather than "answering as —".
+        let nameless = HarnessTips.tip(
+            inferenceName: "Osaurus", isNew: false, isReady: true,
+            model: "", vaultName: "Brain", otherVaults: 0
+        )
+        #expect(nameless?.body == "Osaurus is connected.")
     }
 
     @Test("other vaults nearby raise the wrong-vault nudge")
     func wrongVaultNudge() {
         let tip = HarnessTips.tip(
-            harnessName: "oMLX", isNew: false, isReady: true,
-            modelCount: 3, vaultName: "Second", otherVaults: 1
+            inferenceName: "oMLX", isNew: false, isReady: true,
+            model: "qwen3", vaultName: "Second", otherVaults: 1
         )
         #expect(tip?.kind == .wrongVault)
         #expect(tip?.body.contains("Second") == true)
@@ -443,8 +586,8 @@ struct HarnessTipsTests {
     @Test("a known harness that is not ready says nothing")
     func silentWhenNotReady() {
         let tip = HarnessTips.tip(
-            harnessName: "oMLX", isNew: false, isReady: false,
-            modelCount: 0, vaultName: "Vault", otherVaults: 0
+            inferenceName: "oMLX", isNew: false, isReady: false,
+            model: "", vaultName: "Vault", otherVaults: 0
         )
         #expect(tip == nil)
     }
@@ -510,20 +653,12 @@ struct PanelLayoutTests {
         }
     }
 
-    /// Only the side-by-side needs the room; widening it unconditionally would
-    /// make the ordinary column a stranded strip of ink in a wide panel.
-    @Test("only the side-by-side asks for a wide panel")
-    func onlyCompareIsWide() {
-        #expect(PanelLayout.both.isWide)
-        #expect(!PanelLayout.stack.isWide)
-        #expect(!PanelLayout.chain.isWide)
-    }
-
-    /// The two designs plus the way to compare them. If this ever drops a case,
-    /// the header toggle silently loses a button.
-    @Test("there are three readings")
-    func threeReadings() {
-        #expect(PanelLayout.allCases.count == 3)
+    /// The two layouts and nothing else. The side-by-side comparison was retired
+    /// once the founder picked a reading; if a case drops, the header toggle
+    /// silently loses a button.
+    @Test("there are two layouts")
+    func twoLayouts() {
+        #expect(PanelLayout.allCases.count == 2)
     }
 }
 

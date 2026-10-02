@@ -41,6 +41,17 @@ struct EngineCommand: Sendable, Equatable {
     func serve(environment: [String: String] = [:]) -> Invocation {
         invocation("serve", environment: environment)
     }
+
+    /// Record what the person said a found thing is. The answer is written by
+    /// the engine, not by the app, so the register has one writer and the app
+    /// cannot drift into keeping a second copy of the same decision.
+    func adopt(_ identity: String, name: String) -> Invocation {
+        invocation("adopt", [identity, "--name", name])
+    }
+
+    func dismiss(_ identity: String) -> Invocation {
+        invocation("dismiss", [identity])
+    }
 }
 
 extension EngineCommand {

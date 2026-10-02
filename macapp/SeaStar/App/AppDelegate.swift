@@ -65,7 +65,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func configurePopover() {
         let popover = NSPopover()
-        popover.behavior = .transient
+        // The founder's rule: the cockpit is a panel, not a tooltip. It stays
+        // open until the star is clicked again — clicking another app must not
+        // dismiss it, or you can never watch the cockpit while you work.
+        // Closing is purely the star's toggle in `togglePopover()`.
+        popover.behavior = .applicationDefined
         popover.animates = true
         popover.delegate = self
 

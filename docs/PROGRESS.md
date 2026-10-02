@@ -1224,3 +1224,396 @@ existed.
 whether `hardware.yaml` gets created now), then commit the prepared set. The commit is staged in
 the working tree and described in full below; **it has not been run**, per the standing rule that
 commits happen only on the founder's explicit word.
+
+## Handoff — 2026-10-02 (session close — commit landed, changelog convention trimmed)
+
+**Supersedes the paragraph immediately above:** the commit *was* run, on the founder's explicit
+word, at the end of this session.
+
+**Landed**
+
+- **`dbcd831` — "Record which host spawned serve, so attached hosts stop reading as latent."**
+  12 files, +972/−47: `connections.py` + its tests (new), the `cli.py` wiring, the two harness
+  label corrections, the Swift Host row, and the doc corrections. Tree clean; branch
+  `feat/macapp-cockpit` is now **6 ahead** of origin. **Nothing pushed** — the push gate from the
+  2026-09-30 handoff is untouched and still needs explicit approval.
+- **`AGENTS.md` changelog convention trimmed, at the founder's explicit request** (meta-guardrail
+  satisfied: he asked for exactly this change). The entry block is now **`Harness` + `Date` only**.
+  `Model` and `Routing` are removed from the template and positively forbidden — the rationale
+  recorded in the file is that an agent cannot see the model serving it, so a plausible value is
+  **invented rather than observed**. History, for the record: the convention shipped in the first
+  commit (`b0e9a50`, 2026-09-22) and was **never** edited out afterwards, contrary to the
+  founder's recollection; the last two `AGENTS.md` commits before today were the no-go zone
+  (`a54d21b`, +1 line) and the foundation binding (`4523a59`, +5 lines).
+- **Changelog entries are append-only, so the ~19 existing blocks that still carry `Model:` /
+  `Routing:` lines are left exactly as written.** They are historical record, not drift. New
+  entries follow the new template.
+
+**Still uncommitted at session close**
+
+- Only `AGENTS.md` (2 insertions, 6 deletions — the convention edit above) is unstaged. It needs
+  the same go/no-go treatment as everything else; the founder was taking a break when this note
+  was written.
+
+**Founder decisions still open (unchanged by this session)**
+
+1. **Spec `D3`** ([`.trae/specs/mac-app/spec.md:114`](.trae/specs/mac-app/spec.md#L114)) still
+   locks the graph to a `WKWebView` embed while the same spec's §8.7/§8.8, `DECISIONS.md` D-002
+   and the shipped code all describe the native 2D/3D renderers. Founder-only amendment.
+   **Clarified this session:** the founder's actual interest was never a browser pivot — it was
+   *visual quality* inspired by codebase-memory. The pending note is whether a **bundled, offline**
+   web canvas replaces the SceneKit room, which is a different proposition from D3. Recommend
+   settling that first, then writing the amendment once.
+2. **Two further stale spec lines** — `:516` and `:539` still describe the codebase-memory UI at
+   `localhost:9749` as running infrastructure. Nothing in the app references it. Small factual
+   fixes, offered, not yet approved.
+3. **`hardware.yaml` — closed as "not relevant" by the founder.** It does not exist, nothing reads
+   it, and the project has **no YAML dependency at all** (`mcp`, `httpx`, `typer`, `rich` only;
+   config is `tomllib`). The founder's read that it was "just about the machine we're working on"
+   was correct. `AGENTS.md`'s claim that it "is read at runtime" is therefore still false, and the
+   founder has decided to leave that line alone for now.
+4. **Belated changelog entry.** The convention wants a dated block for a code-changing session;
+   this session's documentation corrections were committed without one. Left to the founder.
+5. **Phantom reference found (pattern worth watching).** A previous session's note justified a
+   design decision by citing "spec's size gate — measure it". **No size gate exists in the spec.**
+   That is the third invented citation found in this repo (two stale docs, one fake constraint).
+
+**Single next step** — next session: read this note and the 2026-10-01/02 one above, then settle
+the D3 wording with the founder and decide whether to commit the `AGENTS.md` change on its own or
+fold it into the next commit.
+
+## Handoff — 2026-10-02 (DeepSeek Harness session, evening — cockpit simplification begins)
+
+**Goal armed (goal-a2516170):** cut the cockpit to one interactive graph + one text panel;
+remove the comparison modes and duplicate layouts; keep the sea-star graphics; add the
+local-vs-API inference distinction; keep the Python engine green; record everything.
+
+**Landed this session (uncommitted — commit gate not yet opened by the founder):**
+
+- **D-003 (DECISIONS.md):** both `Both` comparison modes retired. `SeaStar.graphDepth` is
+  Pool/Deep, `SeaStar.panelLayout` is Stack/Chain; stored `"both"` values degrade to the axis
+  default. Implemented across `CockpitPopoverView.swift` (side-by-side branch and 960pt width
+  gone), `CockpitPanel.swift` (`compareLayout`, `isWide`, the third case gone),
+  `Strings.swift` (labels/help/icons gone), `DoctorReportTests.swift` (two layouts now).
+- **Reconception proposal:** `docs/cockpit-look.md` (final revision) + `assets/cockpit-proposal.png`.
+  The intermediate flow-chart draft (`cockpit-path-proposal.png`) was rejected by the founder
+  and deleted. The proposal: one interactive sea-star graph (hover names, click focuses,
+  focus shows the neighbourhood and the live ribbon marks what is working), one text panel
+  (Vault/Harness/Agent/Inference + Working now), inference as its own kind with local vs API
+  accents, `latent` demoted from kind to rung.
+- **INBOX lesson:** `INBOX/*` files are discussions, not clauses — the agent cited one as
+  evidence and the founder corrected it. Offered (not yet done): an `INBOX/README.md`
+  declaring the folder non-binding.
+- **Changelog entry** appended for the cut (new convention: Harness + Date only).
+
+**Verified:** `xcodebuild` BUILD SUCCEEDED; 69 Swift tests in 13 suites pass (one retired with
+the mode it tested); `uv run pytest` 97 passed; `uv run ruff check .` clean. App relaunched on
+the trimmed build.
+
+**Open with the founder (discussion continues over the coming days):**
+
+1. Graph renderer: fix the SceneKit room's framing ("the blob"), or a bundled **offline** web
+   canvas at codebase-memory quality (the pending note-5 question) — he leans browser-quality.
+2. Stack vs Chain for the list; the loser gets pruned.
+3. The API-inference accent colour.
+4. Popover vs real window (transient popover closes the moment he uses another app).
+5. Commit go: branch + commit + draft PR await his word (per the standing gate).
+
+**Single next step** — settle item 1 with the founder; then the bridge work (`agents[]` gains a
+harness id, `runtimes[]` become `Kind.inference`) unblocks everything visual.
+
+
+---
+
+## 2026-10-02 (evening) — D-004: harness is the app, inference is the endpoint, the rung is drawn
+
+**Context.** The founder stepped out and left instructions for the walkthrough he wants on
+return: *"these are the things on the system, this is how we want it to look when it's idle,
+… when it's activated, … when we spin the mouse through the graphing thing"*, and the rule for
+the text side — *"when you click on a particular harness, it will tell you what it's connected
+to rather than these empty messages … we don't want to see just some text saying five
+models."* He also said, plainly: *"you are an organic harness as well and the graph should be
+reading the fact that you exist. I've kind of been through this before and maybe I was put
+back in my box on that where maybe it wasn't possible, but I can't really understand why it's
+not."* He was right; it was possible.
+
+**Done — the engine can see a harness it is not attached to.** `harnesses.py` reads the
+process table once and reports `present` vs `running` per known app; `connections.py` already
+reported the top rung (`caller-attributed`) from its live `serve` records. `com.deepseek.dsh`
+(DeepSeek Harness) is now a known harness, so on this machine `sea-star doctor` prints:
+
+```
+Connected: Atomic Chat
+Running:  DeepSeek Harness, TraeWork, Unsloth Studio, Xcode (up, not answering yet)
+Latent:   OpenCode (Beta), OpenCode, TraeCode, Osaurus
+Inference: remote (http://127.0.0.1:1337/v1), omlx (http://127.0.0.1:8009/v1)
+```
+
+**Done — the ontology is in the code, not just the docs (D-004).** `Kind.latent` deleted,
+`Kind.inference` added; `Kind.harness` means the app driving Sea-Star and nothing else. The
+endpoint picker moved from the panel's `Harness` row to `Inference`. `HarnessOption` →
+`InferenceOption`, `harnessOptions` → `inferenceOptions`, `activeHarnessID` →
+`activeInferenceID`. Local inference teal, remote API plum, vault bone. Every readout row now
+names something: an endpoint lists the models it serves, a model lists its endpoints and the
+personas riding it, an attached harness lists pid, start time and `ask_seastar`. The per-node
+hue smear narrowed ±25% → ±6% so the colour cannot drift across a kind boundary.
+
+**Verified:** `xcodebuild test` — 73 Swift tests in 13 suites pass; `pytest` 102 passed;
+`ruff check .` clean; app rebuilt and relaunched (`build/Build/Products/Debug/Sea-Star.app`).
+The bridge JSON was read back with the real engine and carries `rung: "running"` for DeepSeek
+Harness. **Not visually verified:** the display was asleep when the screenshot was taken, so
+the new graph has not been eyeballed — that is the first thing to do with the founder.
+
+**Open with the founder:**
+
+1. **Does DSH attach Sea-Star over MCP?** That is the one remaining rung: it would put
+   "DeepSeek Harness — Driving Sea-Star now" on the graph through the existing connection
+   record, with no further code. It is a configuration change inside DSH (which ships
+   `@deepseek-ai/dsh-mcp-client`), i.e. a cross-app decision, so it waits for his word.
+2. Graph renderer: fix the SceneKit room's framing, or a bundled offline web canvas at
+   codebase-memory quality — he leans browser.
+3. Stack vs Chain; the loser gets pruned.
+4. Popover vs real window.
+5. Tailscale → iOS, so the harness is on his phone for the tractor week. Assessed but not
+   started: needs his go, and it is a scope expansion (AGENTS.md #5).
+6. Commit go: branch + commit + draft PR await his word.
+
+**Single next step** — walk the he-returned app with the founder: idle, then activated, then
+the pointer through the graph, then click a harness and confirm the card reads as
+information. Then settle item 1.
+
+### Fingerprint probe (2026-10-02, evening — evidence for the onboarding question)
+
+Ran two probes against `/Applications` to find out how a harness can be recognised without a
+name list. Recorded here because the result is a fact, not an opinion, and should not be
+re-derived.
+
+**Probe 1 — looking inside the bundle for AI evidence: a dead end.** All 31 apps, checking
+model weights (`.gguf`/`.mlmodelc`/`.safetensors`), bundled inference helpers
+(`llama-server`, `mlx_lm`, `ollama`) and linked ML libraries. Thirteen apps are >400MB; the
+only hit was oMLX (links `mlx`). Atomic Chat and DeepSeek Harness — which are purely AI —
+produced nothing. Electron payloads hide everything in one archive, so static bundle
+inspection cannot classify a harness.
+
+**Probe 2 — behaviour and vocabulary, against the founder's own list of seven.** Six of seven
+fired on at least one family:
+
+| app | what caught it |
+| --- | --- |
+| Unsloth | bundled `llama_cpp` |
+| osaurus | bundled `mlx`, `huggingface` |
+| OpenCode (Beta) | names `anthropic`, `openai`, `tokenizer` inside |
+| CC Switch | names `claude` ×398, `codex` ×422, `gemini` ×231, `provider`, `proxy` |
+| Trae | **`.trae/` in this repo** — the bundle showed nothing at all |
+| oMLX | links `mlx`; `local-api-server.json` names its port |
+| Xcode, OpenCode (non-beta) | only weak/noise hits (`transformer`, `mlx`) — unresolved |
+
+Two conclusions that shape the design:
+
+1. **The vocabulary was wrong, not the method.** CC Switch looked invisible until the search
+   used agent words (`claude`, `codex`, `gemini`) instead of provider words (`anthropic`,
+   `openai`). A *vocabulary* of ~20 words generalises to apps that did not exist when it was
+   written; a *list* of app names does not, and is stale within a fortnight.
+2. **Workspace artefacts are the strongest family, and the only one that proves use rather
+   than installation.** `.trae/` and `AGENTS.md` in this repository caught a harness the
+   bundle scan could not see. The files agents leave in a project name the harnesses that
+   actually worked there.
+
+Corroborating find: `Atomic Chat/data/local-api-server.json` contains `"port": 1337`, so the
+app and the endpoint Sea-Star reads are provably one thing — the harness→inference wire can
+be drawn from evidence rather than assumed (D-004's open wire).
+
+Still open: Xcode and non-beta OpenCode have no reliable fingerprint. They are the honest
+residue that "ask once, remember" exists to cover.
+
+### Reconnaissance built (`recon.py`, D-005) — 2026-10-02 late evening
+
+The founder pushed back on treating a launch-time read as "monitoring", and he was right:
+those are two different things and the earlier caution conflated them. `lsof` needs no
+permission, no sudo and no system extension — it is the same table Activity Monitor reads —
+and it proves more than the config files did.
+
+**Built.** `src/sea_star/recon.py` (triggered, stateless, local-only read), wired into the
+bridge as `listening` / `model_like` / `outbound`, printed by `doctor` as `Serving:` and
+`Leaving:`. 14 new tests; 116 Python tests pass; ruff clean.
+
+**What it found on this machine that nothing could see before:** Unsloth Studio serving a model
+on `127.0.0.1:8888`, alongside oMLX (8009), Atomic Chat (1337) and DeepSeek Harness (19387) —
+each attributed to its owning app through the process tree. It also shows live outbound
+connections (DeepSeek Harness → two hosts on 443, Unsloth → its download CDN), which is the
+founder's "keeping track of when APIs are being used" without capturing anything.
+
+**Bug found and fixed while building:** the register matched on display name only, so
+"Unsloth Studio" never matched the bundle's own "Unsloth" and a live endpoint was silently
+lost. Matching is now by identity — display name, bundle path, or folder name.
+
+**Not built yet:** the register itself (the "ask once, remember" store) and the
+candidate-with-evidence card. `recon.py` is the read they sit on. `KNOWN_HARNESS_APPS` is
+demoted to a first-run seed rather than the mechanism that decides what exists.
+
+**Next step** — build the register: onboarding enumerates what the read found, asks once per
+unknown, and remembers by bundle identity; then the cockpit shows candidates with their
+evidence.
+
+### The register built (`register.py`, D-006) — 2026-10-02 late
+
+The founder's answer to "should I build it" was *"Why do you need to ask me that? I'll just go
+ahead and do that for sure"* — so it is built.
+
+**What exists now.** `src/sea_star/register.py`: the store (`~/.seastar/register.json`,
+engine-written only, identity = bundle id or path), six evidence families, and candidates that
+carry the observed facts behind them. CLI: `harnesses [--scan] [--workspace]`, `adopt`,
+`dismiss`, `forget`. Bridge: `candidates`. Cockpit: a `New on this machine` section with the
+evidence above an editable pre-filled name and two answers — asked once, ever.
+
+**Two findings that changed the design mid-build:**
+
+1. **Applying the vocabulary to every installed app gave twelve hits, six of them browsers.**
+   Firefox, DuckDuckGo and ProtonVPN all "name OpenAI" because they ship domain blocklists.
+   Requiring a *protocol* word (`mcpServers`, `modelcontextprotocol`) cut it to five, all
+   genuinely agentic, zero false positives — and still caught **CC Switch**, which the seed
+   table has never heard of. The false positive is pinned as a test.
+2. **"Installed" is not evidence.** Offering all installed apps produced 31 questions. Now only
+   the seed table's apps are offered, with a suggested name. Nothing is hidden — ranking is not
+   hiding — but nothing is accused on no grounds either.
+
+**Verified:** 134 Python tests (18 new), 75 Swift tests in 13 suites (2 new), ruff clean,
+`xcodebuild` succeeded, app relaunched. The `adopt`/`dismiss`/`forget` flow was exercised
+end-to-end against a temporary register.
+
+**Not visually verified:** the cockpit's new section has not been seen on screen — the display
+was asleep during the check, and when it woke the founder was using the machine, so the screen
+was left alone. **That is the first thing to do together.**
+
+**Open:** the workspace family (`.trae/`, `AGENTS.md`) needs a project path the cockpit does not
+yet pass — the CLI takes `--workspace`. `mcp_configs` records presence only, never the tools
+inside another app's tool list.
+
+**Next step** — open the cockpit with the founder and answer the first candidate together,
+confirming the round trip (answer → register → the row disappears → the thing is recognised).
+
+### Inbuilt inference servers (`machine_summary`, `machine_report`, D-007) — 2026-10-02 late
+
+The founder noticed that many harnesses ship their *own* inference server and asked how that is
+dealt with, and whether MCP could just ask. Measured answer: on this machine **all four** loopback
+model servers belong to an app, and one of them is Sea-Star's own brain (`127.0.0.1:1337`, inside
+Atomic Chat). So quitting a chat app would stop Sea-Star thinking, and nothing said so.
+
+**Built.** `recon.machine_summary()` names the owner of every inbuilt server and states the
+dependency; the endpoint readout in the app adds `Runs inside <app>` and, for the endpoint in use,
+*"stops when that app quits — Sea-Star's own model lives here"*. `register.recognised_names()` is
+now the one definition of what this machine recognises, used by both the bridge and the new MCP
+tool, so they cannot describe the machine differently.
+
+**On the MCP question — the honest split:** MCP cannot discover inference. It has no schema for
+"which model servers do I run"; its handshake identifies who is attached and its tools expose what
+that server chooses to offer. Inventing a tool for it would mean every harness implementing it,
+which is the app-name-list trap one layer up. The OpenAI-compatible `/v1/models` is the protocol
+that exists for this, and Sea-Star already speaks it. What MCP *is* good for is the reverse
+direction, so `machine_report` now exposes these findings to any attached host — the foundation's
+symmetry clause, honoured.
+
+**Verified:** 135 Python tests (2 new/updated), 75 Swift tests, ruff clean, `xcodebuild` succeeded.
+
+**Open:** an inbuilt server may be unauthenticated and open to any local process; whether the
+cockpit should say so is a privacy decision awaiting the founder. Nothing distinguishes an app that
+means to serve others from one whose server is private to itself.
+
+**Next step** — with the founder: open the cockpit, confirm the endpoint readout names its owner,
+and answer the first register candidate.
+
+### The behaviour ledger (`harness_behaviour`, D-008) — 2026-10-02 late
+
+The founder's read: every harness is an interested party that makes money from its own endpoints,
+and nobody tells the person which one is in play. He called it the thing that will get traction,
+and told me to stop hedging and build. This is the first product reason for Sea-Star that is not a
+privacy reason.
+
+**Built.** `recon.harness_ledger()` / `harness_behaviour()` / `ledger_lines()`: one row per app —
+what it serves, whether it is using its own server, what it reaches for outside, and the flagged
+case (ships a server, not using it, reaching outside anyway). Rendered in three places from one
+filter: `doctor`, the bridge's `behaviour`, and the MCP `machine_report`. The cockpit gained a
+`What each app is doing` band, with the flagged row in the warning colour.
+
+**Live reading on this machine:** Atomic Chat serves 1337 · oMLX serves 8009 and is using it ·
+Unsloth serves 8888 · DeepSeek Harness serves 19387, is using it, and reaches 2 hosts outside.
+Four harnesses, four inbuilt servers, one of them also in the cloud. The flagged case does not
+fire on this machine right now, which is the honest reading — it is not claimed anywhere.
+
+**Three rules that keep it trustworthy:** no motive is attributed (there is no field for intent);
+"not using them" is never said (Sea-Star itself may be the client — the first version said it and
+was wrong); a stranger is a register candidate, not a ledger row (the first version listed Chrome
+beside oMLX).
+
+**Bug caught while reading the JSON, not by a failure:** the ledger shipped nested inside the
+`vault` object, because the insertion anchor matched the vault's own `candidates` key. Nothing
+read it and nothing failed. There is now a test asserting it is top-level, and an autouse fixture
+keeps the doctor tests off the real machine — they had begun reading the live socket table and
+went from 0.4s to 7.2s.
+
+**Verified:** 140 Python tests, 76 Swift tests in 13 suites, ruff clean, `xcodebuild` succeeded,
+app relaunched.
+
+**Open:** nothing distinguishes model traffic from ordinary telemetry in an app's outbound
+connections — that would need connection contents, which this project does not read. And the
+ledger is live, not historical; history is a founder decision under no-background-monitoring.
+
+**Next step** — with the founder: open the cockpit and read the band together, then answer the
+first register candidate.
+
+### Browsers barred, traffic demoted (`D-009`) — 2026-10-02 late
+
+The founder looked at the cockpit screenshot and immediately caught **Google Chrome** in the
+candidate list. He was right, and the cause was a rule rather than a missing name: outbound traffic
+was allowed to raise a candidate on its own, and almost everything networked reaches outside. That
+one rule would have proposed browsers, messengers, updaters and VPNs on any real machine.
+
+**Built.** Traffic now only *enriches* a candidate another family raised. Two roles are barred from
+harness classification — a **declared web client** (claims `http`/`https` in its own Info.plist, so
+the OS keeps the list and Sea-Star reads it) and an **OS component** (under `/System/`). A finding
+inside an app's own support folder now merges into that app, so each app is asked about once.
+
+**Result:** 17 candidates → **13**, all genuine: ten GUI harnesses and three CLI agent state
+directories. No Chrome, no ControlCenter, no duplicates. Verified on this machine that Chrome,
+Firefox, DuckDuckGo and Safari declare `http`/`https` while Atomic Chat, Trae, Unsloth, oMLX, Xcode
+and CC Switch do not — the discriminator is exact.
+
+**Accepted cost, recorded in D-009:** an AI assistant living inside a browser is barred by the role
+rule. The founder named that market out of scope, so it stays barred until a rule distinguishes an
+assistant from a browser.
+
+**Live event during this work:** Atomic Chat quit, port 1337 vanished with it, and Sea-Star
+re-resolved its own inference to oMLX on 8009 on its own. D-007's hazard, demonstrated by the
+machine rather than argued.
+
+**Verified:** 147 Python tests, 76 Swift tests, ruff clean.
+
+**Next step** — with the founder: reopen the cockpit and read the answer list, which is now 13 real
+questions instead of 17 mixed ones.
+
+### A port is not a server (`D-010`) — 2026-10-02 late
+
+The founder said he'd have guessed ports were the best indicator of what is going on. He was right,
+and checking it immediately showed the ledger telling a lie: it claimed **"Unsloth serves models on
+8888"**. That port carries every signal this project had — owned by Unsloth, on loopback, runtime
+vocabulary in its process tree — and **does not answer an OpenAI probe**. Only one of the four ports
+the ledger called servers had ever been asked; one does.
+
+**The error was a category error:** the vocabulary rule is a *hint about a port*, and it was being
+reported as a *fact about a server*. It also produced a false accusation — DeepSeek Harness shown as
+"inbuilt server on 19387, reaching outside instead", when 19387 serves its own user interface and no
+models.
+
+**Fixed.** `serves` (proved) and `listening` (suspected) are now separate fields with `unconfirmed`
+between them; the flagged case requires a proved server; probing stays in `config` and the answered
+ports are threaded in by the caller, because `recon` must not open a connection to answer a question
+about connections. The panel now reads *"listening 8888, not answering"*.
+
+**Also found by the same change:** `machine_report` called a sync helper that used `asyncio.run`
+from inside the MCP server's own event loop and died on first call. It now awaits the probe. A
+convenience wrapper around an async system is exactly what passes a test and fails in the product.
+
+**Verified:** 149 Python tests (2 new), 76 Swift tests, ruff clean.
+
+**Next step** — back to the UI/UX as the founder asked, with one honest item outstanding: two ports
+on this machine are suspected and unproven, and the ledger now says so rather than guessing.

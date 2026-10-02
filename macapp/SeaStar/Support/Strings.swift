@@ -36,6 +36,21 @@ enum Strings {
         /// The label for the row of installed-but-idle harnesses — apps that
         /// carry their own model loop but are not answering on a port.
         static let latent = "Idle"
+        /// The register's question (D-005): what the engine found and has not
+        /// been told about. Asked once per thing, ever.
+        static let newHere = "New on this machine"
+        static let newHereHelp =
+            "Found on this machine and not decided about yet. Answer once and it is remembered; nothing is proposed twice."
+        /// What each app is doing with models. The heading names the subject
+        /// rather than the sentiment: the panel reports, it does not accuse.
+        static let behaviour = "What each app is doing"
+        /// The flagged case, said as the two observations it is made of.
+        static func idleServer(_ ports: [Int]) -> String {
+            let list = ports.map(String.init).joined(separator: ", ")
+            return "inbuilt server on \(list), reaching outside instead"
+        }
+        static let behaviourHelp =
+            "Read from what is running and connected on this machine. Facts only — no app is described by its intentions."
         static let latentHelp = "Installed but not connected — all float by default; take any off the graph to quiet it."
 
         /// Help for each of the four rows, naming what the row is *for* so the
@@ -43,11 +58,13 @@ enum Strings {
         static let vaultHelp =
             "The notes Sea-Star reads. Everything it knows starts here."
         static let harnessHelp =
-            "Which app answers. Switch it here; the endpoint and model move with it."
+            "The app driving Sea-Star right now. Only an app can attach itself, so this reads rather than switches."
         static let agentHelp =
             "Which persona inside that harness you are talking to."
         static let inferenceHelp =
-            "Where the model call actually goes — the endpoint and the model."
+            "Where the model call goes. Choose the endpoint here; the model list below follows it."
+        static let modelHelp =
+            "The model that endpoint is serving. Choosing one changes what Sea-Star thinks with."
 
         /// The honest states the Agent row can be in. These are deliberately
         /// separate strings: a roster that was never found is not the same as a
@@ -107,22 +124,16 @@ enum Strings {
         /// the one below it, which is what actually happens to a request.
         static let chain = "Chain"
         static let chainHelp = "Linked cards, reading top to bottom"
-        /// Not a third design — the two of them at once, so choosing between them
-        /// is a single look rather than a memory test.
-        static let both = "Both"
-        static let bothHelp = "Side by side, to compare"
         static func label(_ variant: PanelLayout) -> String {
             switch variant {
             case .stack: return stack
             case .chain: return chain
-            case .both: return both
             }
         }
         static func help(_ variant: PanelLayout) -> String {
             switch variant {
             case .stack: return stackHelp
             case .chain: return chainHelp
-            case .both: return bothHelp
             }
         }
     }
@@ -134,6 +145,10 @@ enum Strings {
         static let stopped = "Stopped"
         static let checking = "Checking…"
         static let unknown = "—"
+        /// No harness is attached to the engine. Deliberately not "not
+        /// connected": nothing is wrong, it simply means no app is driving
+        /// Sea-Star at this moment.
+        static let noHarness = "None attached"
     }
 
     enum Actions {
@@ -145,6 +160,9 @@ enum Strings {
         static let chooseHarness = "Switch harness…"
         static let openFolder = "Open folder…"
         static let checkNow = "Check now"
+        /// The two answers to the register's one question.
+        static let itIsAHarness = "It's a harness"
+        static let notAHarness = "Not a harness"
         static let floatHarness = "Float on the graph"
         static let sinkHarness = "Take off the graph"
     }
@@ -192,13 +210,12 @@ enum Strings {
         static let orbitHint =
             "Drag to orbit · scroll or pinch to zoom · right-drag to pan · click a sphere to inspect · double-click to focus"
 
-        /// The three depths the graph can be read at. One switch, three
+        /// The two depths the graph can be read at. One switch, two
         /// readings, all off the same model — the depth changes the camera and
         /// the drawing, never the facts (spec §8.7).
         enum Depth: String, CaseIterable, Identifiable {
             case flat
             case deep
-            case both
 
             var id: String { rawValue }
 
@@ -212,7 +229,6 @@ enum Strings {
                 switch self {
                 case .flat: return "square.grid.2x2"
                 case .deep: return "cube.transparent"
-                case .both: return "rectangle.split.2x1"
                 }
             }
 
@@ -220,7 +236,6 @@ enum Strings {
                 switch self {
                 case .flat: return Strings.Views.flat
                 case .deep: return Strings.Views.deep
-                case .both: return Strings.Views.both
                 }
             }
 
@@ -228,17 +243,14 @@ enum Strings {
                 switch self {
                 case .flat: return Strings.Views.flatHelp
                 case .deep: return Strings.Views.deepHelp
-                case .both: return Strings.Views.bothHelp
                 }
             }
         }
 
         static let flat = "Pool"
         static let deep = "Deep"
-        static let both = "Both"
         static let flatHelp = "Read the graph as a flat pool"
         static let deepHelp = "Read the graph in three dimensions"
-        static let bothHelp = "Read the flat pool and the deep side by side"
     }
 
     /// The card that blooms when a starfish is clicked (spec §8.7): the plain
@@ -251,26 +263,63 @@ enum Strings {
         /// A persona the person built in their harness; the thing they actually
         /// talk to, as opposed to the model it runs on (spec §8.7).
         static let agent = "Agent"
+        /// Where models come from — this machine's endpoints and any API.
+        static let inference = "Inference"
         static let notes = "Notes"
         static let found = "Found via"
         static let nearby = "Nearby"
         static let endpoint = "Endpoint"
         static let models = "Models"
+        /// The actual model names an endpoint serves. Never a bare count:
+        /// "five models" tells the person nothing they can act on.
+        static let serves = "Serves"
         static let servedBy = "Served by"
         static let uses = "Uses"
+        static let usedBy = "Used by"
         static let provider = "Provider"
         static let path = "Path"
         static let status = "Status"
         static let current = "Current"
         static let available = "Available"
+        static let attached = "Attached"
+        static let since = "Since"
+        static let process = "Process"
+        static let bundle = "Bundle"
+        /// What an attached harness can do with Sea-Star, and the one tool it
+        /// calls. Naming the tool is the whole point: a harness on this graph is
+        /// not a label, it is something with a contract against the engine.
+        static let canCall = "Can call"
+        static let askTool = "ask_seastar"
+        /// Whether an endpoint is on this Mac or reached over the network. The
+        /// distinction the founder asked for: local is "about the machine",
+        /// remote is "what is coming in".
+        static let location = "Runs"
+        static let onThisMac = "On this Mac"
+        static let remoteAPI = "Remote API"
+        /// An endpoint that is built into an app rather than standing alone.
+        /// The owner is named because the dependency is real: this server stops
+        /// when that app does.
+        static let insideApp = "Runs inside"
+        static let warning = "Careful"
+        static func stopsWith(_ app: String) -> String {
+            "Stops when \(app) quits — Sea-Star's own model lives here."
+        }
+        /// Whose roster an agent row is reading.
+        static let roster = "Roster"
         /// A latent harness: installed, but nothing is answering on its port.
         static let latent = "Idle"
         static let notConnected = "Not connected"
+
+        /// The ladder rungs, as a person reads them. Foundation §2 says show the
+        /// highest rung reached *and* show the rung, so each state gets its own
+        /// words rather than one yes/no.
+        static let rungConnected = "Driving Sea-Star now"
+        static let rungListening = "Answering on its port"
+        static let rungRunning = "Up, not answering yet"
+        static let rungPresent = "Installed, not running"
+
         static func nearbyVaults(_ count: Int) -> String {
             count == 1 ? "1 other" : "\(count) others"
-        }
-        static func modelCount(_ count: Int) -> String {
-            count == 1 ? "1 model" : "\(count) models"
         }
         /// How the engine came to be reading this vault, in plain words.
         static func source(_ raw: String) -> String {
@@ -303,9 +352,14 @@ enum Strings {
             let count = others == 1 ? "one other vault" : "\(others) other vaults"
             return "Reading \(vault). \(count) nearby — switch if that's not the one."
         }
-        static func connected(_ name: String, _ models: Int) -> String {
-            let count = models == 1 ? "1 model" : "\(models) models"
-            return "\(name) is connected — \(count) on offer."
+        /// The connected note names the model that actually answered. A count
+        /// ("5 models on offer") is the kind of empty indicator the founder
+        /// objected to: it is a number you cannot act on.
+        static func connected(_ name: String, _ model: String) -> String {
+            guard !model.isEmpty, model != Strings.States.unknown else {
+                return "\(name) is connected."
+            }
+            return "\(name) is connected — answering as \(model)."
         }
     }
 
@@ -371,6 +425,9 @@ enum Strings {
     }
 
     enum Errors {
+        /// A verdict the engine refused to store. Said plainly, because a
+        /// decision that did not save must not look like one that did.
+        static let verdictNotSaved = "That could not be recorded."
         static let engineNotResolved =
             "Couldn't find the sea-star command. Set SEASTAR_CLI to its full path, then reopen."
         static func launchFailed(_ reason: String) -> String {

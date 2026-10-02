@@ -58,7 +58,7 @@ struct GraphSceneView: View {
     /// already telling you what is running.
     private var subject: GraphNode? {
         if let id = selected ?? hovered { return model.node(id) }
-        return model.activeHarnessID.flatMap { model.node($0) }
+        return model.activeInferenceID.flatMap { model.node($0) }
     }
 
     /// Where the focused entity sits, and how big it is drawn — the two facts
@@ -94,7 +94,7 @@ struct GraphSceneView: View {
         .overlay(alignment: .topLeading) { focusControl }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .help(Strings.Views.orbitHint)
-        .onChange(of: model.activeHarnessID) { _, _ in
+        .onChange(of: model.activeInferenceID) { _, _ in
             // A new active harness is a new thing to look at, so the camera
             // comes back to where the pool opens, the way the 2D pool re-tides.
             reset()

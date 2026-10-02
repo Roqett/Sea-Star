@@ -114,17 +114,17 @@ struct SettingsView: View {
 
     private var harnessSection: some View {
         Section {
-            if controller.harnessOptions.count > 1 {
-                Picker(Strings.Rows.harness, selection: Binding(
+            if controller.inferenceOptions.count > 1 {
+                Picker(Strings.Rows.inference, selection: Binding(
                     get: { controller.report?.baseURL ?? "" },
-                    set: { controller.selectHarness($0) }
+                    set: { controller.selectInference($0) }
                 )) {
-                    ForEach(controller.harnessOptions) { option in
+                    ForEach(controller.inferenceOptions) { option in
                         Text("\(option.name) · \(option.baseURL)").tag(option.baseURL)
                     }
                 }
             } else {
-                LabeledContent(Strings.Rows.harness) {
+                LabeledContent(Strings.Rows.inference) {
                     Text(harnessValue)
                 }
             }

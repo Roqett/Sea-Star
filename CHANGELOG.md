@@ -6,6 +6,83 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Harness: DeepSeek Harness
+
+Date: 2026-10-02 17:30 ACST
+
+Summary of Changes:
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — retired the graph "Both" comparison: the depth switch offers Pool and Deep only, and the side-by-side branch is gone (D-003).
+- `macapp/SeaStar/Views/CockpitPanel.swift` — retired the text "Both" comparison: `PanelLayout` is now Stack and Chain only, and the compare layout is gone (D-003).
+- `macapp/SeaStar/Support/Strings.swift` — dropped the "Both" labels, help lines and icons from both switches.
+- `macapp/SeaStarTests/DoctorReportTests.swift` — panel-layout tests now expect two layouts, not three.
+- `docs/cockpit-look.md`, `assets/cockpit-proposal.png` — the cockpit reconception proposal: one interactive graph, one text panel, inference as its own kind.
+
+Harness: DeepSeek Harness
+
+Date: 2026-10-02 18:50 ACST
+
+Summary of Changes:
+- `src/sea_star/harnesses.py` — a known harness app now reports the rung it reached. `running_app_paths()` reads the process table once so an app that is up but not answering is `running`, not the same grey as a dormant install; `app_bundle_in()` is shared with `connections.py` so both readers agree what an app is. DeepSeek Harness (`com.deepseek.dsh`) added to `KNOWN_HARNESS_APPS` — the harness the founder is talking to is now on its own graph (D-004).
+- `src/sea_star/connections.py` — the duplicate `.app` path regex is deleted; `_app_in` delegates to `harnesses.app_bundle_in`.
+- `src/sea_star/cli.py` — `latent_harnesses` entries carry `rung`; `doctor` prints `Running:` separately from `Latent:`; the multi-endpoint line is relabelled `Inference:` (it was printing endpoints as "Harnesses").
+- `macapp/SeaStar/Services/ServerController.swift` — `HarnessOption` → `InferenceOption` and `harnessOptions` → `inferenceOptions`: an endpoint is inference, a harness is the app driving Sea-Star. Adds `HarnessRung`, `attachedHarnesses` (the engine's connection record) and `InferenceOption.isRemote`.
+- `macapp/SeaStar/Views/EntityGraphModel.swift` — `Kind.latent` is deleted and `Kind.inference` added: five kinds matching the ontology. Harness nodes come from attached hosts and from known apps carrying their rung; inference nodes are teal locally and plum for a remote API; `activeHarnessID` → `activeInferenceID`. Readouts now name things — the models an endpoint serves, the personas riding them, an attached host's pid, start time and the `ask_seastar` tool it calls — instead of "5 models".
+- `macapp/SeaStar/Views/EntityGraphView.swift` — node sizes and the dim-for-unattached rule follow the new kinds; the per-node hue smear narrows from ±25% to ±6% so a plum API cannot drift red and a teal local runtime cannot drift blue.
+- `macapp/SeaStar/Views/CockpitPanel.swift` — the `Harness` row is a reading of the app driving Sea-Star; the endpoint picker moves to `Inference`, where the ontology puts it.
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — a harness app that is up but not attached says so in the list.
+- `macapp/SeaStar/Models/HarnessTips.swift`, `Support/Strings.swift` — the note beside the active star names the model it is answering as instead of counting models on offer; the now-unused `modelCount` helper is deleted so the count copy cannot come back.
+- `macapp/SeaStar/Support/Palette.swift`, `Support/Strings.swift` — vault bone, inference teal, API-plum tokens; rung words ("Driving Sea-Star now" / "Up, not answering yet" / …) and the string set the readouts need.
+- `macapp/SeaStar/Models/DoctorReport.swift` — `LatentHarnessInfo` decodes the optional `rung`, absent from an older engine.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — fixture gains an attached host and rungs; tests pin four live nodes, an unattached harness having no edges while an attached one is wired to its vault, and an endpoint readout naming models rather than counting them.
+- `src/sea_star/harnesses.py` — **the `/Volumes` sweep is gone by default.** A mounted volume is read only when a caller names it, because the founder's no-go rule puts his external drive off-limits and an unconditional sweep is precisely the quiet visit that rule prevents. `tests/test_harnesses.py` now asserts the default read does not go near a volume.
+- `tests/test_harnesses.py`, `tests/test_cli.py` — rung detection, the shared `.app` reader and the bridge's `rung` field.
+- `DECISIONS.md` — D-004.
+- `src/sea_star/recon.py` — **new.** Triggered reconnaissance of this machine's own process and socket tables: every listening port and live outbound connection, each attributed to the `.app` owning the process tree, so a model server held by a bare helper is still credited to its app. Recognition is runtime vocabulary plus the machine's own register — no list of app names takes part (D-005). Reading *who is connected to whom*, never the contents.
+- `src/sea_star/cli.py` — the report gains `listening`, `model_like` and `outbound`; `doctor` prints `Serving:` and `Leaving:`. The register is matched by identity — display name, bundle path or folder name — after a live endpoint was lost to "Unsloth Studio" vs "Unsloth".
+- `tests/test_recon.py` — **new.** 14 hermetic tests over canned `ps`/`lsof` output: attribution up the process tree, honest absence when no app owns a process, deduplication, loopback vs network, vocabulary vs register, and the identity-matching bug above.
+- `DECISIONS.md` — D-005.
+- `src/sea_star/register.py` — **new.** The register: one verdict per thing, keyed by bundle id or path and never by display name, stored in `~/.seastar/register.json` and written only by the engine. Discovery gathers six evidence families (listening services, outbound connections, MCP tool lists on disk, agent state directories, workspace artefacts, and the seed table) into candidates that each carry the observed facts behind them. Vocabulary candidates qualify only on a protocol word, because browsers ship AI brand names as blocklists (D-006).
+- `src/sea_star/cli.py` — `harnesses [--scan] [--workspace]`, `adopt`, `dismiss` and `forget`; the bridge carries `candidates`, which is what lets the cockpit ask without keeping its own copy of the decision.
+- `tests/test_register.py` — **new.** 18 hermetic tests: round trips, a dismissal remembered as a decision, a malformed register left intact, atomic writes, evidence merged from two families into one question, plain installed apps not accused, and the browser false positive pinned so it cannot return.
+- `macapp/SeaStar/Models/DoctorReport.swift` — decodes `candidates` and their evidence; `undecided` is empty for an engine that predates the register.
+- `macapp/SeaStar/Models/EngineCommand.swift`, `Services/EngineClient.swift` — `adopt` / `dismiss` invocations and a `record` that fails loud when a verdict does not save.
+- `macapp/SeaStar/Services/ServerController.swift` — `candidates`, and the two answer actions; the app asks and the engine remembers.
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — the `New on this machine` section: each candidate's evidence above an editable pre-filled name and the two answers. Asked once, ever.
+- `macapp/SeaStar/Support/Strings.swift` — the register's labels and the plain words for a verdict that did not save.
+- `macapp/SeaStarTests/DoctorReportTests.swift` — candidate decoding pinned, including that evidence survives and an older engine asks nothing.
+- `DECISIONS.md` — D-006.
+- `src/sea_star/recon.py` — `machine_summary()`: the machine in plain lines for a caller that cannot draw it, naming the app every inbuilt model server belongs to and saying that it stops with that app. One rendering, shared.
+- `src/sea_star/register.py` — `recognised_names()`: one definition of what this machine recognises (register verdicts, attached hosts, the seed table, names *and* paths). It was being assembled inline in the bridge and would have needed a second copy for MCP (D-007).
+- `src/sea_star/mcp_server.py` — **new tool `machine_report`**: an attached harness can ask where models are coming from, which servers are inbuilt, and what is leaving the machine. The symmetry clause, and read-only.
+- `src/sea_star/cli.py` — the report's recognition set now comes from `recognised_names()`, so the cockpit and the MCP answer cannot disagree. `model_like` entries carry `app_name`/`app_path`.
+- `tests/test_mcp_server.py` — the tool surface includes `machine_report`, and a host is shown to get an answer from it.
+- `macapp/SeaStar/Models/DoctorReport.swift` — decodes `model_like` and its owner; `isBundled` names the case that matters.
+- `macapp/SeaStar/Services/ServerController.swift` — `bundledOwner(of:)` and `currentEndpointIsBundled`, read from the port rather than assumed from a name.
+- `macapp/SeaStar/Views/EntityGraphModel.swift` — an endpoint readout names the app it runs inside, and warns in plain words when that endpoint is the one Sea-Star is thinking with.
+- `DECISIONS.md` — D-007.
+- `src/sea_star/recon.py` — `harness_ledger()`, `harness_behaviour()` and `ledger_lines()`: one row per app saying what it serves, whether it is using its own server, and what it reaches for outside. Observations only — there is no field for motive, and "not using them" is deliberately never said, because the server may be in use by Sea-Star itself (D-008).
+- `src/sea_star/cli.py` — the bridge carries `behaviour` at the top level, beside the other machine reads.
+- `src/sea_star/mcp_server.py` — `machine_report` answers with the ledger too, so a host learns who is doing what and not merely where models are.
+- `tests/test_recon.py` — the ledger pinned: serving vs using vs reaching, the flagged case firing only on all three, a browser kept out of the sentences, and the "not using them" wording banned.
+- `tests/test_cli.py` — a test for the exact bug that shipped: `behaviour` must be top-level and not nested inside `vault` (the insertion anchor matched the vault's own `candidates` key). An autouse fixture now keeps every doctor test off the real machine — they had begun reading the live socket table and took seven seconds.
+- `macapp/SeaStar/Models/DoctorReport.swift` — decodes the ledger; the type has no field for intent.
+- `macapp/SeaStar/Services/ServerController.swift` — `appBehaviour`, the ledger as the engine observed it.
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — the `What each app is doing` band, with the flagged row in the warning colour.
+- `macapp/SeaStarTests/DoctorReportTests.swift` — the ledger's decoding pinned, including that the flagged case arrives as two facts.
+- `DECISIONS.md` — D-008.
+- `src/sea_star/harnesses.py` — `declared_url_schemes()`, `is_web_client()` and `is_system_component()`: two barred roles, both *declared by the app or by its location* rather than named. Every browser must claim `http`/`https` in its own Info.plist, so the OS already keeps the browser list and Sea-Star reads it (D-009).
+- `src/sea_star/register.py` — **traffic no longer raises a candidate.** Outbound connections are applied after the other families as enrichment, which is what removes browsers, messengers, updaters and VPNs from the question list. Also: an app's own tool list merges into that app, so Atomic Chat and TRAE SOLO are asked about once each rather than twice.
+- `src/sea_star/recon.py` — the barred roles are applied in the ledger *and* inside the unfiltered `harness_ledger`, so no route exists by which a browser becomes a harness; a web client's loopback port is never inference.
+- `tests/test_register.py`, `tests/test_recon.py` — the strategy pinned: a declared web client is never proposed even while reaching outside, a system component is never proposed, traffic alone raises nothing, traffic enriches a question already raised, and an app keeping a tool list is asked about once.
+- `DECISIONS.md` — D-009.
+- `src/sea_star/recon.py` — **a port is not a server.** `HarnessBehaviour` carries `serves` (ports an OpenAI probe answered on) and `listening` (ports that merely look like servers), with `unconfirmed` as the difference. The flagged case now requires a *proved* server, which removes a live false accusation: DeepSeek Harness's 19387 serves its own interface and no models (D-010).
+- `src/sea_star/cli.py` — the report threads the answered ports through by hand, because probing is HTTP and `recon` deliberately does not speak HTTP; `model_like` entries carry `answering`.
+- `src/sea_star/mcp_server.py` — `machine_report` awaits the probe instead of calling a sync wrapper. The wrapper used `asyncio.run` inside the server's own event loop and failed at the first call.
+- `tests/test_recon.py` — a port that never answered is never called a server, and the flagged case cannot fire on a guess.
+- `macapp/SeaStar/Models/DoctorReport.swift` — decodes `answering` and `listening`; an older engine reads as *unproved* rather than being credited with an answer it never gave.
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — the row says "listening 8888, not answering" where it used to claim serving.
+- `DECISIONS.md` — D-010.
+
 Harness: TRAE
 
 Model: unknown (the active harness does not report its own model id to this session)

@@ -18,8 +18,6 @@ enum PanelLayout: String, CaseIterable, Identifiable, Sendable {
     /// Four connected cards reading top to bottom. Each card hands off to the
     /// next, so the chain a request actually travels is visible as a shape.
     case chain
-    /// Both readings at once, in two columns, for choosing between them.
-    case both
 
     var id: String { rawValue }
 
@@ -28,7 +26,6 @@ enum PanelLayout: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .stack: return "rectangle.grid.1x2"
         case .chain: return "arrow.triangle.branch"
-        case .both: return "rectangle.split.2x1"
         }
     }
 
@@ -41,9 +38,6 @@ enum PanelLayout: String, CaseIterable, Identifiable, Sendable {
     static func resolved(from raw: String) -> PanelLayout {
         PanelLayout(rawValue: raw) ?? .stack
     }
-
-    /// Whether this reading needs room for two columns.
-    var isWide: Bool { self == .both }
 }
 
 /// The cockpit's four rows and the `Working now` band beneath them.
@@ -77,40 +71,9 @@ struct CockpitPanel: View {
                 stackLayout
             case .chain:
                 chainLayout
-            case .both:
-                compareLayout
             }
             WorkingNowBand(controller: controller)
         }
-    }
-
-    // MARK: - Compare
-
-    /// The two designs side by side, each under its own name. Deliberately not
-    /// a third design: the point is to *choose* one, and a person choosing
-    /// between two pictures needs both pictures in front of them at once, not
-    /// remembered from a flip.
-    private var compareLayout: some View {
-        HStack(alignment: .top, spacing: 20) {
-            column(.stack) { stackLayout }
-            column(.chain) { chainLayout }
-        }
-    }
-
-    @ViewBuilder
-    private func column<Content: View>(
-        _ variant: PanelLayout,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(variant.label)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Palette.inkMuted)
-
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
-        .help(variant.help)
     }
 
     // MARK: - Variant A — Stack
@@ -146,31 +109,17 @@ struct CockpitPanel: View {
             .help(Strings.Rows.vaultHelp)
 
         case .harness:
-            // The picker is *kept*, not removed. Switching harness is a real,
-            // working action; the thing that was wrong was the URL sharing the
-            // row, and that moved to Inference rather than taking the control
-            // with it.
-            if controller.harnessOptions.count > 1 {
-                PickerRow(
-                    label: Strings.Rows.harness,
-                    value: harnessValue,
-                    accent: Palette.harnessGlow,
-                    options: controller.harnessOptions.map(\.baseURL),
-                    selection: Binding(
-                        get: { controller.report?.baseURL ?? "" },
-                        set: { controller.selectHarness($0) }
-                    ),
-                    display: harnessLabel
-                )
-                .help(Strings.Rows.harnessHelp)
-            } else {
-                StatusRow(
-                    label: Strings.Rows.harness,
-                    value: harnessValue,
-                    accent: Palette.harnessGlow
-                )
-                .help(Strings.Rows.harnessHelp)
-            }
+            // The Harness row is the app driving Sea-Star, and nothing else. The
+            // endpoint selector that used to live here was never a harness — it
+            // is where models come from — so it moved to Inference, where the
+            // ontology puts it. What is left is a fact, not a knob: the app
+            // cannot make another app attach itself.
+            StatusRow(
+                label: Strings.Rows.harness,
+                value: harnessValue,
+                accent: Palette.harnessGlow
+            )
+            .help(Strings.Rows.harnessHelp)
 
         case .agent:
             agentRow
@@ -220,20 +169,37 @@ struct CockpitPanel: View {
 
     /// The Inference row: where the call goes, and on what. Both live together
     /// because they are both properties of the call — the endpoint chose the
-    /// model, so splitting them would hide the relationship.
+    /// model, so splitting them across rows would hide the relationship. The
+    /// endpoint picker belongs here rather than under Harness: an endpoint is
+    /// not an app, it is where the models are coming from.
     private var inferenceRow: some View {
-        PickerRow(
-            label: Strings.Rows.inference,
-            value: inferenceValue,
-            accent: Palette.modelGlow,
-            options: controller.modelOptions,
-            selection: Binding(
-                get: { controller.report?.model ?? "" },
-                set: { controller.selectModel($0) }
-            ),
-            display: { $0 }
-        )
-        .help(Strings.Rows.inferenceHelp + " " + Strings.Detail.endpoint + ": " + endpointValue)
+        VStack(alignment: .leading, spacing: 8) {
+            PickerRow(
+                label: Strings.Rows.inference,
+                value: endpointLabel(controller.report?.baseURL ?? ""),
+                accent: Palette.inferenceGlow,
+                options: controller.inferenceOptions.map(\.baseURL),
+                selection: Binding(
+                    get: { controller.report?.baseURL ?? "" },
+                    set: { controller.selectInference($0) }
+                ),
+                display: endpointLabel
+            )
+            .help(Strings.Rows.inferenceHelp)
+
+            PickerRow(
+                label: "",
+                value: inferenceValue,
+                accent: Palette.modelGlow,
+                options: controller.modelOptions,
+                selection: Binding(
+                    get: { controller.report?.model ?? "" },
+                    set: { controller.selectModel($0) }
+                ),
+                display: { $0 }
+            )
+            .help(Strings.Rows.modelHelp)
+        }
     }
 
     // MARK: - Variant B — Chain
@@ -272,9 +238,9 @@ struct CockpitPanel: View {
             accent = Palette.harnessGlow
             title = Strings.Rows.harness
             value = harnessValue
-            detail = controller.harnessOptions.count > 1
-                ? Strings.Actions.chooseHarness
-                : (controller.currentHarness?.name ?? Strings.States.unknown)
+            detail = controller.attachedHarnesses.isEmpty
+                ? Strings.Detail.rungPresent
+                : HarnessRung.connected.label
         case .agent:
             accent = Palette.agentGlow
             title = Strings.Rows.agent
@@ -311,15 +277,19 @@ struct CockpitPanel: View {
         controller.report?.vault.path ?? Strings.States.unknown
     }
 
-    /// The Harness row shows the app's name and nothing else. The URL it used
-    /// to carry is in `Inference`, where an endpoint belongs.
+    /// The Harness row shows the app driving Sea-Star and how far it got. It is
+    /// a reading, not a control: only the app itself can decide to attach, so a
+    /// row that looked switchable would be a lie about what the cockpit can do.
     private var harnessValue: String {
-        guard let report = controller.report else { return Strings.States.unknown }
-        return controller.currentHarness?.name ?? report.runtime
+        let attached = controller.attachedHarnesses
+        guard !attached.isEmpty else { return Strings.States.noHarness }
+        return attached.map(\.name).joined(separator: ", ")
     }
 
-    private func harnessLabel(_ baseURL: String) -> String {
-        controller.harnessOptions.first { $0.baseURL == baseURL }?.name ?? baseURL
+    /// An endpoint, as the person named it, falling back to its URL when the
+    /// engine has no name for it.
+    private func endpointLabel(_ baseURL: String) -> String {
+        controller.inferenceOptions.first { $0.baseURL == baseURL }?.name ?? baseURL
     }
 
     private var endpointValue: String {

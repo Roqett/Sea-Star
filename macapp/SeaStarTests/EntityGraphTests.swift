@@ -20,14 +20,16 @@ struct GraphLivenessTests {
         ready: Bool = true,
         model: String = "qwen3",
         agents: Bool = true,
-        latent: Bool = true
+        latent: Bool = true,
+        attached: Bool = true
     ) -> ServerController {
         let controller = ServerController(command: nil)
         controller.adopt(try! Fixture.report(
             ready: ready,
             model: model,
             agents: agents,
-            latent: latent
+            latent: latent,
+            attached: attached
         ))
         return controller
     }
@@ -40,23 +42,38 @@ struct GraphLivenessTests {
 
     // MARK: - The rule itself
 
-    /// Live means a probe answered during the latest read. So with a ready
-    /// endpoint, exactly three things can be live: the harness the report is
-    /// describing, the model it is serving, and an agent riding that model.
-    @Test("a ready endpoint makes exactly the current harness, model and their agents live")
-    func readyMakesThreeLive() {
+    /// Live means something was *observed* during the latest read. Four things
+    /// qualify with a ready endpoint and one attached host: the app driving
+    /// Sea-Star (its process is recorded), the endpoint being read, the model
+    /// that endpoint is serving, and an agent riding that model. Nothing else —
+    /// and in particular no app that is merely installed.
+    @Test("a ready endpoint and an attached host make exactly four things live")
+    func readyMakesFourLive() {
         let byID = nodes(controller())
         let live = byID.values.filter(\.isLive).map(\.id).sorted()
 
         #expect(live == [
             "agent:Mariner",
-            "harness:http://127.0.0.1:1337/v1",
+            "harness:chat.atomic.app",
+            "inference:http://127.0.0.1:1337/v1",
             "model:qwen3",
         ])
     }
 
-    /// The single most important test in this file. A harness that is merely
-    /// *installed* answers on no port; a vault is not on one at all. If either
+    /// An app driving the engine is the top rung and the only harness drawn
+    /// live, because the engine recorded the process rather than inferring one.
+    @Test("an attached host is live and wears the connected rung")
+    func attachedHostIsLiveAndConnected() {
+        let byID = nodes(controller())
+        let host = byID["harness:chat.atomic.app"]
+
+        #expect(host?.kind == .harness)
+        #expect(host?.isLive == true)
+        #expect(host?.rung == .connected)
+    }
+
+    /// The single most important test in this file. A vault is not on a port at
+    /// all, and an app that is merely *installed* answers on none. If either
     /// could be drawn live, the graph would be claiming the engine talked to
     /// something it never touched.
     @Test("a vault is never live, however ready the endpoint is")
@@ -71,27 +88,31 @@ struct GraphLivenessTests {
         #expect(cold["vault"]?.isLive == false)
     }
 
-    /// A latent harness is an app on the disk that carries its own model loop
-    /// and is not answering a port. There is nothing for a probe to have
-    /// answered, so it cannot be live under any circumstances.
-    @Test("a latent harness is never live, even while a harness beside it is")
-    func latentIsNeverLive() {
+    /// A harness app that is not attached is an app on the disk carrying its own
+    /// model loop. There is nothing for a probe to have answered, so it cannot be
+    /// live under any circumstances — but it is still drawn, and it still says
+    /// which rung it reached.
+    @Test("an unattached harness app is never live, and never flattened to one grey state")
+    func unattachedHarnessIsNeverLive() {
         let byID = nodes(controller())
-        let latent = byID["latent:com.apple.dt.Xcode"]
+        let installed = byID["harness:app:com.apple.dt.Xcode"]
+        let up = byID["harness:app:ai.unsloth.studio"]
 
-        #expect(latent?.kind == .latent)
-        #expect(latent?.isLive == false)
-        // The contrast is the point: its neighbour on the ring is live.
-        #expect(byID["harness:http://127.0.0.1:1337/v1"]?.isLive == true)
+        #expect(installed?.kind == .harness)
+        #expect(installed?.isLive == false)
+        // "Installed" and "up but not answering" are different facts, and the
+        // graph has to be able to say both.
+        #expect(installed?.rung == .present)
+        #expect(up?.rung == .running)
     }
 
-    /// "Installed" is not "answering". Both harnesses are detected and both are
+    /// "Installed" is not "answering". Both endpoints are detected and both are
     /// on the graph, and only the one the report is actually describing is live.
-    @Test("only the harness being described is live; the other is merely available")
-    func onlyTheCurrentHarnessIsLive() {
+    @Test("only the endpoint being described is live; the other is merely available")
+    func onlyTheCurrentEndpointIsLive() {
         let byID = nodes(controller())
-        #expect(byID["harness:http://127.0.0.1:1337/v1"]?.isLive == true)
-        #expect(byID["harness:http://127.0.0.1:8000/v1"]?.isLive == false)
+        #expect(byID["inference:http://127.0.0.1:1337/v1"]?.isLive == true)
+        #expect(byID["inference:http://127.0.0.1:8000/v1"]?.isLive == false)
     }
 
     /// Every model the endpoint offers is drawn. Only the one it is serving
@@ -123,14 +144,25 @@ struct GraphLivenessTests {
 
     /// The whole graph goes cold together, and stays cold. A failed probe must
     /// not leave yesterday's live nodes glowing.
-    @Test("an endpoint that did not answer leaves nothing live")
-    func notReadyMeansNothingIsLive() {
+    ///
+    /// One exception, and it is the point of the whole pass: an attached harness
+    /// is live on *different evidence* — a process the engine can see — and it
+    /// stays live when inference is down. The app really is connected; it just
+    /// has nothing to think with.
+    @Test("an endpoint that did not answer leaves nothing live but the attached host")
+    func notReadyMeansOnlyTheAttachedHostIsLive() {
         let model = EntityGraphModel(controller: controller(ready: false))
 
         #expect(!model.nodes.isEmpty)
         // Spelled as a closure rather than a key path: the same roster is
         // present, so this has to be about liveness rather than about emptiness.
-        #expect(!model.nodes.contains { $0.isLive })
+        let live = model.nodes.filter(\.isLive).map(\.id).sorted()
+        #expect(live == ["harness:chat.atomic.app"])
+
+        // And with nothing attached, a cold endpoint really does leave the whole
+        // pool dark — nothing is glowing on the strength of a name alone.
+        let dark = EntityGraphModel(controller: controller(ready: false, attached: false))
+        #expect(!dark.nodes.contains { $0.isLive })
     }
 
     /// With no roster from the engine there are simply no agents to draw. The
@@ -144,12 +176,55 @@ struct GraphLivenessTests {
 
     // MARK: - Edges are honest too
 
-    /// A latent harness answers on no port, so it knows about nothing. Drawing
-    /// it wired to the harness would imply a connection that was never probed.
-    @Test("a latent harness is wired to nothing")
-    func latentHasNoEdges() {
+    /// A harness app that is not attached is driving nothing, so it knows about
+    /// nothing. Drawing it wired to the vault would imply a connection that was
+    /// never observed — the exact lie the ladder exists to prevent.
+    @Test("an unattached harness is wired to nothing")
+    func unattachedHarnessHasNoEdges() {
         let model = EntityGraphModel(controller: controller())
-        #expect(model.neighbours(of: "latent:com.apple.dt.Xcode").isEmpty)
+        #expect(model.neighbours(of: "harness:app:com.apple.dt.Xcode").isEmpty)
+        #expect(model.neighbours(of: "harness:app:ai.unsloth.studio").isEmpty)
+    }
+
+    /// The opposite case, and the one the founder asked for by name: an app that
+    /// *is* attached is wired to the vault it is driving, so clicking it tells
+    /// you what it is connected to rather than showing an empty card.
+    @Test("an attached harness is wired to the vault it drives")
+    func attachedHarnessIsWiredToTheVault() {
+        let model = EntityGraphModel(controller: controller())
+        #expect(model.neighbours(of: "harness:chat.atomic.app") == ["vault"])
+    }
+
+    /// The founder's rule for the readout, pinned so it cannot quietly come
+    /// back: never "five models". An endpoint names the models it serves.
+    @Test("an endpoint readout names its models instead of counting them")
+    func endpointFactsNameModels() {
+        let model = EntityGraphModel(controller: controller())
+        let node = try! #require(model.node("inference:http://127.0.0.1:1337/v1"))
+        let rows = model.facts(for: node)
+
+        let serves = rows.first { $0.label == Strings.Detail.serves }?.value
+        #expect(serves == "qwen3, qwen3-tiny")
+        #expect(!rows.contains { $0.value.lowercased().contains("2 models") })
+    }
+
+    /// Local and API inference are the same row and deliberately not the same
+    /// colour. The seat of that rule is the model, so it is pinned there.
+    @Test("a remote endpoint is drawn apart from one on this Mac")
+    func remoteEndpointWearsItsOwnColour() {
+        let local = InferenceOption(
+            name: "omlx",
+            baseURL: "http://127.0.0.1:8009/v1",
+            models: []
+        )
+        let api = InferenceOption(
+            name: "deepseek",
+            baseURL: "https://api.example.com/v1",
+            models: []
+        )
+
+        #expect(local.isRemote == false)
+        #expect(api.isRemote == true)
     }
 
     /// A relationship drawn twice looks busier than the report is. Every edge
@@ -161,8 +236,8 @@ struct GraphLivenessTests {
 
         #expect(Set(ids).count == ids.count)
 
-        // The vault/harness binding is mutual, and appears exactly once.
-        let forward = GraphEdge(from: "vault", to: "harness:http://127.0.0.1:1337/v1")
+        // The vault/endpoint binding is mutual, and appears exactly once.
+        let forward = GraphEdge(from: "vault", to: "inference:http://127.0.0.1:1337/v1")
         #expect(ids.contains(forward.id))
         #expect(ids.filter { $0 == forward.id }.count == 1)
     }
@@ -190,14 +265,14 @@ struct GraphLivenessTests {
 struct GraphSeedTests {
     @Test("an entity's phase is stable across every call")
     func phaseIsStable() {
-        for id in ["vault", "harness:http://127.0.0.1:1337/v1", "model:qwen3", "agent:Mariner"] {
+        for id in ["vault", "inference:http://127.0.0.1:1337/v1", "model:qwen3", "agent:Mariner"] {
             #expect(GraphSeed.phase(for: id) == GraphSeed.phase(for: id))
         }
     }
 
     @Test("a phase is always a real angle")
     func phaseIsInRange() {
-        for id in ["vault", "model:qwen3", "agent:Cartographer", "latent:com.apple.dt.Xcode"] {
+        for id in ["vault", "model:qwen3", "agent:Cartographer", "harness:app:com.apple.dt.Xcode"] {
             let phase = GraphSeed.phase(for: id)
             #expect(phase >= 0)
             #expect(phase < .pi * 2)
@@ -209,7 +284,7 @@ struct GraphSeedTests {
     /// That agreement is the reason the two readings feel like one pool.
     @Test("hue is the same seed read as a fraction of a turn")
     func hueDerivesFromPhase() {
-        for id in ["vault", "harness:http://127.0.0.1:8000/v1", "model:qwen3"] {
+        for id in ["vault", "inference:http://127.0.0.1:8000/v1", "model:qwen3"] {
             #expect(GraphSeed.hue(for: id) == GraphSeed.phase(for: id) / (.pi * 2))
             #expect(GraphSeed.hue(for: id) >= 0)
             #expect(GraphSeed.hue(for: id) < 1)
@@ -308,10 +383,13 @@ struct GraphSpace3DTests {
     /// which is why it lives on the kind rather than in either renderer.
     @Test("a vault outweighs everything else in the pool")
     func vaultIsTheHeavyweight() {
+        // The ring of majors first — vault, then the harnesses and the
+        // endpoints they read from — and the satellites a model and an agent
+        // ride on below them.
         #expect(GraphNode.Kind.vault.scale > GraphNode.Kind.harness.scale)
-        #expect(GraphNode.Kind.harness.scale > GraphNode.Kind.agent.scale)
-        #expect(GraphNode.Kind.agent.scale > GraphNode.Kind.latent.scale)
-        #expect(GraphNode.Kind.latent.scale > GraphNode.Kind.model.scale)
+        #expect(GraphNode.Kind.harness.scale > GraphNode.Kind.inference.scale)
+        #expect(GraphNode.Kind.inference.scale > GraphNode.Kind.agent.scale)
+        #expect(GraphNode.Kind.agent.scale > GraphNode.Kind.model.scale)
     }
 
     /// The layout's actual job is to make the ontology *legible in space*: a
@@ -324,26 +402,26 @@ struct GraphSpace3DTests {
     /// second copy of the rule written here. That is the whole reason the graph
     /// has one model: if the wiring and the placement could disagree, the deep
     /// would be drawing a different claim from the flat pool than the edges in it.
-    @Test("a model sits closest to the harness that serves it")
-    func modelSitsWithItsHarness() {
+    @Test("a model sits closest to the endpoint that serves it")
+    func modelSitsWithItsEndpoint() {
         let (model, space) = pool()
         let positions = space.positions()
 
         for node in model.nodes where node.kind == .model {
             guard let here = positions[node.id] else { continue }
             let servers = model.neighbours(of: node.id)
-                .filter { $0.hasPrefix("harness:") }
-            #expect(!servers.isEmpty, "\(node.title) has no harness in the pool to sit with")
+                .filter { $0.hasPrefix("inference:") }
+            #expect(!servers.isEmpty, "\(node.title) has no endpoint in the pool to sit with")
 
             let nearest = servers
                 .compactMap { positions[$0] }
                 .map { here.distance(to: $0) }
                 .min() ?? .greatestFiniteMagnitude
-            for other in model.nodes where other.kind == .harness {
+            for other in model.nodes where other.kind == .inference {
                 guard let there = positions[other.id] else { continue }
                 #expect(
                     nearest <= here.distance(to: there),
-                    "\(node.title) sits nearer \(other.title) than a harness that serves it"
+                    "\(node.title) sits nearer \(other.title) than an endpoint that serves it"
                 )
             }
         }
@@ -373,7 +451,7 @@ struct GraphSpace3DTests {
                 .compactMap { positions[$0] }
                 .map { here.distance(to: $0) }
                 .min() ?? .greatestFiniteMagnitude
-            for other in model.nodes where other.kind == .harness {
+            for other in model.nodes where other.kind == .inference {
                 guard let there = positions[other.id] else { continue }
                 #expect(
                     nearest <= here.distance(to: there),
@@ -469,7 +547,7 @@ struct GraphScenePlanTests {
     /// make a hover repaint the neighbourhood, or a focus forget the click.
     @Test("focus and selection are independent")
     func focusAndSelectionAreIndependent() {
-        let focused = plan(focus: ["vault", "harness:http://127.0.0.1:1337/v1"])
+        let focused = plan(focus: ["vault", "inference:http://127.0.0.1:1337/v1"])
         let selected = plan(selected: "vault")
 
         #expect(focused != selected)
@@ -504,7 +582,8 @@ enum Fixture {
         ready: Bool = true,
         model: String = "qwen3",
         agents: Bool = true,
-        latent: Bool = true
+        latent: Bool = true,
+        attached: Bool = true
     ) throws -> DoctorReport {
         let json = """
         {
@@ -543,9 +622,30 @@ enum Fixture {
           ],
           "agent_source": "osaurus",
           """ : "")
+          \(attached ? """
+          "mcp_clients": [
+            {
+              "name": "Atomic Chat",
+              "bundle_id": "chat.atomic.app",
+              "pid": 4242,
+              "started_at": "2026-10-02T08:41:58+00:00"
+            }
+          ],
+          """ : "")
           \(latent ? """
           "latent_harnesses": [
-            { "name": "Xcode", "bundle_id": "com.apple.dt.Xcode", "path": "/Applications/Xcode.app" }
+            {
+              "name": "Unsloth Studio",
+              "bundle_id": "ai.unsloth.studio",
+              "path": "/Applications/Unsloth Studio.app",
+              "rung": "running"
+            },
+            {
+              "name": "Xcode",
+              "bundle_id": "com.apple.dt.Xcode",
+              "path": "/Applications/Xcode.app",
+              "rung": "present"
+            }
           ],
           """ : "")
           "server": { "state": "running" },
@@ -567,11 +667,18 @@ enum Fixture {
         ready: Bool = true,
         model: String = "qwen3",
         agents: Bool = true,
-        latent: Bool = true
+        latent: Bool = true,
+        attached: Bool = true
     ) -> ServerController {
         let controller = ServerController(command: nil)
         controller.adopt(
-            try! report(ready: ready, model: model, agents: agents, latent: latent)
+            try! report(
+                ready: ready,
+                model: model,
+                agents: agents,
+                latent: latent,
+                attached: attached
+            )
         )
         return controller
     }

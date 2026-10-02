@@ -41,8 +41,17 @@ enum Palette {
 
     /// Entity colours for the starfield: each kind of thing glows its own hue,
     /// so the graph reads as meaning, not decoration (spec §8.7).
+    /// A harness is the app driving Sea-Star, so it wears the working blue.
     static let harnessGlow = electricBlue
-    static let vaultGlow = teal
+    /// The vault is the pool itself — bone, the colour of the notes' paper,
+    /// so the one thing everything sits in is not competing with a model's green.
+    static let vaultGlow = bone
+    /// Inference on this machine: teal, "about the machine".
+    static let inferenceGlow = teal
+    /// Inference that is not on this machine: plum, "what is coming in". The
+    /// tone is deliberately the palette's most closed, sober red — a remote
+    /// endpoint is the one thing here that leaves the house.
+    static let apiInferenceGlow = plum
     static let modelGlow = neonGreen
     /// Agents are the person's own personas — the crew *they* built — so they
     /// glow warm, apart from the cool infrastructure (vault, harness, model)

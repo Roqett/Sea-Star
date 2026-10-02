@@ -456,7 +456,7 @@ struct EntityGraphView: View {
         )
         .help(Strings.Views.panHint)
         .onAppear { growConnection() }
-        .onChange(of: activeHarnessID) { _, _ in
+        .onChange(of: activeInferenceID) { _, _ in
             growConnection()
             tipExpanded = true
         }
@@ -547,7 +547,7 @@ struct EntityGraphView: View {
     /// rather than a peer of the vault and its harnesses.
     private var majors: [GraphNode] { model.majors }
 
-    private var activeHarnessID: String? { model.activeHarnessID }
+    private var activeInferenceID: String? { model.activeInferenceID }
 
     /// The node the card describes. A click or a hover wins, so inspecting
     /// something else still works; but with neither, this falls back to the
@@ -556,7 +556,7 @@ struct EntityGraphView: View {
     /// moment the popover opens.
     private var subject: GraphNode? {
         if let id = selected ?? hovered { return model.node(id) }
-        return activeHarnessID.flatMap { model.node($0) }
+        return activeInferenceID.flatMap { model.node($0) }
     }
 
     /// The ids that belong to the focused neighbourhood — the focused node and
@@ -602,7 +602,7 @@ struct EntityGraphView: View {
             )
         }
 
-        let anchor = nodes.first(where: { $0.id == activeHarnessID }) ?? majorNodes.first
+        let anchor = nodes.first(where: { $0.id == activeInferenceID }) ?? majorNodes.first
         if let anchor, let tip = points[anchor.id] {
             // Sit the satellites between the active harness and the middle, so
             // they read as "what this harness offers" without spilling past the
@@ -722,7 +722,7 @@ struct EntityGraphView: View {
         animated: Bool
     ) -> some View {
         if let vault = points["vault"],
-           let active = activeHarnessID,
+           let active = activeInferenceID,
            let target = points[active],
            vault != target {
             let dx = target.x - vault.x
@@ -784,7 +784,7 @@ struct EntityGraphView: View {
     @ViewBuilder
     private func tipCallout(_ points: [String: CGPoint], in size: CGSize) -> some View {
         if let tip = controller.currentTip,
-           let active = activeHarnessID,
+           let active = activeInferenceID,
            let point = points[active] {
             Group {
                 if tipExpanded {
@@ -841,20 +841,25 @@ struct EntityGraphView: View {
         switch node.kind {
         case .model: size = 17
         case .agent: size = 21
-        case .latent: size = 19
         case .vault: size = 27
         case .harness: size = 23
+        case .inference: size = 23
         }
-        // A latent harness stays dimmer than a live one: it is installed, but
-        // nothing is answering on its port, and the eye should read that at once.
-        // Unrelated stars, when something is focused, fade almost away.
-        let presence: Double = (node.kind == .latent ? 0.5 : 1) * (faded ? 0.12 : 1)
+        // A harness that is up but not answering stays dimmer than a connected
+        // one: it exists, but it is driving nothing, and the eye should read that
+        // at once. Unrelated stars, when something is focused, fade almost away.
+        let unproven = node.rung.map { !$0.isAttached } ?? false
+        let presence: Double = (unproven ? 0.5 : 1) * (faded ? 0.12 : 1)
         // A slow breath in the glow, each orb on its own phase. Only a node that
         // actually answered breathes — a still one is telling you nothing is on
         // its port, which is a fact, not a lack of decoration.
         let phase = Self.phase(for: node.id)
         let pulse = (animated && node.isLive) ? 0.5 + 0.5 * sin(time * 1.1 + phase) : 0.5
-        let accent = GraphSeed.shifted(node.accent, by: GraphSeed.hue(for: node.id) * 0.25)
+        // The tint is a *narrow* band either side of the kind's colour. It used
+        // to be a quarter-turn, which was enough to turn a plum API endpoint red
+        // and a teal local runtime blue — decoration eating the one distinction
+        // the palette is carrying.
+        let accent = GraphSeed.shifted(node.accent, by: GraphSeed.hue(for: node.id) * 0.06)
         let glow = isActive ? 0.95 : (node.isLive ? 0.35 + 0.3 * pulse : 0)
         let glyph = SeaStarGlyph(accent: accent, seed: phase, isActive: isActive || node.isLive)
             .frame(width: size, height: size)
@@ -1128,7 +1133,7 @@ struct EntityGraphView: View {
 
         // The active starfish keeps its own tap: it opens and closes the tip
         // note that grows beside it.
-        if node.id == activeHarnessID {
+        if node.id == activeInferenceID {
             withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
                 tipExpanded.toggle()
             }
@@ -1150,18 +1155,19 @@ struct EntityGraphView: View {
         switch node.kind {
         case .vault:
             if let path = node.subtitle { controller.selectVault(path) }
-        case .harness:
-            if let baseURL = node.subtitle { controller.selectHarness(baseURL) }
+        case .inference:
+            if let baseURL = node.subtitle { controller.selectInference(baseURL) }
         case .model:
             controller.selectModel(node.title)
+        case .harness:
+            // A harness is inspectable, not drivable from here: the app cannot
+            // make an app attach itself, so clicking one just opens its readout
+            // and says which rung it reached.
+            break
         case .agent:
             // An agent is a persona to inspect, not yet a knob to turn: the
             // engine reports the roster but the app does not drive a harness's
             // agents, so clicking one just opens its readout.
-            break
-        case .latent:
-            // A floating latent harness is inspectable, not drivable: it has no
-            // port to point at, so clicking one just opens its readout.
             break
         }
     }

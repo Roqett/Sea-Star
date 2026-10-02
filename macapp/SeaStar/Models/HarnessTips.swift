@@ -23,15 +23,15 @@ struct HarnessTip: Equatable, Sendable {
 /// "connected" note for a harness the person already knows.
 enum HarnessTips {
     static func tip(
-        harnessName: String,
+        inferenceName: String,
         isNew: Bool,
         isReady: Bool,
-        modelCount: Int,
+        model: String,
         vaultName: String,
         otherVaults: Int
     ) -> HarnessTip? {
         if isNew {
-            return HarnessTip(kind: .fresh, body: Strings.Tips.newHarness(harnessName))
+            return HarnessTip(kind: .fresh, body: Strings.Tips.newHarness(inferenceName))
         }
         if otherVaults > 0 {
             return HarnessTip(
@@ -42,7 +42,7 @@ enum HarnessTips {
         if isReady {
             return HarnessTip(
                 kind: .reconnected,
-                body: Strings.Tips.connected(harnessName, modelCount)
+                body: Strings.Tips.connected(inferenceName, model)
             )
         }
         return nil

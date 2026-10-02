@@ -17,13 +17,12 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from .harnesses import KNOWN_HARNESS_APPS, _bundle_identity
+from .harnesses import KNOWN_HARNESS_APPS, _bundle_identity, app_bundle_in
 
 #: Where live connection records live. Overridable for tests and unusual homes.
 DEFAULT_STATE_DIR = Path.home() / ".seastar" / "clients"
@@ -76,18 +75,12 @@ def _process_info(pid: int) -> tuple[int, str] | None:
 
 #: An absolute ``.app`` path, stopping at any shell delimiter. A parent's
 #: command line may merely *mention* an app inside a script (``source
-#: '/Applications/X.app'``), so only a clean path candidate counts.
-_APP_PATH = re.compile(r"(/[^;|&=\"'\n\r\t]*?\.app)(?![A-Za-z0-9.])")
-
-
+#: '/Applications/X.app'``), so only a clean path candidate counts. The pattern
+#: itself lives with the harness table so both readers agree on what an app is.
 def _app_in(command: str) -> Path | None:
     """The ``.app`` bundle this command runs inside, if any."""
 
-    for match in _APP_PATH.finditer(command):
-        app = Path(match.group(1))
-        if app.name.endswith(".app"):
-            return app
-    return None
+    return app_bundle_in(command)
 
 
 def _host_identity(pid: int) -> tuple[str, str | None, str | None]:

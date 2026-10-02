@@ -62,19 +62,25 @@ struct DoctorReport: Decodable, Sendable, Equatable {
         }
     }
 
-    /// A known harness app installed on this Mac but not answering on a port —
-    /// an IDE or runtime app that carries its own model loop (Xcode, OpenCode).
-    /// It is not connected, but the person may still want it floating on the
-    /// graph, so the cockpit toggles it on and off rather than hiding it.
+    /// A known harness app installed on this Mac but not attached over MCP —
+    /// an IDE, a runtime's own app, or another agent harness that carries its
+    /// own model loop. It is not connected, but the person may still want it
+    /// floating on the graph, so the cockpit toggles it on and off rather than
+    /// hiding it. ``rung`` says how far it got: ``"running"`` means a process
+    /// owns the app right now, ``"present"`` means it is only installed.
     struct LatentHarnessInfo: Decodable, Sendable, Equatable {
         let name: String
         let bundleID: String
         let path: String
+        /// Absent from an engine that predates rungs; ``nil`` then means "the
+        /// engine could not say how far this one climbed", never "not running".
+        let rung: String?
 
         enum CodingKeys: String, CodingKey {
             case name
             case bundleID = "bundle_id"
             case path
+            case rung
         }
     }
 
@@ -96,6 +102,97 @@ struct DoctorReport: Decodable, Sendable, Equatable {
         }
     }
 
+    /// Something found on this machine that the person has not decided about
+    /// yet. ``evidence`` is the load-bearing field: each line is a fact that was
+    /// actually observed, so the question can be judged rather than trusted.
+    struct CandidateInfo: Decodable, Sendable, Equatable, Identifiable {
+        let identity: String
+        let name: String
+        let bundleID: String?
+        let path: String?
+        let evidence: [String]
+        let suggestedName: String?
+
+        var id: String { identity }
+
+        enum CodingKeys: String, CodingKey {
+            case identity
+            case name
+            case bundleID = "bundle_id"
+            case path
+            case evidence
+            case suggestedName = "suggested_name"
+        }
+    }
+
+    /// What one app on this machine is doing with models, as observations.
+    ///
+    /// Every field is something the engine saw. The type deliberately has no
+    /// field for *why* an app is doing it: the person is the one who gets to
+    /// judge that, and a cockpit that editorialises stops being trusted.
+    struct HarnessBehaviourInfo: Decodable, Sendable, Equatable, Identifiable {
+        let name: String
+        let appPath: String?
+        let serves: [Int]
+        let usingOwnServer: Bool
+        let reachesOut: Int
+        let ownsIdleServer: Bool
+        /// Ports the app owns that look like model servers but were never
+        /// confirmed to answer. `nil` from an engine that predates the split.
+        let listening: [Int]?
+
+        var id: String { appPath ?? name }
+
+        /// Owned ports that carried the vocabulary but no answer.
+        ///
+        /// Kept apart from ``serves`` because the difference between "answers as
+        /// a model server" and "looks like one" is the difference between a fact
+        /// and a guess, and the panel must not dress one as the other.
+        var unconfirmed: [Int] {
+            (listening ?? []).filter { !serves.contains($0) }
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case appPath = "app_path"
+            case serves
+            case usingOwnServer = "using_own_server"
+            case reachesOut = "reaches_out"
+            case ownsIdleServer = "owns_idle_server"
+            case listening
+        }
+    }
+
+    /// A port on this machine that answers as a model server, and the app that
+    /// owns it. On this machine every one of them is *inbuilt* — the server
+    /// lives inside a harness and stops when that harness quits — so the owner
+    /// is the single most useful fact about the endpoint, not decoration.
+    struct ModelLikeInfo: Decodable, Sendable, Equatable {
+        let port: Int
+        let appName: String?
+        let appPath: String?
+        let baseURL: String
+        /// Whether this port **answered** as a model server, rather than merely
+        /// looking like one. Optional so an older engine reads as unproved
+        /// instead of being credited with an answer it never gave.
+        let answering: Bool?
+
+        /// Proved, or merely suspected. Nothing may be stated as serving on the
+        /// strength of the port alone.
+        var isProved: Bool { answering == true }
+
+        enum CodingKeys: String, CodingKey {
+            case port
+            case appName = "app_name"
+            case appPath = "app_path"
+            case baseURL = "base_url"
+            case answering
+        }
+
+        /// Whether this server is built into an app rather than standing alone.
+        var isBundled: Bool { appName != nil || appPath != nil }
+    }
+
     let schemaVersion: Int
     let ready: Bool
     let version: String
@@ -111,6 +208,11 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     /// so the panel can say the difference rather than showing a blank row.
     let agentSource: String?
     let latentHarnesses: [LatentHarnessInfo]?
+    /// What the engine found and has not been told about. `nil` from an engine
+    /// that predates the register, which the panel reads as "nothing to ask".
+    let candidates: [CandidateInfo]?
+    let modelLike: [ModelLikeInfo]?
+    let behaviour: [HarnessBehaviourInfo]?
     /// Hosts attached over stdio right now. `nil` when the engine predates
     /// connection records — the app then shows no attached host rather than
     /// inventing one.
@@ -131,10 +233,28 @@ struct DoctorReport: Decodable, Sendable, Equatable {
         case agents
         case agentSource = "agent_source"
         case latentHarnesses = "latent_harnesses"
+        case candidates
+        case modelLike = "model_like"
+        case behaviour
         case mcpClients = "mcp_clients"
         case server
         case servers
     }
+
+    /// What each app is doing with models. Absent from an engine that predates
+    /// the ledger, which the cockpit reads as "nothing to say" rather than
+    /// inventing a picture of the machine.
+    var appBehaviour: [HarnessBehaviourInfo] { behaviour ?? [] }
+
+    /// Every loopback port that answers as a model server. Absent from an
+    /// engine that predates reconnaissance, so the cockpit says nothing rather
+    /// than guessing where a model comes from.
+    var modelServers: [ModelLikeInfo] { modelLike ?? [] }
+
+    /// What is on this machine and undecided. Empty when the engine predates
+    /// the register, so the cockpit shows no questions rather than inventing
+    /// them — and never nags about something the person already answered.
+    var undecided: [CandidateInfo] { candidates ?? [] }
 
     /// Every live harness the engine found, oldest bridge first. Empty when the
     /// engine predates multi-harness detection (`runtimes` absent).

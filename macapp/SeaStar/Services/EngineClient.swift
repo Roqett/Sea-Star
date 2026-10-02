@@ -39,6 +39,22 @@ struct EngineClient: Sendable {
         return try JSONDecoder().decode(DoctorResponse.self, from: output)
     }
 
+    /// Record a verdict and report whether the engine accepted it.
+    ///
+    /// The engine is the only writer of the register, so the answer a person
+    /// gives is stored in one place. A non-zero exit is surfaced rather than
+    /// swallowed: a decision that did not save must not look like one that did.
+    func record(_ invocation: EngineCommand.Invocation) async throws {
+        let outcome = try await run(invocation)
+        guard outcome.terminationStatus == 0 else {
+            let detail = String(data: outcome.standardError, encoding: .utf8) ?? ""
+            let message = detail.trimmingCharacters(in: .whitespacesAndNewlines)
+            throw EngineClientError.emptyOutput(
+                message.isEmpty ? Strings.Errors.verdictNotSaved : message
+            )
+        }
+    }
+
     func run(_ invocation: EngineCommand.Invocation) async throws -> ProcessOutcome {
         try await ProcessRunner.run(invocation)
     }

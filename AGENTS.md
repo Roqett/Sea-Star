@@ -125,18 +125,14 @@ Every code-changing session appends an entry block to `CHANGELOG.md` in this exa
 ```
 Harness: <IDE / harness name>
 
-Model: <model identifier>
-
-Routing: <provider name> → <model identifier>
-
 Date: <YYYY-MM-DD HH:MM TZ>
 
 Summary of Changes:
 - `<file>` — <one-line description of what changed and why>
 ```
 
-- **Provenance is best-effort, not mandatory.** Record the harness, model and routing when the harness exposes them — it helps the factory understand cost and quality later. If a harness cannot report its own routing, leave those lines out. Never burn tokens hunting for it.
-- **Harness** = the IDE/host. **Routing** = where the model call actually goes. They are not the same field.
+- **Harness and date only.** Both are things the session knows about itself. Do **not** record a model identifier or routing: an agent cannot see the model serving it, so a plausible value is invented rather than observed. Never guess. If the model or routing is wanted for a specific investigation, it comes from `sea-star doctor`, recorded as diagnosed fact rather than self-reported provenance.
+- **Harness** = the IDE/host running the session.
 - Entries are append-only. Never edit a past entry — if a correction is needed, append a new dated entry that supersedes the earlier one.
 
 ## Fallback clause

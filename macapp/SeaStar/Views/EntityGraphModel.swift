@@ -1,15 +1,20 @@
 import AppKit
 import SwiftUI
 
-/// One thing in the rockpool: a vault, a harness, a model, an agent, or a
-/// latent harness — one installed but not answering on a port.
+/// One thing in the rockpool: the vault, a harness driving Sea-Star, an
+/// inference endpoint, a model, or an agent.
 ///
-/// Internal rather than file-private because the graph now has two bodies. The
-/// 2D pool and the 3D one are two *drawings* of one model, and the whole value
-/// of having both is that they cannot disagree about what is in the pool.
+/// There are five kinds because the ontology has four rows and one of them holds
+/// two things that used to be filed together: a **harness** is the app that
+/// drives Sea-Star, an **inference** endpoint is where models come from. Calling
+/// both "harness" was the bug that made the pool unreadable.
+///
+/// Internal rather than file-private because the graph has two bodies. The 2D
+/// pool and the 3D one are two *drawings* of one model, and the whole value of
+/// having both is that they cannot disagree about what is in the pool.
 struct GraphNode: Identifiable, Hashable {
     enum Kind: Sendable, Hashable {
-        case vault, harness, model, agent, latent
+        case vault, harness, inference, model, agent
 
         /// Relative size, as a fraction of a vault's. One number per kind, held
         /// here rather than in a renderer, because "how big is a model next to a
@@ -19,9 +24,9 @@ struct GraphNode: Identifiable, Hashable {
         var scale: Double {
             switch self {
             case .vault: return 1.0
-            case .harness: return 0.85
+            case .harness: return 0.86
+            case .inference: return 0.82
             case .agent: return 0.78
-            case .latent: return 0.70
             case .model: return 0.63
             }
         }
@@ -33,9 +38,14 @@ struct GraphNode: Identifiable, Hashable {
     let subtitle: String?
     let accent: Color
     /// Whether something actually answered on this entity during the last read.
-    /// Only a harness and the model it currently serves can be live; a latent
-    /// harness answers on no port at all, and a vault is not on one.
+    /// A harness with a live `serve` process, an endpoint that answered, and the
+    /// model that endpoint is serving can be live; a vault is not on a port, and
+    /// an endpoint that did not answer is not live however installed it is.
     let isLive: Bool
+    /// How far a `.harness` climbed the foundation's ladder; `nil` for every
+    /// other kind. On the node because the graph draws the rung: "installed",
+    /// "up" and "answering" must not be flattened into one grey absence.
+    var rung: HarnessRung? = nil
 }
 
 /// One binding between two entities — the thing a renderer actually draws a
@@ -175,7 +185,7 @@ struct GraphSpace3D {
         // harness serving it and a persona near the model it rides. Anything
         // with nothing to orbit (an agent whose model is not in the pool) is
         // parked on a slow ring of its own rather than dropped.
-        let hub = model.activeHarnessID.flatMap { points[$0] } ?? centre
+        let hub = model.activeInferenceID.flatMap { points[$0] } ?? centre
         var parked: Int = 0
         var parkedCount = 0
         for node in model.nodes where points[node.id] == nil {
@@ -210,19 +220,20 @@ struct GraphSpace3D {
         return points
     }
 
-    /// What a satellite should be pulled toward: a model orbits the harness
-    /// that serves it, an agent orbits the model it rides.
+    /// What a satellite should be pulled toward: a model orbits an endpoint
+    /// that serves it, an agent orbits the model it rides. A major is placed on
+    /// the ring and has nothing to orbit.
     private func anchorID(for node: GraphNode) -> String? {
         switch node.kind {
         case .model:
-            for harness in model.controller.harnessOptions
-            where harness.models.contains(node.title) {
-                return "harness:\(harness.baseURL)"
+            for endpoint in model.controller.inferenceOptions
+            where endpoint.models.contains(node.title) {
+                return "inference:\(endpoint.baseURL)"
             }
-            return model.activeHarnessID
+            return model.activeInferenceID
         case .agent:
             if let model = node.subtitle { return "model:\(model)" }
-            return model.activeHarnessID
+            return model.activeInferenceID
         default:
             return nil
         }
@@ -268,23 +279,51 @@ struct EntityGraphModel {
             ))
         }
 
-        // A harness is live only if it is the one the report is describing *and*
-        // a probe answered during the last read. "Installed" is not "answering",
-        // and the graph must not draw the two as the same thing.
-        let activeHarnessID = self.activeHarnessID
-        for harness in controller.harnessOptions {
-            let id = "harness:\(harness.baseURL)"
+        // Harnesses: the apps that drive Sea-Star. An attached one is proof —
+        // the engine recorded the process that spawned `serve` — so it is the
+        // only thing here drawing as live. Every other known app still belongs
+        // on the graph, wearing the rung it actually reached.
+        for attached in controller.attachedHarnesses {
             nodes.append(GraphNode(
-                id: id,
+                id: "harness:\(attached.id)",
                 kind: .harness,
-                title: harness.name,
-                subtitle: harness.baseURL,
+                title: attached.name,
+                subtitle: attached.bundleID,
                 accent: Palette.harnessGlow,
-                isLive: id == activeHarnessID && controller.isReady
+                isLive: true,
+                rung: .connected
+            ))
+        }
+        for app in controller.visibleLatentHarnesses where !isAttached(app) {
+            nodes.append(GraphNode(
+                id: "harness:app:\(app.bundleID)",
+                kind: .harness,
+                title: app.name,
+                subtitle: app.path,
+                accent: Palette.harnessGlow,
+                // Nothing here has answered a port; the rung says how far it got.
+                isLive: false,
+                rung: app.rung
             ))
         }
 
-        // A model is live when it is the one the active harness is actually
+        // Inference: where models come from. A local endpoint and an API are the
+        // same row and deliberately not the same colour — one is about this
+        // machine, the other is what is coming in.
+        let activeInferenceID = self.activeInferenceID
+        for endpoint in controller.inferenceOptions {
+            let id = "inference:\(endpoint.baseURL)"
+            nodes.append(GraphNode(
+                id: id,
+                kind: .inference,
+                title: endpoint.name,
+                subtitle: endpoint.baseURL,
+                accent: endpoint.isRemote ? Palette.apiInferenceGlow : Palette.inferenceGlow,
+                isLive: id == activeInferenceID && controller.isReady
+            ))
+        }
+
+        // A model is live when it is the one the active endpoint is actually
         // serving right now. Every other model is merely on offer.
         let currentModel = controller.report?.model
         for model in controller.modelOptions {
@@ -312,31 +351,31 @@ struct EntityGraphModel {
             ))
         }
 
-        // Latent harnesses the person has floated on. They are peers of a live
-        // harness — same colour, same ring — but they wear a dimmer glow, because
-        // nothing is answering on their port (spec §8.7).
-        for latent in controller.visibleLatentHarnesses {
-            nodes.append(GraphNode(
-                id: "latent:\(latent.bundleID)",
-                kind: .latent,
-                title: latent.name,
-                subtitle: latent.path,
-                accent: Palette.harnessGlow,
-                isLive: false
-            ))
-        }
         return nodes
     }
 
+    /// Whether a known harness app is the same thing as one already attached.
+    /// The engine already filters attached names out of the latent list; this is
+    /// the belt to that braces, so a connected app can never be drawn twice.
+    private func isAttached(_ app: LatentHarnessOption) -> Bool {
+        controller.attachedHarnesses.contains { attached in
+            guard let bundle = attached.bundleID else {
+                return attached.name.caseInsensitiveCompare(app.name) == .orderedSame
+            }
+            return bundle == app.bundleID
+        }
+    }
+
     /// The majors: everything that is not a satellite. These wear the star. A
-    /// satellite is a model or an agent — a thing that orbits the active harness
-    /// rather than a peer of the vault and its harnesses.
+    /// satellite is a model or an agent — a thing that orbits an endpoint —
+    /// rather than a peer of the vault, its harnesses and its endpoints.
     var majors: [GraphNode] {
         nodes.filter { $0.kind != .model && $0.kind != .agent }
     }
 
-    var activeHarnessID: String? {
-        controller.report.map { "harness:\($0.baseURL)" }
+    /// The endpoint the report is currently reading models from.
+    var activeInferenceID: String? {
+        controller.report.map { "inference:\($0.baseURL)" }
     }
 
     func node(_ id: String) -> GraphNode? {
@@ -366,52 +405,66 @@ struct EntityGraphModel {
 
     /// Everything directly related to one entity, by id — the company a focus
     /// reading keeps lit. Each kind wires to what the report already knows: the
-    /// vault to the harness it is on, a harness to the models it offers, a model
-    /// to the harnesses that serve it and the agents bound to it, an agent to its
-    /// model and its provider. A latent harness answers on no port, so it touches
-    /// nothing. Only ids that are actually drawn survive.
+    /// vault to the harnesses driving it and the endpoint it reads through, a
+    /// harness to the vault it drives, an endpoint to the models it serves and
+    /// the personas riding them, a model to the endpoints offering it and the
+    /// personas bound to it, a persona to its model and where that model lives.
+    /// Only ids that are actually drawn survive, so no edge ever points at a
+    /// node the person cannot see.
     func neighbours(of id: String) -> Set<String> {
         guard let node = node(id) else { return [] }
         var related: Set<String> = []
         switch node.kind {
         case .vault:
-            if let active = activeHarnessID { related.insert(active) }
+            for attached in controller.attachedHarnesses {
+                related.insert("harness:\(attached.id)")
+            }
+            if let active = activeInferenceID { related.insert(active) }
+
         case .harness:
-            if id == activeHarnessID { related.insert("vault") }
-            if let harness = controller.harnessOptions
-                .first(where: { "harness:\($0.baseURL)" == id }) {
-                for model in harness.models { related.insert("model:\(model)") }
+            // A connected harness is by definition driving this vault. An app
+            // that is merely up drives nothing yet, so it is wired to nothing —
+            // an edge would be an invention.
+            if node.isLive {
+                related.insert("vault")
+                // An app that names an endpoint (oMLX, Osaurus) owns that
+                // endpoint: a real match on the name, never a guess from a port.
+                for endpoint in controller.inferenceOptions
+                where endpoint.name.caseInsensitiveCompare(node.title) == .orderedSame {
+                    related.insert("inference:\(endpoint.baseURL)")
+                }
             }
-            if id == activeHarnessID, let current = controller.report?.model {
-                related.insert("model:\(current)")
+
+        case .inference:
+            if let endpoint = controller.inferenceOptions
+                .first(where: { "inference:\($0.baseURL)" == id }) {
+                if id == activeInferenceID { related.insert("vault") }
+                for model in endpoint.models { related.insert("model:\(model)") }
+                for agent in controller.agentOptions
+                where agent.model.map(endpoint.models.contains) == true {
+                    related.insert("agent:\(agent.name)")
+                }
             }
+
         case .model:
             let name = node.title
-            for harness in controller.harnessOptions where harness.models.contains(name) {
-                related.insert("harness:\(harness.baseURL)")
+            for endpoint in controller.inferenceOptions where endpoint.models.contains(name) {
+                related.insert("inference:\(endpoint.baseURL)")
             }
-            if controller.report?.model == name, let active = activeHarnessID {
+            if controller.report?.model == name, let active = activeInferenceID {
                 related.insert(active)
             }
             for agent in controller.agentOptions where agent.model == name {
                 related.insert("agent:\(agent.name)")
             }
+
         case .agent:
             if let model = node.subtitle {
                 related.insert("model:\(model)")
-                for harness in controller.harnessOptions where harness.models.contains(model) {
-                    related.insert("harness:\(harness.baseURL)")
+                for endpoint in controller.inferenceOptions where endpoint.models.contains(model) {
+                    related.insert("inference:\(endpoint.baseURL)")
                 }
             }
-            if let provider = controller.agentOptions
-                .first(where: { "agent:\($0.name)" == id })?.provider {
-                for harness in controller.harnessOptions
-                where harness.name.lowercased().contains(provider.lowercased()) {
-                    related.insert("harness:\(harness.baseURL)")
-                }
-            }
-        case .latent:
-            break
         }
         let known = Set(nodes.map(\.id))
         return related.intersection(known).subtracting([id])
@@ -423,16 +476,26 @@ struct EntityGraphModel {
         switch kind {
         case .vault: return Strings.Detail.vault
         case .harness: return Strings.Detail.harness
+        case .inference: return Strings.Detail.inference
         case .model: return Strings.Detail.model
         case .agent: return Strings.Detail.agent
-        case .latent: return Strings.Detail.latent
         }
     }
 
-    /// What a clicked sea-star can tell you, all of it already in the report: a
-    /// vault says how much is in it and how Sea-Star found it; a harness says its
-    /// endpoint and how many models it serves; a model says which harness offers
-    /// it. Ordered most-useful first, and rows that would say nothing are left out.
+    /// The names of things, shown rather than counted. A readout that says
+    /// "five models" makes the person open something else to find out what they
+    /// are; four names and "and 3 more" is a fact they can act on.
+    private func nameList(_ names: [String], limit: Int = 4) -> String {
+        guard names.count > limit else { return names.joined(separator: ", ") }
+        let shown = names.prefix(limit).joined(separator: ", ")
+        return "\(shown) + \(names.count - limit) more"
+    }
+
+    /// What a clicked sea-star can tell you, all of it already in the report.
+    /// Every row names something: an attached harness names its process and the
+    /// tool it calls Sea-Star with, an endpoint names the models it serves, a
+    /// model names where it lives and who rides it. Rows that would only restate
+    /// the title, or would say nothing at all, are left out rather than padded.
     func facts(for node: GraphNode) -> [(label: String, value: String)] {
         guard let report = controller.report else { return [] }
         switch node.kind {
@@ -445,6 +508,9 @@ struct EntityGraphModel {
             if others > 0 {
                 rows.append((Strings.Detail.nearby, Strings.Detail.nearbyVaults(others)))
             }
+            if !report.model.isEmpty {
+                rows.append((Strings.Detail.model, report.model))
+            }
             if let path = node.subtitle {
                 rows.append((Strings.Detail.path, path))
             }
@@ -452,24 +518,64 @@ struct EntityGraphModel {
 
         case .harness:
             var rows: [(label: String, value: String)] = [
-                (Strings.Detail.endpoint, node.subtitle ?? Strings.States.unknown),
+                (Strings.Detail.status, node.rung?.label ?? Strings.Detail.notConnected),
             ]
-            if let harness = controller.harnessOptions
-                .first(where: { "harness:\($0.baseURL)" == node.id }) {
-                rows.append((
-                    Strings.Detail.models,
-                    Strings.Detail.modelCount(harness.models.count)
-                ))
+            if let attached = controller.attachedHarnesses
+                .first(where: { "harness:\($0.id)" == node.id }) {
+                rows.append((Strings.Detail.process, "pid \(attached.pid)"))
+                rows.append((Strings.Detail.since, attached.startedAt))
+                rows.append((Strings.Detail.canCall, Strings.Detail.askTool))
+            } else if let path = node.subtitle {
+                rows.append((Strings.Detail.path, path))
             }
-            rows.append((
-                Strings.Detail.status,
-                node.id == activeHarnessID ? Strings.Detail.current : Strings.Detail.available
-            ))
+            if let bundle = node.subtitle, node.isLive {
+                rows.append((Strings.Detail.bundle, bundle))
+            }
+            return rows
+
+        case .inference:
+            let endpoint = controller.inferenceOptions
+                .first(where: { "inference:\($0.baseURL)" == node.id })
+            var rows: [(label: String, value: String)] = [
+                (
+                    Strings.Detail.location,
+                    (endpoint?.isRemote ?? false)
+                        ? Strings.Detail.remoteAPI
+                        : Strings.Detail.onThisMac
+                ),
+                (Strings.Detail.endpoint, node.subtitle ?? Strings.States.unknown),
+                (
+                    Strings.Detail.status,
+                    node.id == activeInferenceID ? Strings.Detail.current : Strings.Detail.available
+                ),
+            ]
+            if let models = endpoint?.models, !models.isEmpty {
+                rows.append((Strings.Detail.serves, nameList(models)))
+            }
+            // Who the server actually belongs to. On this machine every endpoint
+            // is inbuilt, so this is not trivia: it is the reason the model list
+            // changes when a chat app is quit, and the reason to know which app
+            // has to be running for the current one to work.
+            if let owner = controller.bundledOwner(of: endpoint?.baseURL ?? node.subtitle ?? "") {
+                rows.append((Strings.Detail.insideApp, owner))
+                if node.id == activeInferenceID {
+                    rows.append((Strings.Detail.warning, Strings.Detail.stopsWith(owner)))
+                }
+            }
+            let riders = controller.agentOptions
+                .filter { agent in
+                    guard let model = agent.model else { return false }
+                    return endpoint?.models.contains(model) == true
+                }
+                .map(\.name)
+            if !riders.isEmpty {
+                rows.append((Strings.Detail.usedBy, riders.joined(separator: ", ")))
+            }
             return rows
 
         case .model:
             var rows: [(label: String, value: String)] = []
-            let servers = controller.harnessOptions
+            let servers = controller.inferenceOptions
                 .filter { $0.models.contains(node.title) }
                 .map(\.name)
             if !servers.isEmpty {
@@ -479,6 +585,12 @@ struct EntityGraphModel {
                 Strings.Detail.status,
                 node.title == report.model ? Strings.Detail.current : Strings.Detail.available
             ))
+            let riders = controller.agentOptions
+                .filter { $0.model == node.title }
+                .map(\.name)
+            if !riders.isEmpty {
+                rows.append((Strings.Detail.usedBy, riders.joined(separator: ", ")))
+            }
             return rows
 
         case .agent:
@@ -489,15 +601,15 @@ struct EntityGraphModel {
                 .first(where: { "agent:\($0.name)" == node.id })?.provider {
                 rows.append((Strings.Detail.provider, provider))
             }
-            return rows
-
-        case .latent:
-            var rows: [(label: String, value: String)] = [
-                (Strings.Detail.status, Strings.Detail.notConnected),
-            ]
-            if let path = node.subtitle {
-                rows.append((Strings.Detail.path, path))
+            if let model = node.subtitle {
+                let homes = controller.inferenceOptions
+                    .filter { $0.models.contains(model) }
+                    .map(\.name)
+                if !homes.isEmpty {
+                    rows.append((Strings.Detail.servedBy, homes.joined(separator: ", ")))
+                }
             }
+            rows.append((Strings.Detail.roster, controller.agentScopeLabel))
             return rows
         }
     }
