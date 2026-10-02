@@ -13,6 +13,7 @@ from sea_star.agents import (
     candidate_agent_sources,
     detect_agent_roster,
     detect_agents,
+    placement,
     read_agents,
 )
 
@@ -190,3 +191,46 @@ def test_detect_agents_still_returns_just_the_specs(tmp_path):
     assert detect_agents(home=tmp_path, volumes_dir=tmp_path / "none") == (
         AgentSpec(name="Scout", model=None, description=""),
     )
+
+
+class FakeProbe:
+    """A minimal runtime double: a name and the models it lists."""
+
+    def __init__(self, name, models):
+        self.name = name
+        self.models = list(models)
+
+
+def _spec(name, model):
+    return AgentSpec(name=name, model=model, description="")
+
+
+def test_placement_names_the_serving_endpoint():
+    """Case one: the model is on offer, so the sentence says where it is."""
+
+    probes = [FakeProbe("omlx", ["KAT-Coder", "Qwen3"])]
+    text = placement(_spec("Patchdog", "KAT-Coder"), probes)
+    assert text == "Runs on KAT-Coder — served by omlx."
+
+
+def test_placement_distinguishes_up_but_not_serving():
+    """Case two is the live trap: the provider is up and the model is not on it.
+
+    On the real machine this is Patchdog's state, and flattening it into "not
+    offered anywhere" would be a lie in the other direction.
+    """
+
+    probes = [FakeProbe("omlx", ["Qwen3"])]
+    text = placement(_spec("Patchdog", "omlx/KAT-Coder"), probes)
+    assert text == "Runs on omlx/KAT-Coder — omlx is up, but not serving it."
+
+
+def test_placement_says_when_nowhere_offers_it():
+    probes = [FakeProbe("omlx", ["Qwen3"])]
+    text = placement(_spec("Lono", "OsaurusAI/Raptor"), probes)
+    assert text == "Runs on OsaurusAI/Raptor — not offered by any running endpoint."
+
+
+def test_placement_handles_an_agent_with_no_model():
+    text = placement(_spec("Drifter", None), [])
+    assert text == "Rides whatever the endpoint is serving."

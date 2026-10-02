@@ -248,3 +248,33 @@ def detect_agent_roster(
         if specs:
             return AgentRoster(specs=tuple(specs), source=AGENT_ADAPTER, path=source)
     return AgentRoster(specs=(), source=None, path=None)
+
+
+def placement(spec: AgentSpec, runtimes) -> str:
+    """Where one agent is, in one honest sentence (D-013).
+
+    The cascade's last hop, shared between every surface that answers it: the
+    panel says it in the cockpit, the MCP answer says it to a host, and both use
+    this rule so they cannot disagree. Three cases, told apart rather than
+    flattened:
+
+    1. a running endpoint lists the agent's model — it is *there*;
+    2. the model names a provider whose endpoint is up but not serving it;
+    3. nothing answers to the model at all.
+
+    ``runtimes`` is any iterable with ``name`` and ``models`` — a real probe or
+    a test double.
+    """
+
+    model = spec.model or ""
+    if not model:
+        return "Rides whatever the endpoint is serving."
+    for probe in runtimes:
+        if model in probe.models:
+            return f"Runs on {model} — served by {probe.name}."
+    provider = model.split("/", 1)[0] if "/" in model else ""
+    if provider:
+        for probe in runtimes:
+            if probe.name.casefold() == provider.casefold():
+                return f"Runs on {model} — {probe.name} is up, but not serving it."
+    return f"Runs on {model} — not offered by any running endpoint."

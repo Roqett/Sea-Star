@@ -21,6 +21,7 @@ from urllib.parse import urlsplit
 from mcp.server import MCPServer
 
 from .agent import Agent
+from .agents import detect_agent_roster, placement
 from .config import Config, probe_runtimes
 from .recon import machine_summary
 from .register import recognised_names
@@ -64,9 +65,18 @@ def create_server(config: Config, agent: Agent) -> MCPServer:
         # `asyncio.run` there fails at the first call.
         probes = await probe_runtimes()
         answering = {urlsplit(probe.base_url).port or 0 for probe in probes}
-        return "\n".join(
-            machine_summary(known_apps=recognised_names(), answering=answering)
-        )
+        lines = list(machine_summary(known_apps=recognised_names(), answering=answering))
+
+        # The cascade's last hop, answered for a host (D-013): the roster with
+        # each agent's model and where it runs. The same `placement` rule the
+        # cockpit's panel reads, so a host asking "where does Patchdog run?"
+        # gets the same sentence a person gets from the rows.
+        roster = detect_agent_roster(config.vault_path)
+        if roster.specs:
+            lines.append("Agents and where they run:")
+            for spec in roster.specs:
+                lines.append(f"  {spec.name}: {placement(spec, probes)}")
+        return "\n".join(lines)
 
     @server.tool()
     async def vault_search(query: str, limit: int = 10) -> str:

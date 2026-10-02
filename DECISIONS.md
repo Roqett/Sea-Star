@@ -867,3 +867,61 @@ register duplicated and contradicted each other four rows apart.
 
 - The founder has seen the restructured surfaces and confirms the register feels like a desk to
   clear rather than a reading.
+
+---
+
+## D-013 — The cascade is the spine: vault → harness → agent → inference, rendered by every surface from one rule
+
+- **Date:** 2026-10-02
+- **Status:** Accepted
+- **Affects:** UX flow, architecture (the agent→endpoint derivation), the MCP surface
+- **Founder input:** *"when the agent is selected and then you click inference, does it actually show
+  the inference for that particular agent — and when harness is displayed, does it pick the agents
+  for that particular harness? … as long as it cascades down from harness, then you pick the
+  harness, then you pick the agent, and then you pick the inference that agent is on and know where
+  it's at — whereas on our graph we can immediately see that graphically as well. This is the whole
+  concept of the app."*
+
+### The problem
+
+The concept had always been the spine and the graph had always drawn it — agent → its model → the
+endpoint serving it. The text panel did not. Selecting an agent changed only the agent row itself;
+the Inference row kept showing whatever the endpoint was serving, so the two readings of the same
+request path disagreed, and a person picking Patchdog could not see that Patchdog lives on oMLX.
+
+### The decision
+
+1. **One cascade, one rule, three surfaces.** The placement of an agent — its model, and the
+   endpoint that serves it — is derived by one rule with three honest cases: the model is *served
+   by* a running endpoint; the model *names* a provider whose endpoint is up but not serving it;
+   or *nothing* answers to it. The Swift panel (`ServerController.placement(of:)`), the Python MCP
+   answer (`agents.placement`), and the graph's existing wiring all express the same three cases in
+   the same sentences.
+2. **The text panel speaks the last hop.** When an agent is selected, the Inference row shows the
+   sentence beneath it: "Runs on X — served by Y", or the honest alternative. The agent row's help
+   already names whose roster it is (Osaurus today), which is the harness-scoping half of the
+   cascade said honestly rather than invented.
+3. **A host hears the whole cascade.** `machine_report` gains "Agents and where they run": every
+   agent, its model, and its placement. A harness attached over MCP asking "where does Patchdog
+   run?" gets the same sentence a person gets from the rows — the utility the founder named as
+   flowing on from the concept.
+
+### Consequences
+
+- On this machine the MCP answer now reads, for the founder's own roster:
+  `Patchdog: Runs on omlx/KAT-Coder… — omlx is up, but not serving it.` — the distinction between
+  "offered" and "built for" that a flattened answer would have lied about in one direction or the
+  other.
+- 3 new Swift tests, 4 new Python tests pin the three cases. 79 Swift, 153 Python, ruff clean.
+- The harness→agent scoping half remains deliberately unbuilt: the engine reads one roster
+  (Osaurus) and says so. Reading every harness's own roster is engine work and stays on the list.
+
+### Open
+
+- Reading each harness's own roster, so the Agent row genuinely becomes "the crew of the attached
+  harness" rather than one named source.
+
+### Revisit when
+
+- A second roster source exists in the engine: then `placement` is computed per harness and the
+  agent row follows the Harness row.

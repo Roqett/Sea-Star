@@ -370,6 +370,44 @@ final class ServerController {
         selectedAgentName = name
     }
 
+    /// The persona the panel is currently reading, resolved from its name.
+    ///
+    /// The whole cascade hangs off this one lookup: an agent lives in a harness,
+    /// rides a model, and the model comes from an endpoint. Pick the agent and
+    /// the other two rows can now say where it is.
+    var selectedAgent: AgentOption? {
+        guard let name = selectedAgentName else { return nil }
+        return agentOptions.first { $0.name == name }
+    }
+
+    /// Where the selected agent is, in one honest sentence (D-013).
+    ///
+    /// Three cases, and they must be told apart rather than flattened:
+    ///
+    /// 1. A running endpoint lists the agent's model — it is *there*.
+    /// 2. The agent's model names a provider whose endpoint is up, but the
+    ///    endpoint is not serving that model — "built for X, X is not
+    ///    serving it". On this machine this is Patchdog's real state.
+    /// 3. Nothing answers to the model at all.
+    ///
+    /// A sentence is returned rather than a structure because the panel draws
+    /// it as one line, and the MCP answer renders the same three cases from
+    /// the same rule in Python — one cascade, one wording.
+    func placement(of agent: AgentOption) -> String {
+        guard let model = agent.model, !model.isEmpty else {
+            return Strings.Rows.agentRidesWhatever
+        }
+        let serving = inferenceOptions.first { $0.models.contains(model) }
+        if let endpoint = serving {
+            return Strings.Rows.agentRunsOn(model, endpoint.name)
+        }
+        if let provider = agent.provider,
+           let named = inferenceOptions.first(where: { $0.name.caseInsensitiveCompare(provider) == .orderedSame }) {
+            return Strings.Rows.agentBuiltFor(model, named.name)
+        }
+        return Strings.Rows.agentModelNowhere(model)
+    }
+
     /// Every harness app the engine found that is not attached over stdio, in
     /// the engine's stable order, each carrying the rung it reached. These are
     /// togglable rather than autodetected: an app on the disk is not a

@@ -687,3 +687,51 @@ enum Fixture {
         case notAReport
     }
 }
+
+/// The cascade (D-013): pick an agent and the panel must be able to say where
+/// that agent actually is — model first, then the endpoint serving it, with
+/// the three honest cases told apart.
+@Suite("An agent's placement follows the cascade")
+@MainActor
+struct AgentPlacementTests {
+    /// The fixture's cast: Mariner rides the current model (qwen3, on osaurus),
+    /// Cartographer rides qwen3-large (on omlx), Drifter rides nothing.
+    private func controller() -> ServerController {
+        let controller = ServerController(command: nil)
+        controller.adopt(try! Fixture.report())
+        return controller
+    }
+
+    @Test("a model on offer names its serving endpoint")
+    func servedAgentNamesItsEndpoint() {
+        let controller = controller()
+        controller.selectAgent("Mariner")
+        guard let agent = controller.selectedAgent else {
+            Issue.record("Mariner should be selected")
+            return
+        }
+        #expect(controller.placement(of: agent) == "Runs on qwen3 — served by osaurus.")
+    }
+
+    @Test("an agent on another endpoint's model names that endpoint")
+    func agentOnAnotherEndpoint() {
+        let controller = controller()
+        controller.selectAgent("Cartographer")
+        guard let agent = controller.selectedAgent else {
+            Issue.record("Cartographer should be selected")
+            return
+        }
+        #expect(controller.placement(of: agent) == "Runs on qwen3-large — served by omlx.")
+    }
+
+    @Test("an agent with no model says it rides whatever is set")
+    func unboundAgent() {
+        let controller = controller()
+        controller.selectAgent("Drifter")
+        guard let agent = controller.selectedAgent else {
+            Issue.record("Drifter should be selected")
+            return
+        }
+        #expect(controller.placement(of: agent) == "Rides whatever the endpoint is serving.")
+    }
+}

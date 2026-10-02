@@ -54,6 +54,18 @@ enum Strings {
         }
         /// The register's question (D-005): what the engine found and has not
         /// been told about. Asked once per thing, ever.
+        /// The cascade's three honest cases (D-013): where an agent runs.
+        /// Said as sentences so the panel and the MCP answer can share them.
+        static let agentRidesWhatever = "Rides whatever the endpoint is serving."
+        static func agentRunsOn(_ model: String, _ endpoint: String) -> String {
+            "Runs on \(model) — served by \(endpoint)."
+        }
+        static func agentBuiltFor(_ model: String, _ endpoint: String) -> String {
+            "Runs on \(model) — \(endpoint) is up, but not serving it."
+        }
+        static func agentModelNowhere(_ model: String) -> String {
+            "Runs on \(model) — not offered by any running endpoint."
+        }
         static let newHere = "New on this machine"
         /// How many things are waiting to be decided about, said as a sentence
         /// rather than left for the person to count.

@@ -1685,3 +1685,27 @@ thing with the founder is to open it together.
 
 **Next step** — the founder opens the cockpit (left in graph/flat mode deliberately, so the graph
 is what he sees first) and reads the three surfaces.
+
+### The cascade is the spine (`D-013`) — 2026-10-02 late
+
+The founder expressed what the app is: vault → harness → agent → inference, one request path,
+readable as rows in the text panel, as wires in the graph, and — the utility — answerable over MCP.
+The graph always drew it. The text panel didn't, and that was the gap he felt but hadn't pinned.
+
+**Built.** One placement rule with three honest cases, implemented twice in the same words
+(`ServerController.placement(of:)` in Swift, `agents.placement` in Python): served by a running
+endpoint / built for a provider that is up but not serving it / nowhere at all. The Inference row
+now shows the selected agent's placement beneath the pickers. `machine_report` gained
+"Agents and where they run", so a host gets the same cascade.
+
+**Live proof, the founder's own roster:** `Patchdog: Runs on omlx/KAT-Coder… — omlx is up, but not
+serving it.` — the honest distinction a flattened answer would have missed.
+
+**Still open, deliberately:** the agent roster is one source (Osaurus) and says so; reading each
+harness's own roster is the engine half of the cascade and remains on the list.
+
+**Verified:** 79 Swift tests (3 new), 153 Python tests (4 new), ruff clean; the MCP answer read
+back live through `call_tool`.
+
+**Next step** — with the founder: pick Patchdog in the text panel and read the placement line, then
+the same fact on the graph.

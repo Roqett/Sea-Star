@@ -93,6 +93,13 @@ Summary of Changes:
 - `macapp/SeaStar/Views/SettingsView.swift` — the generic grouped form is replaced with the house style: canvas, ink, accent bars, mono headings and plain word buttons, plus a door to onboarding.
 - `macapp/SeaStar/Support/Strings.swift` — onboarding copy, the honest "On your graph" heading, empty states, and the note-count line.
 - `DECISIONS.md` — D-012.
+- `src/sea_star/agents.py` — `placement()`: the cascade's last hop as one rule with three honest cases — served by a running endpoint, built for a provider that is up but not serving it, or nowhere at all (D-013).
+- `src/sea_star/mcp_server.py` — `machine_report` answers "Agents and where they run": every agent, its model, and its placement, so a host hears the same cascade a person sees.
+- `macapp/SeaStar/Services/ServerController.swift` — `selectedAgent` and `placement(of:)`, the same rule in Swift.
+- `macapp/SeaStar/Views/CockpitPanel.swift` — the Inference row speaks the selected agent's placement beneath the pickers.
+- `tests/test_agents.py` — the three placement cases pinned, including the live trap where the provider is up and the model is not on offer.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — the panel's placement for the fixture cast: served, served-elsewhere, and unbound.
+- `DECISIONS.md` — D-013.
 - `macapp/SeaStar/Views/CockpitPopoverView.swift` — the two nudibranch strips framing the Start/Refresh controls are removed. They were pure decoration from the early visual spec, and the founder asked for them off more than once; they survive only where the strip *says* something (the live-connection ribbon in the starfield, the liveness bar, the expanded log frame).
 - `macapp/SeaStar/Views/EntityGraphView.swift` — the two green-orange liveness bars floating above live nodes in the starfield are removed. The founder asked for them off across multiple sessions; every session defended them as information. They were redundant — the node's glow already says the same thing.
 

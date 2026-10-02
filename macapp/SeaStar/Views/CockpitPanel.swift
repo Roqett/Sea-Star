@@ -199,6 +199,17 @@ struct CockpitPanel: View {
                 display: { $0 }
             )
             .help(Strings.Rows.modelHelp)
+
+            // The cascade's last hop, spoken (D-013): pick the agent above and
+            // this line says where that agent actually is — model first, then
+            // the endpoint that serves it, and the honest version of each.
+            if let agent = controller.selectedAgent {
+                Text(controller.placement(of: agent))
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Palette.inkMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 73)
+            }
         }
     }
 
