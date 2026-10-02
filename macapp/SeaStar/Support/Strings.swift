@@ -120,31 +120,18 @@ enum Strings {
     /// a claim that a person used anything — only what a probe actually reached.
     enum WorkingNow {
         static let title = "Working now"
-        static let idle = "Nothing in flight"
-        static let endpoint = "Endpoint"
-        static let server = "Server"
-        static let harness = "Harness"
-        /// Proven reachable: a probe answered on this port during the last read.
-        static let answering = "Answering"
-        /// Configured and known, but nothing is answering it right now.
-        static let notAnswering = "Not answering"
-        /// The server this app started and is holding open.
-        static let serving = "Serving"
-        static let notServing = "Stopped"
-        /// A host attached to the engine over stdio, proven by the engine's
-        /// own live connection record — never by a port, which a stdio host
-        /// never answers.
-        static let host = "Host"
-        static let hostDetail = "stdio connection record"
-
-        /// The evidence line under the band. It names *how far* the claim was
-        /// proven, which is the whole point: "live" here means "answered a
-        /// probe", never "a person used it".
-        static let evidenceProbe = "Live means a probe answered, just now."
-        static let evidenceNone = "No probe has answered yet."
-        /// Evidence for the attached-host row: the engine holds the record
-        /// because it *is* the process this host spawned.
-        static let evidenceMcp = "Attached means the engine holds the host's own live connection record."
+        /// The three states the band can be in, as one word each. One word is
+        /// the whole bar the old design needed, and it says more.
+        static let live = "Live"
+        static let running = "Running"
+        static let idle = "Idle"
+        /// An endpoint answered and named its model — the cascade's live hop.
+        static func answering(_ endpoint: String, _ model: String) -> String {
+            "\(endpoint) is answering — serving \(model)."
+        }
+        /// The server Sea-Star owns is up, but nothing behind it is answering.
+        static let serverOnly = "The server is up, but no endpoint is answering."
+        static let nothing = "Nothing in flight."
     }
 
     /// The ways to lay the same four rows out, so the choice is a picture

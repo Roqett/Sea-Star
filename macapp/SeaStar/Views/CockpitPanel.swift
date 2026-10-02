@@ -517,57 +517,39 @@ private struct ChainCard: View {
     }
 }
 
-/// The `Working now` band: what the cockpit can see happening, and — just as
-/// importantly — how far that seeing was proven.
+/// The `Working now` band: one honest sentence about what is answering right
+/// now, and nothing else.
 ///
-/// It is **observation-only**. It never shows a prompt, an output, or a claim
-/// that a person used anything, because nothing in Sea-Star observes those yet.
-/// "Live" here means *a probe answered this port* or *the engine holds this
-/// host's live connection record*, and the evidence line says which — as many
-/// words. The stronger claim — that a request actually went somewhere — waits
-/// for the activity stream, and until then the band would rather be quiet than
-/// promising something it cannot prove.
+/// It was, for a long time, the most incoherent thing in the cockpit: two
+/// liveness bars, a row that changed its own label depending on whether the
+/// server was up, a host row that duplicated the Harness row above it, and an
+/// evidence line that read as two paragraphs of self-justification. All of that
+/// is gone. What is left is the cascade's live hop, said once: which endpoint
+/// is answering, and the model it is serving.
 private struct WorkingNowBand: View {
     let controller: ServerController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
                 Text(Strings.WorkingNow.title)
                     .font(.caption2.weight(.semibold))
                     .foregroundStyle(Palette.inkMuted)
 
                 Spacer(minLength: 0)
 
-                LivenessBar(isLive: hasAnswered, count: 1, height: 3)
-                    .frame(width: 54)
+                // A word, not a bar: the founder asked for the bars off the
+                // graph, and this band had two more of them. Liveness is one
+                // word now — Live, Running, or Idle — the same three states the
+                // sentence underneath says at length.
+                Text(statusText)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(statusColour)
             }
 
-            if let observation = observation {
-                ObservationRow(
-                    label: observation.label,
-                    value: observation.value,
-                    detail: observation.detail,
-                    isLive: observation.isLive
-                )
-            } else if attachedHosts.isEmpty {
-                Text(Strings.WorkingNow.idle)
-                    .font(.caption)
-                    .foregroundStyle(Palette.inkMuted)
-            }
-
-            if !attachedHosts.isEmpty {
-                ObservationRow(
-                    label: Strings.WorkingNow.host,
-                    value: attachedHosts.map(\.name).joined(separator: ", "),
-                    detail: Strings.WorkingNow.hostDetail,
-                    isLive: true
-                )
-            }
-
-            Text(evidence)
-                .font(.system(size: 9, design: .monospaced))
-                .foregroundStyle(Palette.inkMuted.opacity(0.8))
+            Text(sentence)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(Palette.ink)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(10)
@@ -576,83 +558,24 @@ private struct WorkingNowBand: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// A probe answered during the last read. This is the only thing that earns
-    /// the word "live" in the cockpit, and the band is explicit about it.
-    private var hasAnswered: Bool {
-        controller.isReady
+    private var status: (text: String, colour: Color) {
+        if controller.isReady { return (Strings.WorkingNow.live, Palette.neonGreen) }
+        if controller.isServerRunning { return (Strings.WorkingNow.running, Palette.working) }
+        return (Strings.WorkingNow.idle, Palette.inkMuted)
     }
 
-    /// Hosts attached to the engine over stdio right now, per the engine's own
-    /// connection records. Empty when no host is attached (or the engine
-    /// predates the key) — the band then says nothing about hosts at all.
-    private var attachedHosts: [DoctorReport.McpClientInfo] {
-        controller.report?.attachedMcpClients ?? []
-    }
+    private var statusText: String { status.text }
+    private var statusColour: Color { status.colour }
 
-    /// Which piece of evidence the band is standing on. A port probe and a
-    /// connection record are different proofs of different things, so the line
-    /// names whichever applies — and both, when both exist.
-    private var evidence: String {
-        switch (hasAnswered, attachedHosts.isEmpty) {
-        case (true, false): return "\(Strings.WorkingNow.evidenceProbe) \(Strings.WorkingNow.evidenceMcp)"
-        case (true, true): return Strings.WorkingNow.evidenceProbe
-        case (false, false): return Strings.WorkingNow.evidenceMcp
-        case (false, true): return Strings.WorkingNow.evidenceNone
+    /// The one sentence, chosen from the three states that are actually distinct.
+    private var sentence: String {
+        guard let report = controller.report else { return Strings.WorkingNow.nothing }
+        if controller.isReady, !report.model.isEmpty {
+            return Strings.WorkingNow.answering(report.runtime, report.model)
         }
-    }
-
-    private struct Observation {
-        let label: String
-        let value: String
-        let detail: String
-        let isLive: Bool
-    }
-
-    /// The single most useful thing to say right now: whether the server this
-    /// app owns is actually up, and what the engine could reach behind it.
-    private var observation: Observation? {
-        guard let report = controller.report else { return nil }
-        let serving = controller.isServerRunning
-        let answering = hasAnswered ? Strings.WorkingNow.answering : Strings.WorkingNow.notAnswering
-        return Observation(
-            label: serving ? Strings.WorkingNow.server : Strings.WorkingNow.endpoint,
-            value: serving ? Strings.WorkingNow.serving : answering,
-            detail: serving
-                ? Strings.WorkingNow.serving
-                : (report.baseURL.isEmpty
-                    ? answering
-                    : "\(answering) · \(report.baseURL)"),
-            isLive: serving || hasAnswered
-        )
-    }
-}
-
-/// One line inside `Working now`: what is being reported, what it is, and a
-/// liveness bar that only moves when the thing was actually reached.
-private struct ObservationRow: View {
-    let label: String
-    let value: String
-    let detail: String
-    let isLive: Bool
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(label)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Palette.inkMuted)
-                .frame(width: 58, alignment: .leading)
-
-            Text(value)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(Palette.ink)
-                .lineLimit(1)
-                .truncationMode(.middle)
-
-            Spacer(minLength: 6)
-
-            LivenessBar(isLive: isLive, count: 2, height: 3)
-                .frame(width: 34)
+        if controller.isServerRunning {
+            return Strings.WorkingNow.serverOnly
         }
-        .help("\(label) — \(detail)")
+        return Strings.WorkingNow.nothing
     }
 }
