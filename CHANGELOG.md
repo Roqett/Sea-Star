@@ -102,6 +102,7 @@ Summary of Changes:
 - `DECISIONS.md` — D-013.
 - `macapp/SeaStar/Views/CockpitPopoverView.swift` — the two nudibranch strips framing the Start/Refresh controls are removed. They were pure decoration from the early visual spec, and the founder asked for them off more than once; they survive only where the strip *says* something (the live-connection ribbon in the starfield, the liveness bar, the expanded log frame).
 - `macapp/SeaStar/Views/EntityGraphView.swift` — the two green-orange liveness bars floating above live nodes in the starfield are removed. The founder asked for them off across multiple sessions; every session defended them as information. They were redundant — the node's glow already says the same thing.
+- `macapp/SeaStar/Views/CockpitPanel.swift` — the `Working now` band is rebuilt as one honest sentence. It had two liveness bars, a row that changed its own label with server state, a host row duplicating the Harness row above it, and a two-paragraph evidence line. Now it is one status word — Live / Running / Idle — and one sentence: the endpoint answering and the model it serves.
 
 Harness: TRAE
 
