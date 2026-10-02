@@ -1617,3 +1617,42 @@ convenience wrapper around an async system is exactly what passes a test and fai
 
 **Next step** — back to the UI/UX as the founder asked, with one honest item outstanding: two ports
 on this machine are suspected and unproven, and the ledger now says so rather than guessing.
+
+### Ready to go to Apple (`release.sh`, D-011) — 2026-10-02 late
+
+The founder remembered notarisation and moved tonight's target from "publish" to "ready to go to
+Apple". The honest finding first: **there is no signing identity on this machine at all** — `security
+find-identity` reports zero — so notarisation is not a config detail but a membership and a
+certificate that only he can obtain.
+
+**Built.** `macapp/project.yml` now has two configurations: Debug ad-hoc and unsigned so anyone can
+build without an Apple account, Release requiring the hardened runtime and a Developer ID and
+*failing to build* without one. `script/release.sh` builds, signs, packages a DMG, notarises,
+staples and asks Gatekeeper for its verdict — checking the certificate, Team ID and notary
+credential *before* the build rather than after. `docs/ship.md` holds the one-time setup, the two
+routes, and the remaining gap.
+
+**Proven, not assumed.** `--dry-run` completes end to end and produces a 1.7 MB DMG labelled
+unsigned and not for distribution. Without `--dry-run` it stops at the first gate with the exact
+steps to fix it — verified, because no certificate exists here.
+
+**The headline that matters more than the pipeline:** the engine is **not inside the app bundle**.
+The DMG is the menu-bar app and nothing else, so on a stranger's Mac it would have no engine behind
+it. A notarised DMG is not yet worth distributing, and no amount of signing fixes that. The script
+says so on every run. Closing it means vendoring the engine into `Contents/Resources/engine` (and
+ideally a relocatable Python) before `EngineCommand.resolve()` looks at `PATH`.
+
+**Also answering the founder's question:** the work has **not** gone to Codeberg. Only `origin`
+(GitHub) received the commit and draft PR #2; Codeberg sits at `main`, level with GitHub's `main`
+and none of the branch. It is a deliberate second home — `docs/PROGRESS.md` records it as
+`Touretro/theSeaStar`, and `docs/README_DRY.md` says it is where the pieces deliberately kept off
+GitHub live. Nothing has broken; it is simply not a mirror of the current work yet.
+
+**Also done tonight:** the app's first-run register no longer fills the panel — three things are
+shown, with the count stated and the rest behind one word.
+
+**Verified:** 149 Python tests, 76 Swift tests, ruff clean, `--dry-run` produces a DMG, the real path
+fails loudly.
+
+**Next step** — bundle the engine into the app, which is the last thing standing between this and a
+notarised DMG worth handing to someone.

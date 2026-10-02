@@ -39,6 +39,13 @@ enum Strings {
         /// The register's question (D-005): what the engine found and has not
         /// been told about. Asked once per thing, ever.
         static let newHere = "New on this machine"
+        /// How many things are waiting to be decided about, said as a sentence
+        /// rather than left for the person to count.
+        static func newHereCount(_ count: Int) -> String {
+            count == 1
+                ? "1 thing found and not decided about yet."
+                : "\(count) things found and not decided about yet."
+        }
         static let newHereHelp =
             "Found on this machine and not decided about yet. Answer once and it is remembered; nothing is proposed twice."
         /// What each app is doing with models. The heading names the subject
@@ -161,6 +168,8 @@ enum Strings {
         static let openFolder = "Open folder…"
         static let checkNow = "Check now"
         /// The two answers to the register's one question.
+        static let showAll = "Show all"
+        static let showFewer = "Show fewer"
         static let itIsAHarness = "It's a harness"
         static let notAHarness = "Not a harness"
         static let floatHarness = "Float on the graph"

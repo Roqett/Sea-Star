@@ -82,6 +82,10 @@ Summary of Changes:
 - `macapp/SeaStar/Models/DoctorReport.swift` — decodes `answering` and `listening`; an older engine reads as *unproved* rather than being credited with an answer it never gave.
 - `macapp/SeaStar/Views/CockpitPopoverView.swift` — the row says "listening 8888, not answering" where it used to claim serving.
 - `DECISIONS.md` — D-010.
+- `macapp/project.yml` — **two build configurations.** Debug stays ad-hoc and unsigned so anyone can build without an Apple account; Release requires the hardened runtime and a Developer ID, and *fails to build* without one rather than silently producing a DMG Gatekeeper would refuse. The Team ID is supplied by the release script, so no account identifier is committed (D-011).
+- `script/release.sh` — **new.** Build, sign, package, notarise, staple and verify, checking the certificate, Team ID and notary credential before the build rather than after it, and ending on Gatekeeper's own verdict via `spctl`. `--dry-run` proves the pipeline without an Apple account and labels its output as unsigned.
+- `docs/ship.md` — **new.** The one-time Apple setup in plain language, why the script does each step in that order, the two distribution routes and why the App Store is closed to this design, and the remaining packaging gap stated as the headline rather than a footnote.
+- `DECISIONS.md` — D-011.
 
 Harness: TRAE
 

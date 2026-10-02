@@ -721,3 +721,76 @@ strength of a guess is worth nothing, which is the whole point of the ledger.
 
 - A runtime answers a probe on a path other than ``/v1/models``, or a suspected port is confirmed
   serving by a second method.
+
+---
+
+## D-011 — Ship via Developer ID and a notarised DMG; the Release configuration refuses to build without a real signature
+
+- **Date:** 2026-10-02
+- **Status:** Accepted
+- **Affects:** architecture (`macapp/project.yml`, `script/release.sh`), distribution, product values
+- **Founder input:** *"I really have to apologise, I totally forgot about the notarisation Apple side of
+  it. So of course we're not gonna deliver anything tonight … but at least I'd like to get to the
+  point of looking good, to get it close — something ready to go to Apple."*
+
+### The problem
+
+The app had one build configuration, with signing switched off entirely
+(`CODE_SIGNING_ALLOWED: NO`, `ENABLE_HARDENED_RUNTIME: NO`, ad-hoc identity). That
+is correct for development and useless for shipping, and the two were the same
+setting. Nothing about the app said, anywhere, that it could not be handed to a
+person — and there is no signing identity on this machine at all, so notarisation
+is not a configuration detail to be discovered at upload time.
+
+### The decision
+
+1. **Two configurations, because building for yourself and building for strangers are
+   different acts.** Debug stays ad-hoc and unsigned so anyone can build without an
+   Apple account. Release requires the hardened runtime and a Developer ID.
+2. **The Release configuration fails rather than degrades.** Notarisation requires the
+   hardened runtime; the hardened runtime is meaningless without a real signature. A
+   Release build that silently fell back to ad-hoc would produce a DMG that Gatekeeper
+   refuses on someone else's Mac, and the failure would arrive as a support message
+   instead of a build error. Failing the build is the honest place for it.
+3. **No account identifier is committed.** The identity is fixed in the project; the
+   Team ID is supplied by `script/release.sh` from the environment.
+4. **Developer ID and a notarised DMG, downloaded from GitHub — not the Mac App Store.**
+   App Store apps must be sandboxed, and Sea-Star reads an Obsidian vault from an
+   arbitrary folder while spawning a Python engine as a child process. Both are exactly
+   what the sandbox prevents. Sandboxing is a rewrite of how the app reaches the vault,
+   not a signing task, so the App Store is recorded as not available to this design
+   rather than left as an open possibility.
+5. **Every gate the script can check, it checks first** — certificate, Team ID, notary
+   credential — and it asks Gatekeeper for its own verdict at the end with `spctl`,
+   because every step above can report success while Gatekeeper still refuses.
+6. **`--dry-run` exists so the pipeline can be proven without an account.** It builds,
+   packages and labels the result as unsigned and not for distribution.
+
+### Consequences
+
+- `script/release.sh --dry-run` was run and completes: Release builds, the signature is
+  verified, a 1.7 MB DMG is produced at `dist/Sea-Star-0.1.0.dmg`, and the run stops
+  before notarisation stating plainly that Gatekeeper would refuse it elsewhere.
+- Run without `--dry-run`, it stops at the first gate with the exact steps to fix it —
+  verified, since no certificate exists on this machine.
+- `docs/ship.md` records the one-time setup, the two routes, and the remaining gap.
+
+### Open — and this is the honest headline
+
+**The engine is not inside the app bundle.** The DMG contains the menu-bar app and
+nothing else; on this machine the app finds the repository and `sea-star` on `PATH`,
+and on a stranger's Mac it would find nothing. A notarised DMG is therefore *not yet
+worth distributing*, and no amount of signing fixes it. Closing it means vendoring the
+engine into `Contents/Resources/engine` and pointing `EngineCommand.resolve()` at the
+bundle first, and ideally bundling a relocatable Python so the app is self-contained.
+The release script says this on every run rather than letting it surface after
+notarisation, when the DMG looks finished and is not.
+
+Also open: a shipping decision the founder should make knowingly — the deployment
+target is **macOS 26.0**, so anyone on an earlier Mac cannot run it at all.
+
+### Revisit when
+
+- The engine is bundled: then flipping the repository public and attaching a notarised
+  DMG to a GitHub release is the last step, and this entry should be updated with the
+  first notarised version number.

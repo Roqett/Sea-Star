@@ -25,10 +25,31 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: UpPeriscope.Sea-Star
         PRODUCT_NAME: Sea-Star
         PRODUCT_MODULE_NAME: SeaStar
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGNING_REQUIRED: NO
-        CODE_SIGNING_ALLOWED: NO
-        ENABLE_HARDENED_RUNTIME: NO
+      # Two configurations, because building for yourself and building for
+      # strangers are different acts and were previously the same one.
+      configs:
+        Debug:
+          # Local development: ad-hoc signed and unsigned, so anyone can build
+          # and run it without an Apple account. Never ship this configuration.
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGNING_REQUIRED: NO
+          CODE_SIGNING_ALLOWED: NO
+          ENABLE_HARDENED_RUNTIME: NO
+        Release:
+          # Shipping: notarisation *requires* the hardened runtime, and a
+          # hardened runtime is meaningless without a real signature. The
+          # identity is fixed and the team is supplied by `script/release.sh`,
+          # so no account identifier is committed to the repository.
+          #
+          # This configuration fails the build when no Developer ID certificate
+          # is present, which is deliberate: a Release build that silently falls
+          # back to ad-hoc would produce a DMG that Gatekeeper refuses on someone
+          # else's Mac, and the failure would arrive as a support message instead
+          # of a build error.
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          ENABLE_HARDENED_RUNTIME: YES
+          OTHER_CODE_SIGN_FLAGS: "--timestamp --options=runtime"
     info:
       path: SeaStar/Support/Info.plist
       properties:

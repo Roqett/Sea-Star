@@ -66,6 +66,9 @@ struct CockpitPopoverView: View {
 
     @State private var isImportingVault = false
     @State private var isLogsExpanded = false
+    /// Whether the whole register backlog is unfolded. Folded by default: the
+    /// panel is a cockpit, not a to-do list.
+    @State private var showingAllCandidates = false
     @State private var isLogsHovering = false
 
     /// Which reading of the cockpit the person prefers (spec §8.7). Empty until
@@ -375,11 +378,35 @@ struct CockpitPopoverView: View {
     private var newOnThisMachine: some View {
         if !controller.candidates.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                Text(Strings.Rows.newHere)
-                    .font(.caption2.weight(.semibold))
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(Strings.Rows.newHere)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(Palette.inkMuted)
+
+                    Spacer(minLength: 8)
+
+                    // Tidy by default: the register is a backlog, not the panel.
+                    // A first run can have a dozen things to decide about, and
+                    // showing all of them buries the cockpit underneath its own
+                    // housekeeping. Three are shown; the rest wait behind one
+                    // quiet word, and nothing is hidden.
+                    if controller.candidates.count > Self.candidatesShown {
+                        Button(showingAllCandidates ? Strings.Actions.showFewer : Strings.Actions.showAll) {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                showingAllCandidates.toggle()
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Palette.inkMuted)
+                    }
+                }
+
+                Text(Strings.Rows.newHereCount(controller.candidates.count))
+                    .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(Palette.inkMuted)
 
-                ForEach(controller.candidates) { candidate in
+                ForEach(visibleCandidates) { candidate in
                     NewCandidateRow(
                         candidate: candidate,
                         isBusy: controller.isDeciding,
@@ -394,6 +421,14 @@ struct CockpitPopoverView: View {
             }
             .help(Strings.Rows.newHereHelp)
         }
+    }
+
+    /// How many undecided things are shown before the rest are folded away.
+    private static let candidatesShown = 3
+
+    private var visibleCandidates: [DoctorReport.CandidateInfo] {
+        guard !showingAllCandidates else { return controller.candidates }
+        return Array(controller.candidates.prefix(Self.candidatesShown))
     }
 
     /// The one binding both the header toggle and the panel read and write, so
