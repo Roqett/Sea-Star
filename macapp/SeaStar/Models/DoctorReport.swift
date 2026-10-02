@@ -78,6 +78,24 @@ struct DoctorReport: Decodable, Sendable, Equatable {
         }
     }
 
+    /// One host currently attached to the engine over stdio. The engine
+    /// records who spawned its `serve` process and prunes the record when the
+    /// process dies, so this is proof of a live connection — the stdio
+    /// equivalent of a port probe, since a stdio host never answers a port.
+    struct McpClientInfo: Decodable, Sendable, Equatable {
+        let name: String
+        let bundleID: String?
+        let pid: Int
+        let startedAt: String
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case bundleID = "bundle_id"
+            case pid
+            case startedAt = "started_at"
+        }
+    }
+
     let schemaVersion: Int
     let ready: Bool
     let version: String
@@ -93,6 +111,10 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     /// so the panel can say the difference rather than showing a blank row.
     let agentSource: String?
     let latentHarnesses: [LatentHarnessInfo]?
+    /// Hosts attached over stdio right now. `nil` when the engine predates
+    /// connection records — the app then shows no attached host rather than
+    /// inventing one.
+    let mcpClients: [McpClientInfo]?
     let server: ServerState
     let servers: [BridgedServer]
 
@@ -109,6 +131,7 @@ struct DoctorReport: Decodable, Sendable, Equatable {
         case agents
         case agentSource = "agent_source"
         case latentHarnesses = "latent_harnesses"
+        case mcpClients = "mcp_clients"
         case server
         case servers
     }
@@ -129,6 +152,10 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     /// Every installed-but-idle harness the engine found. Empty when the engine
     /// predates latent-harness scanning (`latent_harnesses` absent).
     var detectedLatentHarnesses: [LatentHarnessInfo] { latentHarnesses ?? [] }
+
+    /// Every host attached over stdio right now. Empty when the engine
+    /// predates connection records (`mcp_clients` absent).
+    var attachedMcpClients: [McpClientInfo] { mcpClients ?? [] }
 }
 
 /// The bridge answers with either the report or a fail-loud error object.

@@ -81,12 +81,20 @@ enum Strings {
         /// The server this app started and is holding open.
         static let serving = "Serving"
         static let notServing = "Stopped"
+        /// A host attached to the engine over stdio, proven by the engine's
+        /// own live connection record — never by a port, which a stdio host
+        /// never answers.
+        static let host = "Host"
+        static let hostDetail = "stdio connection record"
 
         /// The evidence line under the band. It names *how far* the claim was
         /// proven, which is the whole point: "live" here means "answered a
         /// probe", never "a person used it".
         static let evidenceProbe = "Live means a probe answered, just now."
         static let evidenceNone = "No probe has answered yet."
+        /// Evidence for the attached-host row: the engine holds the record
+        /// because it *is* the process this host spawned.
+        static let evidenceMcp = "Attached means the engine holds the host's own live connection record."
     }
 
     /// The ways to lay the same four rows out, so the choice is a picture

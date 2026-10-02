@@ -6,8 +6,9 @@ note at the end of every session.
 ## Current state
 
 - **Version:** 0.1.0 (unreleased). Repo is **private** until built and tested.
-- **Health:** `uv run ruff check .` clean; `uv run pytest` — 76 passing. App:
-  `xcodebuild … test` — 29 Swift Testing cases passing (8 suites).
+- **Health:** `uv run ruff check .` clean; `uv run pytest` — 97 passing. App:
+  `xcodebuild … test` — 70 Swift Testing cases passing (13 suites). Both re-run at session
+  close 2026-09-30.
 - **Foundation (`docs/foundation.md`, binding from 2026-09-28).** The lead clause is
   **"no name is ever a precondition"** — every known harness/runtime name is an *additive
   hint* that improves a label, and its absence may never reduce what is displayed. Carries
@@ -21,11 +22,13 @@ note at the end of every session.
   visibility on a bundle-id allowlist and skips unknown apps entirely. `AGENTS.md` now
   points here; the repo front page is the shopfront, not the foundation.
 - **Bridge:** `sea-star doctor --json` now emits the full §6 contract —
-  `schema_version`, nested `vault {path, source, note_count, candidates}`, `server.state`,
+  `schema_version`, nested `vault {path, source, note_count, candidates}`, `mcp_clients[]`,
   and `runtimes[]` (one object per live harness). Always one JSON object, even on failure.
   `include` / `exclude` tool curation is wired through `config.py` → `mcp_client.py`.
+  `server.state` is **still emitted but is misleading** and is no longer described here as
+  part of the contract — see the 2026-10-01 handoff, "Stale `server.state`".
 - **Cockpit (new):** the macOS menu-bar app exists under `macapp/` (XcodeGen + SwiftUI).
-  It builds, launches, and its 12 Swift Testing cases pass. Popover shows vault/harness/model
+  It builds, launches, and its 70 Swift Testing cases pass (13 suites). Popover shows vault/harness/model
   and its vault, model and harness rows are pick-lists (T3.2/T3.3 + multi-harness), switching
   via `SEASTAR_VAULT` / `SEASTAR_MODEL` / `SEASTAR_BASE_URL`+`SEASTAR_RUNTIME`. It holds **all four founder icons in one roster** (`IconRoster`) and
   rerolls to a different face on server start/stop — the "open and shut" Easter egg (T4.7) —
@@ -81,6 +84,7 @@ note at the end of every session.
 | Foundation | `docs/foundation.md` | **New** — the binding document. "No name is ever a precondition"; capability ladder, degradation contract, MCP-first. Binding from 2026-09-28. |
 | Harness/app discovery | `src/sea_star/harnesses.py` | Partial — **violates foundation §1**: gates on `KNOWN_HARNESS_APPS` and skips unrecognised apps instead of showing them degraded. |
 | Agent roster | `src/sea_star/agents.py` | New — per-harness agent/provider/model config discovery. Private prompts are never copied out. |
+| Connection records | `src/sea_star/connections.py` | **New 2026-09-30** — `serve` records which host spawned it (`~/.seastar/clients/{pid}.json`, identity walked up 8 parent processes to the `.app`, derived fields only, dead pids pruned); doctor counts recorded hosts **active**, emits additive `mcp_clients[]`. Fixes the "TraeWork not active" structural bug (quick form of foundation §3). |
 | Cockpit (mac app) | `macapp/` | **New** — XcodeGen project; **AppKit-hosted** SwiftUI (`SeaStarMain` → `AppDelegate`, `NSStatusItem` + `NSPopover`). `App/ Views/ Models/ Services/ Support/ Shaders/`; builds, launches, 29 Swift tests pass. Right-click app menu + Settings window + GitHub-Releases update check. Vault + model + harness pick-lists wired to `SEASTAR_VAULT`/`SEASTAR_MODEL`/`SEASTAR_BASE_URL`. Four-face icon roster rerolls on start/stop (T4.7); real T4.3/T4.4 cuts; header caustic shimmer (T4.5). Idle harnesses float by default (hidden-set preference, migrated off the old enabled-set key). |
 
 ## File ownership
@@ -910,3 +914,313 @@ to actually connect to something." Before the pending push of 7828ada, fix it.
 **Open / single next step** — unchanged from the note above: the activity-event stream;
 `harnesses.py` §1 debt; voice/keyboard roadmap; brighter strip art; stray `plain` dump;
 telemetry vs Tier 1. Push/merge of 7828ada + this fix still awaits explicit approval.
+
+## Founder notes — 2026-09-30 (review-pass observations — HOLD, discuss before building)
+
+Recorded during the start of the founder's methodical feature-by-feature review. These are
+**notes, not work items yet** — he asked for them logged and left alone until the pass
+produces the full picture.
+
+1. **Plain-language MCP panels (docs).** The founder hit Atomic Chat's *Add MCP Server*
+   panel (single Command box, `npx …` placeholder) and couldn't map it to our docs.
+   `connect.md` speaks JSON `command`/`args`; hosts like this want **one line**. Needs a
+   dummies-level section: what each field means, the exact line to paste
+   (`uv --directory <abs path> run sea-star serve`), and no assumption that the reader
+   uses a terminal or has `uv`. Wording rule: no jargon — he didn't know what a "smoke
+   test" was; explain as if for dummies.
+2. **Nobody has seen the tools used for real.** He has only ever seen Sea-Star *connect*,
+   never *do* anything — "later we're gonna have to describe to people how an agent
+   actually uses these tools." Most harnesses ship near-built-in Obsidian connections, so
+   ours is a sidecar; docs/`connect.md` §"What to say to the agents" exists but has never
+   been exercised end-to-end in front of him. Needs a worked, real example before any
+   marketing-style claims.
+3. **Primary-view decluttering rule (new, not yet discussed or spec'd).** "Actual models
+   not being used in a server should only be visible in the zoom view unless it's actually
+   active. The primary view needs to be as uncluttered as possible — only primary
+   harnesses, servers, potentially MCPs active if possible." Hold for a design discussion
+   before touching spec §8 or the graph.
+4. **Carried holds** (from earlier today, still no fixes): always-visible blue latent vault
+   line (latent when disconnected, live when connected, in every panel); `harnesses.py`
+   allowlist debt (stale Osiris shown active, Atomic Chat undetected); docs/README naming
+   neutrality scrub ("down the track", names only as explicit examples).
+5. **3D direction — `3d-force-graph` as a hidden canvas (discussed, not yet decided).**
+   The founder asked whether the web-borne `3d-force-graph` (three.js wrapper — the
+   little package the rest of the industry copies) could live in our panel "just as like a
+   canvas so that yes it's web originated but you wouldn't know." It can: a chromeless
+   `WKWebView` hosting a **local bundled page** (no network), fed the same
+   `EntityGraphModel` JSON, background painted to match the starfield — a **third
+   renderer** over the same renderer-independent model. Costs to weigh before building:
+   a few MB of bundle (spec's size gate — measure it), Swift↔page glue for
+   hover/click/focus, Reduce Motion (no auto-spin). Would replace the hand-built SceneKit
+    `GraphSceneView`, not sit beside it. Follow-up from the founder: could we then use
+    *any* browser-based graph, "including the codebase-memory version"? Distinction
+    recorded: a rendering **library** (3d-force-graph) is a dumb canvas we feed our own
+    model into — clean, ours; a whole **application** (codebase-memory's explorer) expects
+    its own backend/API/data shape, so embedding it means running their engine alongside
+    ours (or maintaining an adapter), plus a license check and their update schedule.
+    Sweet spot: same ingredient, our data.
+6. **The orange/green nudi strips in the panels are "just sitting there doing nothing."**
+   Investigation only — no fix until he says so. What they are: the two `LivenessBar`s in
+   the text panel's *Working now* section — the header bar (`CockpitPanel.swift:555`,
+   live = doctor `ready`) and the observation row (`CockpitPanel.swift:638`, live =
+   server running or ready); graph nodes reuse the same component
+   (`EntityGraphView.swift:895`, shown only when live). Design: vivid orange→green with a
+   slow gradient crawl when live, grey and still when idle; motion additionally gated on
+   the popover being open (`SeaStar.cockpitOpen`, default false, written by
+   `popoverDidShow`/`popoverDidClose`) and on Reduce Motion (spec D-002 — "no signal means
+   still, which is the safe failure"). Findings: (a) engine is genuinely live
+   (`doctor ready:true`, `sea-star serve` running) so both bars should be in their vivid,
+   moving state; (b) the running build (09:49 binary, launched 09:56) **does** contain the
+   gate code — an earlier scare that the key string was missing from the binary was a
+   false alarm caused by grepping the 40 KB launcher stub instead of
+   `Sea-Star.debug.dylib`, where Debug builds keep all app code; (c) Reduce Motion is
+   **off** (no `reduceMotion` key in `com.apple.universalaccess.plist` — never toggled);
+   (d) `SeaStar.cockpitOpen` has never been written to any defaults domain, but the app
+   was relaunched at 09:56 and the popover may simply not have been opened since — a
+   15-minute passive watch (`/tmp/seastar_gate_watch.log`, started 12:33) logs the key and
+   `cockpitMode` every 2 s while he clicks, to see whether opening the popover turns the
+   signal on. If the signal works, the fallback explanation is the crawl itself: the sweep
+   is only 8 points of travel, and "liveness bars too subtle to notice" was his complaint
+   in the previous session too.
+   **Root cause found (watch log + AppKit header, 12:33–12:58) — still report-only, no
+   fix until he says go.** The watch log's 449 lines all read `cockpitOpen=absent
+   cockpitMode=graph`, yet by 12:58 the live defaults show `cockpitMode = "list"`: he is
+   clicking, and `@AppStorage` writes work — the open flag simply never fires. Cause:
+   `NSPopoverDelegate` is declared in the SDK header as
+   `- (void)popoverDidShow:(NSNotification *)notification` (same for willShow/willClose/
+   didClose), but `AppDelegate.swift:92–98` implements `popoverDidShow(_ popover: NSPopover)`
+   / `popoverDidClose(_ popover: NSPopover)`. Wrong parameter type → the ObjC selector never
+   matches → AppKit never calls them → `SeaStar.cockpitOpen` is never written →
+   `LivenessBar`'s `isOpen` gate stays false forever → crawl permanently off (D-002's
+   "no signal means still" safe-failure doing exactly what it says, with a signal that can
+   never arrive). Fix location when approved: the two delegate methods (or an explicit
+   write in `togglePopover`, the single `popover.show` call site at `AppDelegate.swift:87`).
+
+## Handoff — 2026-09-30 (session close — the structural fix landed, everything else listed)
+
+**Why this session existed**
+
+The founder's structural complaint: *"I just added TraeWork to it and it's not coming up as
+active and you are."* Plus the session-close directive: finish what can finish now, then
+leave a list that loses nothing for the new session. (He also suggested compaction — safe
+once this section is on disk; it is a client-side button.)
+
+**Root cause (found and fixed)**
+
+The doctor decided "active vs latent" purely from **port probes**. TraeWork attaches over
+**stdio** and never answers a port, so it was *structurally incapable* of looking active —
+it would show as latent while genuinely connected. The approved quick fix is foundation
+§3's "ask, don't guess" in miniature: **connection records** instead of the full §3 build.
+
+**Done — engine (all live-proven)**
+
+- New `src/sea_star/connections.py`: `serve` writes `~/.seastar/clients/{pid}.json` on
+  start, clears it on exit. Identity = walk ≤8 parent processes to an absolute `.app`
+  path matched against the bundle-id allowlist; fallback nearest executable basename.
+  Stores **derived fields only** (name/bundle_id/app_path) — never raw `ps` command
+  lines (they can contain shell exports/tokens). Dead pids are pruned on read, so a crash
+  can never leave a ghost. Entirely best-effort: recording must never fail `serve`.
+  Override dir: `SEASTAR_CLIENTS_DIR` (used by tests).
+- `src/sea_star/cli.py`: doctor's `active` set now unions recorded client names → a
+  connected TraeWork leaves `latent_harnesses[]`; new additive bridge key
+  `mcp_clients[]` (`name`, `bundle_id`, `pid`, `started_at`); human doctor prints
+  `Connected: <names>`; `serve` wraps `record_client()` / `finally: clear_client()`.
+- Tests: `tests/test_connections.py` (new) + `tests/test_cli.py` additions, including
+  `test_doctor_json_counts_an_attached_host_as_active`.
+- Live proof: `doctor --json` showed both serves under `mcp_clients` —
+  `{"name": "Sea-Star", "bundle_id": "UpPeriscope.Sea-Star", "pid": 30999}` (the
+  cockpit's own) and `{"name": "TraeWork", "bundle_id": "com.trae.solo.app", "pid":
+  31147}` — and TraeWork was gone from the latent list.
+- Gotcha already paid for: parent command lines may merely *mention* an app
+  (`source '/Applications/X.app'`), so app-path extraction is a delimiter-aware regex
+  with a lookahead rejecting letters **and** dots — not a naive `.*?\.app`.
+
+**Done — cockpit (decode + surface)**
+
+The fix created a display gap: a connected TraeWork leaves both the popover's latent list
+*and* the graph (latent nodes are idle-only), so it would appear **nowhere**. Closed in
+the place with the right meaning — the **Working-now band** ("what's happening right
+now"):
+- `DoctorReport.swift`: new `McpClientInfo` struct, optional `mcpClients` field keyed
+  `mcp_clients`, `attachedMcpClients` computed (`?? []`). The only construction path is
+  the decoder, so the new field is contract-safe; an older engine yields an empty list,
+  never an invented host.
+- `Strings.swift`: `WorkingNow.host` / `.hostDetail` ("stdio connection record") /
+  `.evidenceMcp`.
+- `CockpitPanel.swift` (`WorkingNowBand`): a live **Host** row (all attached names) when
+  `attachedHosts` is non-empty; the evidence line became a computed four-state switch —
+  probe only / probe+record / record only / none — because a port probe and a connection
+  record are *different proofs of different things* and the line must say which it stands
+  on.
+- `DoctorReportTests.swift`: 2 new decode tests (with and without the key).
+- Spec §6 rules honoured: additive-only, stable keys, `schema_version` unchanged.
+
+**Done — wrap-up items approved ("All four items")**
+
+- The `plain` stray dump is **deleted** (524,945 bytes). Rule stands: never commit dumps.
+- Full suites green: **97 pytest** + `ruff check .` clean; **70 Swift tests in 13
+  suites**, TEST SUCCEEDED.
+- CHANGELOG's 2026-09-30 entry gained the structural-fix bullet; verified numbers updated.
+- Computer-use / permission probes (his extra ask) — findings at the bottom of this note.
+
+**Not done in code, deliberately**
+
+- The running cockpit binary predates these Swift changes. Relaunch when he's not
+  mid-review: `pkill -x Sea-Star; open <DerivedData>/Build/Products/Debug/Sea-Star.app`
+  (`script/build_and_run.sh` does the full rebuild). Then the Host row appears live.
+- Nothing committed this session — see git state below; commits need his go (and 7828ada
+  / 1216c7a still await explicit push approval).
+
+**OPEN — complete list for the new session (start here)**
+
+1. **Push / publish gate.** `7828ada` + `1216c7a` on `feat/macapp-cockpit` (plus all
+   uncommitted work below) await **explicit approval** — never push/merge without it.
+   Stale GitHub copy: the port-8009 scan was never published; the repo is still private
+   ("publish as work in progress, hours away" was the founder's framing — his call).
+2. **Commit decision for this session's work** (engine + cockpit + docs above) — single
+   commit or split; don't touch the two awaiting-approval commits' history.
+   **Git state at session close (2026-09-30):** branch `feat/macapp-cockpit`, **ahead 5**
+   of `origin`; modified: `CHANGELOG.md`, `docs/PROGRESS.md`, `macapp/SeaStar/Models/
+   DoctorReport.swift`, `macapp/SeaStar/Support/Strings.swift`, `macapp/SeaStar/Views/
+   CockpitPanel.swift`, `macapp/SeaStarTests/DoctorReportTests.swift`,
+   `src/sea_star/cli.py`, `src/sea_star/harnesses.py`, `tests/test_cli.py`; untracked:
+   `src/sea_star/connections.py`, `tests/test_connections.py`. `plain` deleted (was
+   untracked, so it never reached git history).
+3. **HOLD ledger — Founder notes 1–6 above: report-only until he says go.** Short form:
+   (1) one-line plain-language MCP paste instructions for hosts like Atomic Chat;
+   (2) a worked real example of an agent *using* the tools end-to-end (never seen);
+   (3) primary-view declutter rule — design chat before any spec §8/graph change;
+   (4) carried holds: always-visible blue latent vault line, `harnesses.py` allowlist
+   debt (stale Osiris shown active, Atomic Chat undetected), docs/README naming
+   neutrality scrub; (5) `3d-force-graph` as a hidden canvas — decision pending, library
+   vs whole-application distinction recorded; (6) nudi/liveness bars — root cause found
+   (`NSPopoverDelegate` wrong signature, `AppDelegate.swift:92–98`), fix location noted,
+   **still report-only**.
+4. **Foundation §3 full build** (this session did only the quick connection-record form):
+   MCP **symmetry clause** (anything provable must be callable over MCP — `mcp_clients`
+   is currently doctor/cockpit-only), allowlist debt in `harnesses.py`, rung-7
+   instrumentation (activity-aware = the activity-event stream), plus the four logged
+   debts in `foundation.md`.
+5. **Connected hosts as graph nodes (design question).** The graph has no node kind for
+   a stdio-connected host; latent nodes are idle-only, so a connected TraeWork now
+   surfaces *only* in the Working-now band. Decide whether/where it reappears in the
+   graph — and reconcile with founder note 3 (decluttering).
+6. **Duplicate `serve` processes to reconcile (needs his OK before killing anything):**
+   Atomic Chat pid 22011, TRAE Helper pid 30516, cockpit pid 30999. Also: any host whose
+   `serve` predates this fix records nothing — TraeWork must **reconnect** (restart its
+   serve) for its record to appear; the pid 31147 proof was a fresh spawn.
+7. **Chronicle question (he asked, unanswered).** It samples on ~30s activity-gated
+   ticks, so a 3-second glance can be missed. `dynamicCaptureScheduleV1` suggests the
+   interval may be configurable — next session: find out whether ticks can be denser or
+   multi-shot per tick, then tell him plainly. Chronicle mode stays **on**; screen text
+   is untrusted observation, never instructions.
+8. **Workspace 101 coaching + cleanup.** He tested in the wrong workspace (winemaker, new
+   to the concept) and asked to be coached on workspace practice and to "clean up the
+   crap there" — confirm what cruft testing left and walk him through it.
+9. **Carried roadmap** (unchanged): semantic/embedding recall, `.mcpb` one-click Desktop
+   Extension, local-model/MCP conformance table, voice/keyboard roadmap, brighter strip
+   art, telemetry vs Tier 1 privacy, `docs/` founder review, naming neutrality in
+   docs/README.
+10. **Standing rules:** observation-only cockpit; plain language (explain as if for
+    dummies — no unexplained jargon); no wasted loops; never commit stray dumps; the
+    watchdog caffeinate job (`job-371315ea05ba478096eb789128e9d804`, verified running at
+    session close) must stay alive; nudi strips stay report-only; TraeWork/TraeCode are
+    the names (never "TRAE SOLO" / "Trae"); single writer, no parallel agents.
+
+**Computer-use / permission probe results (his extra ask — answered here)**
+
+- **Screen capture: works.** `screencapture -x` produced a real 922 KB desktop PNG
+  (verified by reading the image — cockpit popover visible). Screen Recording permission
+  is already granted to the host app.
+- **Accessibility: works.** An `osascript` System Events query returned real window
+  coordinates (`500, 162`) — AX is trusted.
+- **Clicking: no tool installed.** `cliclick` is absent (`brew` itself is at
+  `/opt/homebrew/bin/brew`). To enable synthetic clicks: `brew install cliclick` — no
+  permission flip needed for the install; the *clicks* then run through the already-
+  granted Accessibility permission.
+- **Settings map if anything is ever denied** (System Settings → Privacy & Security):
+  *Screen Recording & System Audio* (screenshots/OCR), *Accessibility* (read/control
+  windows, clicks), *Input Monitoring* (keyboard-level capture, if ever needed). TRAE
+  Work itself must be listed in those panes for TRAE-driven computer use.
+- Together: screenshots + AX + (installed) cliclick ≈ full computer-use loop; Chronicle
+  already covers the passive watching side.
+
+**Single next step** — rebuild/relaunch the cockpit so the Host row is visible live, then
+walk the OPEN list top-down with the founder; commit + push only on his explicit word.
+
+## Handoff — 2026-10-01/02 (verification pass — the "uncommitted findings" re-checked against the code)
+
+**Why this session existed**
+
+A new session was handed a short verbal summary of the previous one: *"the connection-tracking
+work is finished but never committed, the `server.state` field in `cli.py` is stale/misleading,
+and `docs/HANDOVER-mac-app.md` still describes a WKWebView graph that was built natively
+instead."* Nothing was taken on trust. Every claim below was re-derived from the working tree;
+two of them need correcting, and one item on the list turned out to name a file that has never
+existed.
+
+**Verified true — all three claims hold**
+
+- **Connection tracking is complete and uncommitted.** `src/sea_star/connections.py` (189 lines,
+  untracked) + `tests/test_connections.py` (167 lines, untracked); wired into `cli.py` `serve`
+  (`record_client()` / `finally: clear_client()`) and `doctor` (`live_clients()` → `mcp_clients[]`,
+  and the records feed `detect_latent_harnesses(active=…)`). Diff is **9 modified files + 2
+  untracked**, and nothing has been committed since `1216c7a`.
+- **`server.state` is stale and misleading.** `cli.py:125` emits
+  `{"state": "running" if models else "stopped"}`. `models` is the **inference endpoint's** model
+  list — so the field reports *"the model server answered"*, never *"the Sea-Star MCP server is
+  running"*, which is what the name says. The macOS app already ignores it: `isServerRunning` is
+  local process state (`ServerController.swift:71`, and the §6 comment at `:63` reads the field as
+  *"may be local app state"*). It is kept alive only by its own test (`tests/test_cli.py:92`) and
+  seven Swift fixtures. Nothing reads it for truth.
+- **The web-view plan is out of date in `docs/HANDOVER-mac-app.md`** — `:37-39` (Decision 3) and
+  `:132` (suggested step 4) both plan `WKWebView` → `http://localhost:9749`; `:19-21` cites 27
+  tests and HEAD `f4d21b3` on `main`; `:119-122` and `:152` still point at the codebase-memory UI
+  as live infrastructure. All superseded.
+
+**Corrections to the handoff I was given**
+
+1. **The stale web-view plan is in two documents, and the worse one is the binding spec.** The
+   spec's own locked-decision table still carries it:
+   [`.trae/specs/mac-app/spec.md`](.trae/specs/mac-app/spec.md) **D3 — "Embed the codebase-memory
+   web UI via `WKWebView`, restyled to the palette"** — while *the same document's* §8.7/§8.8
+   specify a hand-drawn 2D starfield and a SceneKit room, `DECISIONS.md` D-002 accepted Flat 2D +
+   Deep 3D over one `EntityGraphModel`, and the code agrees with §8. A handover doc is a
+   wayfinding note; **D3 is a locked founder decision**, so it is *not* edited on my own initiative
+   — see the decision block below. This is the same class of bug as the stale `server.state`:
+   a name that outlived the thing it named.
+2. **`hardware.yaml` does not exist** — anywhere in the repo, at any depth, and nothing reads it.
+   `AGENTS.md:153` says *"`hardware.yaml` is read at runtime and is the only place hardware is
+   specified. If the hardware changes, update this file only."* No such file, no schema, no
+   reader. It is the same Fail-Loud shape as the other two defects, one level up: a documented
+   contract with nothing behind it. (Also — the founder called this an "M4 Pro"; it is a **Mac mini
+   M4 Pro**, `Mac16,11`, 12 cores (8P+4E), **64 GB**, macOS 27.0 build 26A428. Worth noting because
+   `hardware.yaml`'s first job is to be the single true record, and "M4 Pro" alone does not
+   identify the machine.)
+
+**Verified state at close (2026-10-02 13:41 ACST)**
+
+- `uv run pytest` → **97 passed** in 0.34s. Claim re-checked, not assumed.
+- Branch `feat/macapp-cockpit`, **ahead 5** of origin. Nothing committed or pushed this session.
+- The PROGRESS.md "Current state" block contradicted this file's own handoff (it said **12** Swift
+  cases on line 29 while line 10 said **70**). Corrected to 70; the stale `server.state` mention in
+  the Bridge bullet was replaced with `mcp_clients[]` and an explicit pointer here.
+
+**Decision needed: the three defects above are three different kinds of fix, so they are not one commit**
+
+- `server.state` and the handover doc are **documentation/labelling** — low risk, reversible, and
+  fixable without touching a locked decision.
+- Spec **D3 is a locked decision**: superseding it is the founder's call (AGENTS.md, Tier-2
+  architecture bet + "State-machine or workflow alterations" both bite). A one-line amendment in
+  the spec's own Revision-N style is all it needs — but I will not write it unprompted, because a
+  *pending* founder note (Founder notes §5, hold ledger item 5) reopens the very question of a
+  web canvas. Amending D3 to "natively drawn" days before possibly reintroducing a bundled
+  `3d-force-graph` canvas would replace one stale line with another. The honest record is that
+  D3 is superseded *in spirit and in code*, and the note-5 decision settles what replaces it.
+- `hardware.yaml` is a **new file with no schema** — creating it means inventing a format and a
+  runtime reader, which is a scope expansion, not a tidy-up.
+
+**Single next step** — settle the two founder-only items (spec D3's replacement wording, and
+whether `hardware.yaml` gets created now), then commit the prepared set. The commit is staged in
+the working tree and described in full below; **it has not been run**, per the standing rule that
+commits happen only on the founder's explicit word.

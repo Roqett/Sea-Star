@@ -15,10 +15,14 @@ is about building a native macOS front end on top of it.
   South Australia.
   Comfortable with Swift basics only — **allergic to the terminal**. This is the whole
   reason the GUI exists.
-- **Engine state:** `uv run ruff check .` clean; `uv run pytest` → 27 passing. Version
-  `0.1.0`, unreleased. The **app bridge (`sea-star doctor --json`) and `include`/`exclude`
-  tool curation are now in** — the engine surface the app needs already exists. Latest
-  committed HEAD is `f4d21b3` on `main`; the bridge work sits on top of it.
+- **Engine state:** `uv run ruff check .` clean; `uv run pytest` → 97 passing. Version
+  `0.1.0`, unreleased. The **app bridge (`sea-star doctor --json`), `include`/`exclude`
+  tool curation, and the stdio connection records (§7 note below) are all in** — the engine
+  surface the app needs exists. The app itself is **built and running**: Swift suite → 70
+  cases in 13 suites, green. Branch `feat/macapp-cockpit`.
+  *This section was rewritten 2026-10-02; it previously cited 27 tests and HEAD `f4d21b3`
+  on `main`, both long superseded. `docs/PROGRESS.md` is the live record — trust it over any
+  figures quoted in this document.*
 - **Local folder:** `/Users/lono/Random_MCP/theSeaStar` (folder name still the old
   spelling; the repo and package are already `Sea-Star` / `sea_star`).
 
@@ -33,10 +37,23 @@ engine so the founder never has to open a terminal — it flashes up what it fin
 1. **Form factor:** a **menu-bar app** (SwiftUI `MenuBarExtra`) — click the star, get a
    compact popover. Optionally a matching main window later.
 2. **Engine link:** the app **shells out to the existing `sea-star` CLI** and reads the
-   output. Do **not** rewrite the Python engine. Keep the 27 tests green.
-3. **Graph view:** embed the existing codebase-memory web UI in a web view
+   output. Do **not** rewrite the Python engine. Keep the Python tests green (currently 97).
+3. ~~**Graph view:** embed the existing codebase-memory web UI in a web view
    (`WKWebView`) so the app shows that exact bright graph, restyled in the Sea-Star
-   palette.
+   palette.~~ **Superseded — the graph was built natively instead.** The cockpit draws its
+   own entity graph: a **Flat** 2D starfield (`EntityGraphView.swift`) and a **Deep**
+   SceneKit room (`GraphScene.swift` / `GraphSceneView.swift`), both fed by one
+   renderer-independent `EntityGraphModel.swift` so the two readings and the list rows can
+   never disagree (`DECISIONS.md` D-002; spec §8.7/§8.8). No web view, no `WKWebView`, and
+   **no runtime dependency on codebase-memory** — that project is now a *visual reference*
+   only (its look, and `assets/reference/ui-codebase-memory-graph.png`), not infrastructure.
+   The colour rule in §5 below still stands unchanged.
+   *Superseded 2026-10-02. The same stale line is still in the spec's locked table as **D3**;
+   that is a founder-only amendment and has been flagged rather than edited (see
+   `docs/PROGRESS.md`, 2026-10-01/02 handoff). A **pending, undecided** founder note asks
+   whether a *bundled, offline* web canvas (`3d-force-graph`, local files, no network) might
+   replace the SceneKit room — which is a different proposition from this old plan and is
+   deliberately not pre-empted here.*
 4. **Theme:** the **Carpet Sea Star** (*Meridiastra calcar*) — see §5.
 
 ## 4. Architecture
@@ -46,13 +63,19 @@ Three layers. Only the third is new code.
 1. **Engine (unchanged):** `src/sea_star/`. Already handles vault detection, runtime +
    model autodetect, and the MCP server.
 2. **Bridge:** the app runs `sea-star ...` and parses the result. **Gap closed:**
-   `sea-star doctor --json` now emits one JSON object (vault path, note count, runtime name,
-   base URL, model, model list, bridged servers) and always emits JSON, even on failure —
-   see [cli.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/cli.py#L64-L131). The
-   human output stays the default. Still worth a test (spec T1.5); the app should decode
-   this object rather than scrape rich text.
-3. **Cockpit (new):** a SwiftUI app. Start with `MenuBarExtra`; keep the scene explicit
-   and files split by responsibility (`App/`, `Views/`, `Models/`, `Services/`, `Support/`).
+   `sea-star doctor --json` now emits one JSON object (`schema_version`, a nested
+   `vault {path, source, note_count, candidates}`, `mcp_clients[]`, `latent_harnesses[]`,
+   `runtimes[]`, bridged `servers`) and always emits JSON, even on failure — see
+   [cli.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/cli.py). The
+   human output stays the default. The app decodes this object rather than scraping rich
+   text, and `tests/test_cli.py` now covers it (spec T1.5). **One field is known-stale:**
+   `server.state` is derived from whether the *inference endpoint* answered, not from
+   whether the MCP server is running — the app ignores it and tracks the real state itself
+   (`ServerController.isServerRunning`). See `docs/PROGRESS.md`, 2026-10-01/02 handoff.
+3. **Cockpit (built):** a SwiftUI app under `macapp/` (XcodeGen project). Started as
+   `MenuBarExtra`, and is now **AppKit-hosted SwiftUI** (`SeaStarMain` → `AppDelegate`,
+   `NSStatusItem` + `NSPopover`) because the popover behaviour needed AppKit. Files are split
+   by responsibility: `App/`, `Views/`, `Models/`, `Services/`, `Support/`, `Shaders/`.
 
 Useful existing internals to lean on:
 - Vault resolution order — `SEASTAR_VAULT` env > `seastar.toml [vault]` > Obsidian
@@ -116,21 +139,33 @@ Menu-bar item text stays short (≤ ~30 chars); push detail into a window or pop
 
 - Inference: **Osaurus** on `http://127.0.0.1:1337/v1`, model `foundation`. `sea-star
   doctor` prints **Ready**. oMLX defaults to `http://localhost:8000/v1`.
-- **codebase-memory graph UI is already running** at **http://localhost:9749**
-  (`codebase-memory-mcp --ui=true --port=9749`). Sea-Star is indexed there (252 nodes /
-  814 edges) but the index is **stale** — it predates the rename, so it still shows
-  `src/seastar/...`. Re-index before trusting paths.
+- *Removed 2026-10-02:* this section used to say the codebase-memory graph UI "is already
+  running" at `http://localhost:9749` and that Sea-Star was indexed there. **Nothing depends
+  on it.** The cockpit's graph is drawn natively from `EntityGraphModel`, and no Swift or
+  Python file references `9749` or codebase-memory. If that UI happens to be running it is
+  useful only as a visual reference; it is not part of the build, the run, or the tests.
 
 ## 8. Suggested first steps
 
-1. ~~Add the machine-readable bridge~~ — **done**: `sea-star doctor --json` ships. Add a
-   test for it (spec T1.5), then move on to the app itself.
-2. Scaffold the SwiftUI menu-bar app (own folder or sibling repo — decide this first):
-   `MenuBarExtra` scene + a `Services/` CLI client that runs the command and decodes JSON.
-3. Static first pass: popover showing vault / harness / model from the JSON, with a
-   start-stop toggle. Theme it with the palette in §5.
-4. Add the embedded graph (`WKWebView` → `http://localhost:9749`) in a detail window.
-5. Then polish: colouration picker, the star icon, the founder's live feedback.
+**All five of the original steps are done** — the app is scaffolded, the popover is wired to
+the bridge, the theme is applied, and the graph shipped natively (step 4 was built as a native
+renderer, not the `WKWebView` originally proposed; see §3). Kept here corrected rather than
+deleted, so a reader is not sent to build something that exists:
+
+1. ~~Add the machine-readable bridge~~ — **done**: `sea-star doctor --json` ships, and now
+   carries `mcp_clients[]` as well (see `docs/PROGRESS.md`).
+2. ~~Scaffold the SwiftUI menu-bar app~~ — **done**: `macapp/`, AppKit-hosted (`AppDelegate` +
+   `NSStatusItem`/`NSPopover`), with a `Services/` CLI client that runs the command and decodes
+   the JSON.
+3. ~~Static first pass: popover showing vault / harness / model + start-stop toggle~~ — **done**,
+   themed with the §5 palette, and grown well past a static pass.
+4. ~~Add the embedded graph~~ — **done natively**: Flat 2D starfield + Deep SceneKit room over
+   one `EntityGraphModel`. No `WKWebView`.
+5. ~~Then polish: colouration picker, the star icon, the founder's live feedback~~ — **done and
+   ongoing**: four-face icon roster, caustic shimmer, hover readout, focus mode.
+
+**Where to actually start now:** `docs/PROGRESS.md` → the most recent handoff's "OPEN" list.
+That file, not this one, tracks outstanding work.
 
 ## 9. Open questions / risks
 
@@ -147,9 +182,11 @@ Menu-bar item text stays short (≤ ~30 chars); push detail into a window or pop
 
 ```bash
 uv run sea-star doctor      # human-readable readiness check
+uv run sea-star doctor --json   # the bridge contract the app decodes
 uv run sea-star serve       # run as an MCP server (stdio)
-uv run ruff check . && uv run pytest   # keep green before committing
-open http://localhost:9749  # codebase-memory graph UI (if running)
+uv run ruff check . && uv run pytest   # engine: keep green before committing
+script/build_and_run.sh     # app: regenerate project.yml via XcodeGen, build, launch
 ```
 
-Build commands and project protocol: `AGENTS.md`. Live build state: `docs/PROGRESS.md`.
+Build commands and project protocol: `AGENTS.md`. Live build state: `docs/PROGRESS.md`
+— that file is the source of truth for what is outstanding; this document is wayfinding.

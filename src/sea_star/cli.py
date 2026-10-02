@@ -31,6 +31,7 @@ from .config import (
     resolve_vault,
     write_default_config,
 )
+from .connections import clear_client, live_clients, record_client
 from .harnesses import detect_latent_harnesses
 from .mcp_server import create_server
 from .vault import Vault
@@ -63,6 +64,11 @@ async def _build_report() -> dict:
     live = next((probe for probe in probes if probe.base_url == config.base_url), None)
     models = list(live.models) if live is not None else await probe_base_url(config.base_url)
     roster = detect_agent_roster(vault_path)
+    # §3, ask, don't guess: a host attached over stdio never answers a port
+    # probe, so its own live connection record is the only honest signal.
+    clients = live_clients()
+    active = {probe.name for probe in probes}
+    active.update(client.name for client in clients)
     return {
         "schema_version": BRIDGE_SCHEMA_VERSION,
         "ready": bool(models),
@@ -96,7 +102,16 @@ async def _build_report() -> dict:
                 "bundle_id": spec.bundle_id,
                 "path": spec.path,
             }
-            for spec in detect_latent_harnesses(active=(probe.name for probe in probes))
+            for spec in detect_latent_harnesses(active=active)
+        ],
+        "mcp_clients": [
+            {
+                "name": client.name,
+                "bundle_id": client.bundle_id,
+                "pid": client.pid,
+                "started_at": client.started_at,
+            }
+            for client in clients
         ],
         "runtimes": [
             {
@@ -189,6 +204,9 @@ def doctor(
     if report["agents"]:
         names = ", ".join(agent["name"] for agent in report["agents"])
         console.print(f"Agents:   {names}")
+    if report["mcp_clients"]:
+        names = ", ".join(client["name"] for client in report["mcp_clients"])
+        console.print(f"Connected: {names}")
     if report["latent_harnesses"]:
         names = ", ".join(harness["name"] for harness in report["latent_harnesses"])
         console.print(f"Latent:   {names}")
@@ -225,7 +243,11 @@ def serve() -> None:
     except ConfigError as error:
         _die(str(error))
     server = create_server(config, agent)
-    server.run(transport="stdio")
+    record_client()
+    try:
+        server.run(transport="stdio")
+    finally:
+        clear_client()
 
 
 if __name__ == "__main__":

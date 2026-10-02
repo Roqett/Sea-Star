@@ -11,6 +11,7 @@ from sea_star import __version__
 from sea_star.agents import AGENT_ADAPTER, AgentRoster, AgentSpec
 from sea_star.cli import app
 from sea_star.config import RuntimeProbe
+from sea_star.connections import ClientRecord
 from sea_star.harnesses import HarnessSpec
 
 runner = CliRunner()
@@ -28,6 +29,8 @@ def _clean_env(monkeypatch):
         "sea_star.cli.detect_agent_roster",
         lambda *args, **kwargs: AgentRoster(specs=(), source=None, path=None),
     )
+    # Live MCP connection records belong to the real machine; keep them out.
+    monkeypatch.setattr("sea_star.cli.live_clients", lambda **kwargs: ())
 
 
 def _async_return(value):
@@ -85,6 +88,7 @@ def test_doctor_json_emits_the_bridge_shape(tmp_path, monkeypatch):
     assert report["models"] == ["test-model"]
     assert report["runtimes"] == []
     assert report["latent_harnesses"] == []
+    assert report["mcp_clients"] == []
     assert report["server"] == {"state": "running"}
     assert report["servers"] == [
         {"name": "obsidian", "command": "npx", "include": ["search"], "exclude": ["delete"]}
@@ -152,6 +156,53 @@ def test_doctor_json_reports_latent_harnesses(tmp_path, monkeypatch):
         {"name": "Xcode", "bundle_id": "com.apple.dt.Xcode", "path": "/Applications/Xcode.app"},
         {"name": "Goose", "bundle_id": "com.electron.goose", "path": "/Applications/Goose.app"},
     ]
+
+
+def test_doctor_json_counts_an_attached_host_as_active(tmp_path, monkeypatch):
+    """§3, ask don't guess: a host on stdio never answers a port probe.
+
+    TraeWork spawns ``sea-star serve`` itself, so the port sweep cannot see it.
+    Its live connection record is the evidence — the bridge must both report it
+    and stop calling it latent.
+    """
+    _write_vault(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sea_star.cli.probe_base_url", _async_return(["test-model"]))
+    monkeypatch.setattr("sea_star.cli.probe_runtimes", _async_return(()))
+    monkeypatch.setattr("sea_star.cli.detect_vault_candidates", lambda home=None: ())
+    monkeypatch.setattr(
+        "sea_star.cli.live_clients",
+        lambda **kwargs: (
+            ClientRecord(
+                pid=4242,
+                started_at="2026-09-30T05:00:00+00:00",
+                name="TraeWork",
+                bundle_id="com.trae.solo.app",
+                app_path="/Applications/TRAE SOLO.app",
+            ),
+        ),
+    )
+    seen: dict = {}
+
+    def _spy(**kwargs):
+        seen.update(kwargs)
+        return ()
+
+    monkeypatch.setattr("sea_star.cli.detect_latent_harnesses", _spy)
+
+    result = runner.invoke(app, ["doctor", "--json"])
+
+    assert result.exit_code == 0
+    report = json.loads(result.stdout)
+    assert report["mcp_clients"] == [
+        {
+            "name": "TraeWork",
+            "bundle_id": "com.trae.solo.app",
+            "pid": 4242,
+            "started_at": "2026-09-30T05:00:00+00:00",
+        }
+    ]
+    assert "TraeWork" in seen["active"]
 
 
 def test_doctor_json_reports_agent_scope_with_the_roster(tmp_path, monkeypatch):

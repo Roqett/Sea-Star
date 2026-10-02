@@ -536,10 +536,11 @@ private struct ChainCard: View {
 ///
 /// It is **observation-only**. It never shows a prompt, an output, or a claim
 /// that a person used anything, because nothing in Sea-Star observes those yet.
-/// "Live" here means *a probe answered this port during the last read*, and the
-/// evidence line says so in as many words. The stronger claim — that a request
-/// actually went somewhere — waits for the activity stream, and until then the
-/// band would rather be quiet than promising something it cannot prove.
+/// "Live" here means *a probe answered this port* or *the engine holds this
+/// host's live connection record*, and the evidence line says which — as many
+/// words. The stronger claim — that a request actually went somewhere — waits
+/// for the activity stream, and until then the band would rather be quiet than
+/// promising something it cannot prove.
 private struct WorkingNowBand: View {
     let controller: ServerController
 
@@ -563,13 +564,22 @@ private struct WorkingNowBand: View {
                     detail: observation.detail,
                     isLive: observation.isLive
                 )
-            } else {
+            } else if attachedHosts.isEmpty {
                 Text(Strings.WorkingNow.idle)
                     .font(.caption)
                     .foregroundStyle(Palette.inkMuted)
             }
 
-            Text(hasAnswered ? Strings.WorkingNow.evidenceProbe : Strings.WorkingNow.evidenceNone)
+            if !attachedHosts.isEmpty {
+                ObservationRow(
+                    label: Strings.WorkingNow.host,
+                    value: attachedHosts.map(\.name).joined(separator: ", "),
+                    detail: Strings.WorkingNow.hostDetail,
+                    isLive: true
+                )
+            }
+
+            Text(evidence)
                 .font(.system(size: 9, design: .monospaced))
                 .foregroundStyle(Palette.inkMuted.opacity(0.8))
                 .fixedSize(horizontal: false, vertical: true)
@@ -584,6 +594,25 @@ private struct WorkingNowBand: View {
     /// the word "live" in the cockpit, and the band is explicit about it.
     private var hasAnswered: Bool {
         controller.isReady
+    }
+
+    /// Hosts attached to the engine over stdio right now, per the engine's own
+    /// connection records. Empty when no host is attached (or the engine
+    /// predates the key) — the band then says nothing about hosts at all.
+    private var attachedHosts: [DoctorReport.McpClientInfo] {
+        controller.report?.attachedMcpClients ?? []
+    }
+
+    /// Which piece of evidence the band is standing on. A port probe and a
+    /// connection record are different proofs of different things, so the line
+    /// names whichever applies — and both, when both exist.
+    private var evidence: String {
+        switch (hasAnswered, attachedHosts.isEmpty) {
+        case (true, false): return "\(Strings.WorkingNow.evidenceProbe) \(Strings.WorkingNow.evidenceMcp)"
+        case (true, true): return Strings.WorkingNow.evidenceProbe
+        case (false, false): return Strings.WorkingNow.evidenceMcp
+        case (false, true): return Strings.WorkingNow.evidenceNone
+        }
     }
 
     private struct Observation {

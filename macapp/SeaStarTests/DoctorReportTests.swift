@@ -96,6 +96,71 @@ struct DoctorReportTests {
         #expect(message == "No vault found.")
     }
 
+    /// The stdio connection list proves attachment without any port probe —
+    /// a stdio host never answers a port. The engine only ever adds keys, so
+    /// this decodes additively alongside everything else in §6.
+    @Test("decodes hosts attached over stdio")
+    func decodesMcpClients() throws {
+        let response = try decode(
+            """
+            {
+              "schema_version": 1,
+              "ready": true,
+              "version": "0.1.0",
+              "vault": { "path": "/v", "source": "obsidian", "note_count": 1, "candidates": [] },
+              "runtime": "osaurus",
+              "base_url": "http://127.0.0.1:1337/v1",
+              "model": "qwen3",
+              "models": ["qwen3"],
+              "mcp_clients": [
+                { "name": "TraeWork", "bundle_id": "com.trae.solo.app", "pid": 31147, "started_at": "2026-09-30T10:00:00Z" }
+              ],
+              "server": { "state": "stopped" },
+              "servers": []
+            }
+            """
+        )
+
+        guard case .report(let report) = response else {
+            Issue.record("expected a report, got a failure")
+            return
+        }
+
+        #expect(report.attachedMcpClients.map(\.name) == ["TraeWork"])
+        #expect(report.attachedMcpClients.first?.bundleID == "com.trae.solo.app")
+        #expect(report.attachedMcpClients.first?.pid == 31147)
+    }
+
+    /// An engine that predates connection records omits the key entirely, and
+    /// the app must show *no* attached host rather than an invented one — the
+    /// same absent-vs-empty rule the roster follows above.
+    @Test("an older engine decodes to no attached host")
+    func decodesWithoutMcpClients() throws {
+        let response = try decode(
+            """
+            {
+              "schema_version": 1,
+              "ready": true,
+              "version": "0.1.0",
+              "vault": { "path": "/v", "source": "obsidian", "note_count": 1, "candidates": [] },
+              "runtime": "osaurus",
+              "base_url": "http://127.0.0.1:1337/v1",
+              "model": "qwen3",
+              "models": ["qwen3"],
+              "server": { "state": "stopped" },
+              "servers": []
+            }
+            """
+        )
+
+        guard case .report(let report) = response else {
+            Issue.record("expected a report, got a failure")
+            return
+        }
+
+        #expect(report.attachedMcpClients.isEmpty)
+    }
+
     /// The roster and the fact that *someone* vouched for it are two separate
     /// fields, and the panel's four Agent states are read straight off them. So
     /// the pair has to survive the bridge intact, in both directions.

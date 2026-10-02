@@ -28,8 +28,8 @@ KNOWN_HARNESS_APPS: dict[str, str] = {
     "com.apple.dt.Xcode": "Xcode",
     "ai.opencode.desktop": "OpenCode",
     "ai.opencode.desktop.beta": "OpenCode (Beta)",
-    "com.trae.app": "Trae",
-    "com.trae.solo.app": "TRAE SOLO",
+    "com.trae.app": "TraeCode",
+    "com.trae.solo.app": "TraeWork",
     "com.electron.goose": "Goose",
     "ai.unsloth.studio": "Unsloth Studio",
 }

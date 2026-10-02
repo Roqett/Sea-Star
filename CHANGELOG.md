@@ -59,10 +59,25 @@ Summary of Changes:
   keep their friendly names, the harness's default agent (the orchestrator) ordered first,
   and new `detect_agent_roster` / `AgentRoster.source` reporting *which harness* a roster
   belongs to.
-- **Verified:** 68 Swift tests in 13 suites (re-passed after the connector fix); 84 pytest
-  in 0.47s; ruff clean; Release
-  bundle 4.4MB vs the 3.6MB baseline — Resources unchanged at 136KB, growth is compiled 3D
-  code only.
+- **Connected hosts are no longer reported as latent (the structural fix).** The doctor
+  called a harness latent when no port answered it — but a harness like TraeWork attaches
+  over **stdio** and never answers a port, so it looked idle while actually connected.
+  `serve` now records who spawned it (`~/.seastar/clients/{pid}.json`; identity found by
+  walking up to 8 parent processes to the `.app`, stored as derived name/bundle-id/path
+  only — never raw command lines; record pruned automatically when the process dies, so a
+  crash can't leave a ghost). The doctor counts recorded hosts as **active**, drops them
+  from `latent_harnesses[]`, and reports them under a new additive `mcp_clients[]` key
+  (`name`, `bundle_id`, `pid`, `started_at`; `schema_version` unchanged, older apps still
+  decode). The cockpit decodes the key and the Working-now band shows a live **Host** row
+  whose evidence line names the proof — a connection record is not a port probe, so the
+  line says which one it is standing on. All three layers now agree: engine records →
+  doctor reports active → panel shows attached.
+- **Verified:** 70 Swift tests in 13 suites; 97 pytest in 0.38s; ruff clean; live
+  `doctor --json` showed both the cockpit's serve (`Sea-Star`, pid 30999) and TraeWork
+  (`com.trae.solo.app`, pid 31147) under `mcp_clients`, with TraeWork gone from the latent
+  list; earlier entry's numbers (68 Swift / 84 pytest) superseded by this run; Release
+  bundle 4.4MB vs the 3.6MB baseline stands — Resources unchanged at 136KB, growth is
+  compiled 3D code only.
 
 Harness: TRAE
 
