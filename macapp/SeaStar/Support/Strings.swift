@@ -181,8 +181,6 @@ enum Strings {
         static let openFolder = "Open folder…"
         static let checkNow = "Check now"
         /// The two answers to the register's one question.
-        static let showAll = "Show all"
-        static let showFewer = "Show fewer"
         static let itIsAHarness = "It's a harness"
         static let notAHarness = "Not a harness"
         static let floatHarness = "Float on the graph"

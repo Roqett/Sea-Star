@@ -1709,3 +1709,32 @@ back live through `call_tool`.
 
 **Next step** — with the founder: pick Patchdog in the text panel and read the placement line, then
 the same fact on the graph.
+
+---
+
+## 2026-10-02 — session end: handover written
+
+Full handover for the next session is at **[`docs/NEXT-SESSION.md`](NEXT-SESSION.md)**. Read
+that first; this file is the append-only history it summarises.
+
+**State at hand:** working tree clean; `feat/macapp-cockpit` pushed to **both** GitHub and
+Codeberg (32 commits ahead of `main`); draft PR #2 open and unmerged; GitHub still private.
+**153 Python tests, 79 Swift tests in 14 suites, ruff and xcodebuild clean.**
+
+**Nothing is answering locally** — oMLX is not running and no model port is listening, so
+`sea-star doctor` fails and the app correctly reports it. Start a runtime before judging the
+app's liveness states.
+
+**The founder has answered two register questions himself:** `~/.claude` and `~/.gemini` are
+**not harnesses**. That is evidence about the CLI-state evidence family, and the handover
+records it as such.
+
+**Also done this session, after the last PROGRESS block:** the three-surface restructure and
+the rebuilt `Working now` band (a dormant popover-delegate bug fixed along the way — the
+open/close flag had never been set because the macOS 26 SDK changed `NSPopoverDelegate` to
+take a `Notification`), the floating liveness bars removed from the starfield, the cascade
+wired through the panel and `machine_report`, the dead strings pruned, and the `AGENTS.md`
+changelog convention confirmed (Harness + Date only).
+
+**Single next step:** start a local model and read the three surfaces with the founder. None
+of the recent UI work has been seen by eye.

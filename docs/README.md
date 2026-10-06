@@ -17,6 +17,7 @@ schemas."* Pick the door that fits where you are right now.
 | A developer who wants the facts | **[Reference](reference.md)** | Commands, MCP tools, config keys, runtimes, environment variables. |
 | Stuck on an error | **[Troubleshooting](troubleshooting.md)** | Every failure we know about, and the fix. |
 | A developer, or an agent, changing how Sea-Star behaves | **[Foundation](foundation.md)** | The binding rules — chiefly *"no name is ever a precondition"*, which keeps new harnesses working without new code. |
+| An agent picking the work up tomorrow | **[Next session](NEXT-SESSION.md)** | The state of the world, every loose end, and the to-do list. Read it before touching anything. |
 
 ## The one-paragraph version
 
