@@ -2556,3 +2556,45 @@ sensibly in the header.
 **Open `http://100.126.11.98:8766` on his phone.** Serve it with
 `python3 script/phone_preview.py`. He asked for a way to see a build and has never seen
 the app run; tell him whether it is usable or clumsy.
+
+---
+
+## Session handoff — 2026-10-09, after midnight
+
+**Full detail: `docs/HANDOVER-2026-10-09.md`. Read that one first; this is the index.**
+The founder is on a tractor from 7:30am tomorrow and wants the mobile preview sorted
+next week, not now.
+
+### The next piece of work: the deep reading
+
+Not a bug — design work never done. His brief is in the handover verbatim. In short:
+the IDEs and harnesses must **appear when they are working** (none of them do at
+moment), the pool **will** be busy and that is expected, and it must be readable while
+spinning — which node is working, whether an IDE is on a remote API, and whether it is
+running a subagent off oMLX to save money.
+
+**Constraint he was emphatic about: no separate panel or test build.** It has been
+tried before and failed. Work in the shipping graph, keep the structure, do not fork.
+
+Committed tonight: spheres removed (the node is now the glyph), neon gone, fog added,
+hairline wires, labels restored, camera pulled back, and **Flat/Deep moved out of a
+hidden tray into the graph header** — the deep view was a dead end and he was stuck in
+it. Tried and **reverted**: widening the pool to 260, which made it a distant clump
+instead of fixing the crowd.
+
+The real diagnosis, untried: the **satellite pull** in `GraphSpace3D.positions()`
+packs models and personas onto their anchors. That is a judgement call, not a number.
+
+### Tools that did not exist before tonight
+
+- **`script/shot.sh flat|deep`** — captures a reading as a PNG, opening the cockpit if
+  closed. An agent can now *see* what it built. Four bugs tonight were found only by
+  looking; no test found any of them.
+- **`script/phone_preview.py`** — live screen over Tailscale. Built, untested on the
+  phone. Next week.
+
+### Still open
+
+The wrong model name (Inference says Dirk, truth is MiMo) — needs only his nod on the
+wording. Server priority, same root cause. Panel wording. `site/assets/` uncommitted.
+Spec `D3`, founder-only. **6 commits unpushed** — his word.
