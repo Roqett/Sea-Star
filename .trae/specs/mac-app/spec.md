@@ -256,20 +256,20 @@ pinned, and everything between them scrolls when there is more to say than fits.
 (D-002):
 
 - the **text window** (`SeaStar.cockpitMode == list`) arranges the four rows with
-  `SeaStar.panelLayout`: **Stack** (default — the rows one under the next), **Chain**
-  (the rows as connected cards showing the request path), or **Both** (the two designs
-  side by side under their own labels). It is a **360pt** column, widening to **660pt**
-  only for the side-by-side.
+  `SeaStar.panelLayout`: **Stack** (default — the rows one under the next) or **Chain**
+  (the rows as connected cards showing the request path). It is a **360pt** column.
 - the **graph window** (`SeaStar.cockpitMode == graph`) picks its renderer with
-  `SeaStar.graphDepth`: **Flat** (default — the 2D starfield, §8.7), **Deep** (the 3D
-  room), or **Both** (the two renderings side by side). It opens **600pt** wide
-  (**960pt** for the side-by-side) and takes a definite **560pt** height (600pt for Deep)
+  `SeaStar.graphDepth`: **Flat** (default — the 2D starfield, §8.7) or **Deep** (the 3D
+  room). It opens **600pt** wide and takes a definite **560pt** height (600pt for Deep)
   so the popover opens whole rather than clipping itself.
 
-One key answers "how many dimensions", the other "how are the rows arranged"; a person may
-compare on either axis without the other changing under them, and the defaults show one
-design each. The popover is clamped only to keep the bottom on-screen
-(`maxPopoverHeight`).
+One key answers "how many dimensions", the other "how are the rows arranged", and the two
+readings are never compared side by side (D-003). **Both choices live inside the reading they
+affect, not in the header** (D-016): the graph's drawer at its foot carries Depth beside the
+harness roster, and the text reading's own drawer carries Layout. The header keeps **one pair
+of symbols — the mode switch — and Settings**, so a control for a reading you are not in is
+never sitting in a header both readings share. The popover is clamped only to keep the bottom
+on-screen (`maxPopoverHeight`).
 
 **Everything animated runs only while the popover is open** (D-002). The popover's
 delegate writes `SeaStar.cockpitOpen` (default false) and an environment value carries it
@@ -296,19 +296,33 @@ seen, the menu carries **Open folder…**, which raises a folder picker; the cho
 pinned via `SEASTAR_VAULT`. The **Settings window** (§8.4) adds a searchable, scrolling
 list of the same candidates for machines with many vaults.
 
-### 8.2 Harness — one row per live endpoint
+### 8.2 Harness — the roster, as a dial (D-018)
 
-`runtimes[]` gives one entry per live harness; each is labelled `name · baseURL` (an
-endpoint alone cannot say which app answers on a shared port). Switching pins
-`SEASTAR_BASE_URL` + `SEASTAR_RUNTIME` and clears any model override, since the previous
-model may not exist on the new endpoint.
+The Harness row is **the app driving Sea-Star** and it is a dial over *everything this machine
+knows about*: the attached host is choosable, and every other known harness app is listed
+**switched off with the rung that explains it** (`Installed, not running`, `Up, not answering yet`).
+A hidden entry answers "can I use this?" with silence, so nothing is hidden. Choosing the live one
+points the engine at the servers that app *owns*, read from the socket; it does **not** pretend to
+attach a dormant app, which the cockpit still cannot do. Which endpoint Sea-Star actually reads
+through is the Inference row, one below.
+
+An endpoint's label is the **app that owns its port** whenever the server merely named a place
+(`owned_by: "remote"` is not a name — Atomic Chat holds 1337 on this Mac), and its own name when
+that name is a product (`omlx`, `apple`). Every endpoint label carries its **port**, because one app
+can serve models from more than one.
 
 ### 8.3 Model — follows the selected harness
 
-The model row lists the **selected harness's** own models (from `runtimes[]`), falling back
+The model row lists the **selected endpoint's** own models (from `runtimes[]`), falling back
 to `report.models`; the current model is kept first. This is what makes a model served only
 by one harness (e.g. a Qwen model behind oMLX) appear as soon as that harness is chosen.
 Switching pins `SEASTAR_MODEL`.
+
+The **Agent** row above it is also a dial (D-018): a persona whose model no running endpoint offers
+is shown switched off with that as the reason, and choosing one that *is* served takes the endpoint
+and the model with it — so the rows underneath agree with the row just chosen. The sentence and the
+dial entry come from one rule, so a persona can never read as unserved while its entry is
+choosable.
 
 ### 8.4 Settings window (the configuration surface)
 
@@ -350,28 +364,49 @@ fine) and remembers the answer in `UserDefaults` (`SeaStar.cockpitMode`); therea
 icons swap between the two readings of the same facts. Until a preference exists, the graph is
 shown behind the question and neither icon is pressed.
 
+The harness roster lives in a **drawer at the foot of the graph** (D-014), not in a list under it.
+One centred control slides it out; an Aqua-style grip at the top of the revealed tray closes it
+again; and the pool gives up the tray's height while it is open, so the panel's total height is
+unchanged and no row is cut in half. The reference is QuickTime 4's drawer — the attachment and the
+connected motion, both built from current SwiftUI rather than `NSDrawer`.
+
 The starfield opens a **larger panel than the rows do** — 600pt wide against the text window's
 360pt column, and a definite 560pt tall (600pt in Deep). It needs the width so the harnesses down
 the right edge and the tip note beside the active starfish stop crowding the frame, and the height
 so the orbs have room to drift; the side-by-side comparison widens to 960pt so both readings stay
 readable at once (spec §8, D-002).
 
-The graph draws the roster as glowing nodes on a dark backdrop — the **vault** off to the
-left, each **harness** down the right edge, and the active harness's **models** ringing it.
-Colour is meaning, not decoration: vault `teal`, harness and latent `electricBlue`, model
-`neonGreen`, agent `orange` (the same accents the list rows carry), and each node shifts its
+The graph draws the roster as glowing nodes on a dark backdrop: the **majors** — the vault, every
+harness app, every inference endpoint — stand on the points of an N-pointed star, and the active
+endpoint's **models** and the **personas** riding them ring it as satellites. **Sea-Star itself is a
+node at the centre** (D-017), drawn larger than everything else in the pool and holding the middle
+in both readings. Colour is meaning, not decoration: vault `bone`, harness `electricBlue`,
+inference on this Mac `teal`, a remote API `plum`, model `neonGreen`, agent `orange`, and the hub
+`mauve` — the palette's own quiet structural voice, the colour the pool's rays are already drawn in
+(the same accents the list rows carry). Each node shifts its
 kind's hue by a **deterministic fraction of its own id** — so one kind reads as a genre with
 variation, the way the C-stars do, rather than as clones. Glow is earned, never decorative:
 full glow only when the node is active or selected, a dim breath when it is live, plain
-definition when idle — so even the idle, greyed-out nodes stay colour-coded by kind.
-**Hover reveals what every node is** — name and kind without a click, because people do not
+definition when idle — so even the idle, greyed-out nodes stay colour-coded by kind. **Sea-Star is
+never itself live**: it is the thing doing the observing, so nothing on this machine can probe it,
+and a heartbeat there would be an invented fact — what lights up is its *edges*. **Hover reveals
+what every node is** — name and kind without a click, because people do not
 like clicking to discover — and selecting a node still goes through the same `selectVault` /
-`selectHarness` / `selectModel` calls the list uses, so the two views can never disagree.
+`selectInference` / `selectModel` calls the list uses, so the two views can never disagree.
 
-The **connection** between the vault and the active harness is drawn as a nudibranch strip
-(`NudiStrip.expands == false`, fixed length), rotated to sit between the two nodes — the 3px
-ribbon grown up into the wiring of the app. It *grows out of the vault* whenever the active
-harness changes, so the strip visibly shoots at the thing it just connected to. The orbs drift on
+The **wires** are nudibranch strips (`NudiStrip.expands == false`, fixed length), rotated to sit
+between the two nodes — the 3px ribbon grown up into the wiring of the app. The whole-pool reading
+draws **every binding between two things on the ring, plus every binding Sea-Star has**: the vault
+to the apps driving it and to the endpoint it reads through, each app to the model servers its own
+process was observed to own, and the hub to the vault, the hosts driving it and the endpoint it is
+reading. A model's spokes to the endpoints offering it, and an agent's spokes to its model, are
+held back for the focus reading, because drawn all at once they turn a dozen nodes into a bag of
+string; the deep room draws them always. The strip that reaches the endpoint Sea-Star is currently
+reading *grows out of the vault* whenever that endpoint changes, so it visibly shoots at the thing
+it just connected to. **Green-and-orange means one thing only — something live is on that wire**
+(an app the engine recorded driving Sea-Star, or the endpoint being read) — and it crawls along its
+track; a binding the report merely states stays cool blue-white wiring. Being drawn earns nothing.
+The orbs drift on
 a slow current and their glow breathes; all of that stills under Reduce Motion. Every connecting
 graphic must **terminate on an actual node** — no strip overshoots into empty space. In focus mode
 (double-click) the decorative star backdrop (outline and centre→tip hairlines, which are pinned
@@ -390,7 +425,10 @@ with **Got it**, after which the note settles into the connected line.
 *same* renderer-independent `EntityGraphModel` this view consumes — so Flat, Deep and the
 rows can never disagree with one another. The room is free to orbit, zoom and pan, with
 hover text and click inspection over a fixed, deterministic layout: the camera moves, the
-nodes do not. It is tuned for legibility over spectacle — restrained bloom, dim body
+nodes do not. Sea-Star holds the origin here exactly as it holds the middle of the pool, and
+every edge is drawn — including the satellites' spokes the flat reading holds back — coloured by
+the same liveness facts the pool uses (D-017). It is tuned for legibility over spectacle —
+restrained bloom, dim body
 emission, opaque glyphs, readable labels — so its star shells hold their definition beside
 the flat drawing instead of blowing out.
 

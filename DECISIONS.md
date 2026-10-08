@@ -925,3 +925,707 @@ request path disagreed, and a person picking Patchdog could not see that Patchdo
 
 - A second roster source exists in the engine: then `placement` is computed per harness and the
   agent row follows the Harness row.
+
+---
+
+## D-014 — The harness list is a drawer: the graph keeps its room, and the pool gives way
+
+**Date:** 2026-10-06
+
+**Context.** The latent-harness list sat permanently under the starfield. The founder's read was
+that the listing *belongs to the graph* rather than beside it — a graph you are reading should not
+be half-covered by its own legend — and he asked for the drawer his own Vibette build already
+uses: the slide-down tray, a nod to QuickTime 4's drawer, with an Aqua grip at the top of what it
+reveals.
+
+**Decision.** The list moves into a **drawer at the foot of the graph**, opened by one centred
+control and closed by that control or by the grip. Two things are kept from the reference, both of
+them native: the **attachment** (the tray grows out of the panel's lower edge; it is not a second
+window and not a popover) and the **motion** (a connected slide that tracks the opening edge). No
+`NSDrawer`, no deprecated API, no Aqua bitmap.
+
+**The height rule.** The cockpit's height is capped (D-012), so a tray that simply grew would open
+below the fold — the first build did exactly that, and cut the last row in half. **An open drawer
+is paid for out of the pool:** the graph gives way by the tray's height, so the panel's total height
+is unchanged and the whole drawer is on screen. "The panel extends" has to be read against a screen
+that will not get any taller, so the pool is what yields.
+
+**Consequences.**
+
+- Graph mode opens shorter and quieter: closed, the drawer is one word at its foot; open, it holds
+  the whole roster (8 rows on this machine) with no row cut in half.
+- The row itself is untouched — `HarnessVisibilityList` is shared with the onboarding window, so one
+  row and one wording are read wherever the list appears.
+- An extreme roster still scrolls *inside* the drawer (244pt cap), so the controls can never be
+  pushed off the display.
+- 83 Swift tests, 158 Python tests, ruff clean; the drawer was driven live over Accessibility
+  (`AXPress` — synthetic clicks are not delivered to this process) and screenshotted in both states.
+
+**Open.** Whether the drawer should remember its open state between launches. It is session-only
+today, which keeps the cockpit opening uncluttered.
+
+---
+
+## D-015 — A harness is found by more than its bundle, and an endpoint is probed wherever it listens
+
+**Date:** 2026-10-06
+
+**Context.** The founder's test: Atomic Chat open with an Apple foundation model loaded, MCP-linked
+to OpenCode, which was also open — he hit Refresh and *none of it came up*. Two separate gaps were
+behind that, and they were the same mistake in two places: **Sea-Star was looking only where it had
+already decided to look.**
+
+1. `running_app_paths()` read the process table for `.app` bundles. OpenCode was running as a bare
+   CLI binary, so it could not appear as running at all — while the *installed* OpenCode desktop app
+   showed as latent. A harness that was demonstrably open read as absent.
+2. `probe_runtimes()` swept a fixed port list. Atomic Chat's Apple foundation server answers on
+   **3355**, which is not on that list. Reconnaissance *saw the port listening* and attributed it to
+   Atomic Chat; Sea-Star never asked it whether it served models. A live endpoint Sea-Star could
+   already see was never spoken to.
+
+**Decision.**
+
+- A harness may be found **by bundle id, by CLI command name, or by nothing at all** — and a missing
+  name stays an *additive hint* in the foundation's sense: rename the binary and it drops off this
+  list, while every other family still finds it. A running CLI harness carries the `running` rung,
+  because running is what was observed; a stopped one is reported as nothing, because for a bare
+  binary there is no install to have found.
+- **An endpoint is probed wherever it is observed to listen**, not only where the sweep list expects
+  it. The ports come from `listening_services()` and are threaded in by the caller, preserving the
+  split D-010 drew: `config` asks a port, `recon` surveys the machine, and neither does the other's
+  job.
+
+**Consequences.** `sea-star doctor` now reads `Inference: remote (1337), omlx (8009), apple (3355)`
+and `Running: DeepSeek Harness, Xcode, OpenCode (up, not answering yet)`, and OpenCode no longer
+appears twice — a running CLI harness stands in for its installed desktop sibling.
+
+**Open.** The endpoint on 1337 names itself `remote` (its own `owned_by`), which is what the note
+beside the pool now says: *"remote is connected"*. That is not wrong, but the owning app is already
+known — the same card reads "Runs inside Atomic Chat" — so a better label exists. It wants the name
+to come from that attribution rather than from the server's own generic word, and it was
+deliberately not changed in the same breath as the discovery fix. Note that `remote` cannot simply
+join `GENERIC_OWNERS`: the fallback for port 1337 is the *port's* known harness, which would
+mislabel Atomic Chat as Osaurus.
+
+---
+
+## D-016 — The header is a mode switch and Settings; every other choice lives in its own reading
+
+**Date:** 2026-10-06
+
+**Context.** The founder looked at the header and counted: *"there's too many of them … there's
+four buttons up there between text and graph"* — the mode pair, the depth-or-layout pair, and the
+gear, five controls in a bar that also has to hold the app's own name. In the narrow text reading
+that bar was squeezed until **"Sea-Star" rendered as "Sea-" / "Star"** and the subtitle wrapped
+under it. The header was carrying a control for a reading the person was not in.
+
+**Decision.** The header keeps **one pair of symbols — the mode switch — and Settings**, and
+nothing else. Each secondary choice moves into the **drawer at the foot of the reading it affects**
+(D-014), which is where the QuickTime ledge earned its keep:
+
+- the graph's drawer carries **Depth** above the harness roster it already held;
+- the text reading's drawer carries **Layout**.
+
+The drawer therefore stops being "the harness roster's home" and becomes **the reading's own
+ledge** — a control belongs there when it is only meaningful inside that reading.
+
+**Consequences.**
+
+- Five controls become three, and the name is pinned to one line (`.lineLimit(1)` + `.fixedSize()`)
+  so it can never break again in the narrow column.
+- The drawer is generic (`CockpitTray<Content>`) and `TrayChoiceRow` gives any drawer a labelled row
+  of exclusive choices; `HarnessTray.swift` is replaced by `CockpitTray.swift`.
+- The pool-gives-way height rule (D-014) still applies in graph mode only, since the text reading
+  already hugs its content.
+- Spec §8.7 amended; the stale "Both" comparisons it still described were removed in the same pass,
+  having been retired by D-003.
+- 83 Swift tests, 162 Python tests, ruff clean; both readings screenshotted with the drawer open.
+
+**Open.** Whether the drawer should remember its open state between launches, and whether the two
+drawers should share one open state (they currently do — `isTrayOpen` is the popover's).
+
+---
+
+## D-017 — Sea-Star is a node in the pool, and its wires are what light up
+
+- **Date:** 2026-10-06
+- **Status:** Accepted
+- **Affects:** UX flow, product values (what the graph is allowed to claim)
+- **Founder input:** *"I connected them to see if anything actually happens in the graph, and it
+  didn't … even without 3-D we do want everything in there once it actually is live to connect to
+  the appropriate nodes."* He had already said **yes** to the earlier proposal that Sea-Star
+  become a `.core` node at the centre, with the vault staying an ordinary ring node.
+
+### The problem
+
+The wiring was **found but not drawable**. The engine saw everything — `sea-star doctor` at the
+moment of the complaint read:
+
+```
+Inference: remote (http://127.0.0.1:1337/v1), omlx (http://127.0.0.1:8009/v1),
+           apple (http://127.0.0.1:3412/v1)
+Serving:   DeepSeek Harness (19387), oMLX (8009), Atomic Chat (1337), Atomic Chat (3412)
+Connected: Atomic Chat
+Running:   DeepSeek Harness, Xcode, OpenCode (up, not answering yet)
+```
+
+and the app the founder was looking at **was** the current build (binary and launch time both
+19:27). So this was a drawing failure, and it had three causes, all of them rules rather than
+bugs:
+
+1. **There was nothing in the middle to connect to.** `GraphModel.centre` was `.origin` and the
+   majors ringed it, so the centre of the pool held a *decorative outline*. A picture cannot carry
+   an edge: "everything connects to Sea-Star" was a claim the graph had no way to draw, and a wire
+   with nothing at its end is not a wire.
+2. **The flat pool drew exactly one wire** — from the vault to the endpoint currently being read —
+   and only ever that one. Connecting an app to Sea-Star therefore changed a *node* and never a
+   *wire*: a new star appeared with nothing joining it to anything, and the picture sat still while
+   the machine changed underneath it.
+3. **A harness was wired to an endpoint only when the endpoint's name matched the app's.** Atomic
+   Chat's inbuilt server answers as `remote`, which is nobody's name, so Atomic Chat was never
+   joined to `1337` or to the Apple foundation server on `3412` — even though the engine had
+   already recorded the port's owner (`listening[].app_name`), and `ServerController.bundledOwner`
+   was already reading it for the card.
+
+### The decision
+
+Four rules, and the fourth is the one that took two sessions to reach:
+
+1. **A sixth kind, `.core`.** One node, `id: "seastar"`, at `.origin` in **both** `GraphModel.layout`
+   and `GraphSpace3D.positions()` — the two bodies are two drawings of one arrangement and may not
+   disagree about the middle. It is **excluded from `majors`**: a major's place is a point on the
+   ring, and counting the core would both steal a point from the star and put Sea-Star in orbit
+   around itself.
+2. **Sea-Star is never `isLive`.** It is the observer, and nothing on this machine can probe the
+   thing doing the probing; a heartbeat here would be the one fact the graph cannot support. Its
+   *edges* are what light up — a live edge is the crawl, green-and-orange while a live thing is on
+   it and blue-white wiring when it is merely a stated binding.
+3. **What it wires to, and nothing more:** the vault it lives in, the apps that drive it over stdio
+   (`attachedHarnesses` — the engine has their process records, so that is proof rather than
+   presence), and the one endpoint it is reading models through. *Not* every endpoint that happens
+   to be up, and *not* every harness app on the disk: "connected" has to mean something the other
+   end is doing with Sea-Star.
+4. **Port ownership is a connection.** An app whose own process holds a model-server port is wired
+   to that server, whether or not it is attached, because the engine observed the socket. This is
+   reversible (`ServerController.endpoints(ownedBy:)`) and it is what finally draws
+   `Atomic Chat → 1337` and `Atomic Chat → 3412`, and — on a machine where a chat app serves an
+   on-device model — `Atomic Chat → apple`. Only endpoints that also answer as model servers are
+   ever returned, so a port that merely looked like one is never claimed.
+
+The **vault is not displaced or demoted**. It is a ring point today and stays one; this is additive.
+The cascade (`vault → harness → agent → inference`) is untouched — it is a drawing that changed,
+not a rule.
+
+### The consequences
+
+- The flat pool now draws **every binding between two things on the ring, plus every binding
+  Sea-Star has** (`EntityGraphModel.standingEdges`). A model's spokes to the endpoints offering it,
+  and an agent's spokes to its model, are deliberately **held back for the focus reading**: drawn
+  all at once they turn a dozen nodes into a bag of string, which is the founder's own complaint
+  about the 2D reading — and the reason the 3D room exists. The deep still draws every edge.
+- The deep colours a wire by the same `isLive` facts the flat pool uses (`GraphScenePlan.isLive`),
+  so flying between the two readings cannot change which connections look live.
+- Sea-Star is drawn **larger than the vault** (`Kind.core.scale = 1.18`): the founder asked for "an
+  actual big one hanging in the middle", and a hub smaller than the things wired into it reads as
+  one more node with an unusual address.
+- New palette entry `Palette.coreGlow = .mauve` — the palette's quiet structural voice, the colour
+  the pool's own rays are already drawn in. Deliberately not the vault's bone, or the hub and the
+  memory it lives in would read as the same kind of thing.
+- `EntityGraphView.layout(in:)` becomes internal, like `nodeSize` and `hitNode`: where the pool puts
+  each thing is a claim both readings and the tests have to be able to check without a window.
+- **90 Swift tests in 16 suites** (7 new), **162 Python tests**, ruff clean; app rebuilt, relaunched
+  and screenshotted: the hub at the middle with a lit wire to Atomic Chat, a wire to the endpoint it
+  is reading through, and Atomic Chat joined to both of its own servers.
+
+### Open
+
+- **`OpenCode → Atomic Chat` is still not drawn**, and it is the one link of the founder's chain
+  that remains missing. It is not a socket — `lsof` on 1337 shows Atomic Chat listening and nobody
+  connected — but a *configured provider* in `~/.config/opencode/opencode.json`
+  (`"model": "atomic/Dirk-…"`), so it can only be read from the harness's own config. This is the
+  same reader recommended in D-015's Open and in the previous two handoffs, and still not built.
+- **A live harness's configured provider is invisible in general**, for the same reason: nothing
+  reads harness config files except the Osaurus agent roster.
+- **'remote' remains a poor endpoint label** (D-015 Open) — and now there are two ports owned by
+  Atomic Chat, so the port-1337 fallback that made `remote` hard to rename matters twice over.
+- **oMLX's own port has an owner with no node.** `model_like` reports `oMLX` owning `8009`, but
+  there is no oMLX harness node, so that ownership cannot be drawn. Showing an owner that is not in
+  the pool is a question about the roster, not about the wire.
+- **DeepSeek Harness's own endpoint on 19387 is not an inference node**, correctly: it *listens*
+  but does not answer as a model server (`answering: false`), so `endpoints(ownedBy:)` drops it.
+  A harness that serves models would need to be classified as inference by the engine first.
+- **The flat pool still crowds once there are many majors** — thirteen ring points is a busy star,
+  and this change adds wires to it. That is an argument for the deep, not a reason to thin the
+  truth; if it needs solving, the answer is a second page of the pool, not fewer wires.
+
+---
+
+## D-018 — The panel's rows are dials over everything that exists, and a vague name is not a name
+
+- **Date:** 2026-10-06
+- **Status:** Accepted
+- **Affects:** UX flow, product values (what a control may claim)
+- **Founder input:** *"Harness right now is only showing Atomic Chat. It should have a selectable
+  because it's a cockpit panel, it's a dial … it should be able to select whatever is live, or if it
+  exists, it should be greyed out on the dropdown … Then selecting agent is nonfunctional as well …
+  it should basically reflect in all other settings that are relevant … I'm not exactly sure what
+  remote reflects to."*
+
+### The problem
+
+Two separate faults, found by reading the panel he was looking at:
+
+1. **The Harness row was a fact, not a dial** — deliberately, and made so by D-001/D-004 on the
+   argument that the app cannot make another app attach itself. The argument still holds, but the
+   row had thrown away the *roster* with it: the machine's other eleven harness apps were nowhere in
+   the panel, so "why can't I use OpenCode?" had no answer on screen.
+2. **The Agent row was a dial that moved nothing.** Choosing a persona only re-said a sentence under
+   the Inference row (`Runs on omlx/KAT-Coder-… — omlx is up, but not serving it`), which is
+   *correct* and was invisible as a consequence, so it read as broken. Nothing else followed the
+   choice, and personas that could never be honoured sat in the menu looking identical to the ones
+   that could.
+3. And underneath both: **`remote`**, the endpoint name. Atomic Chat's inbuilt server answers
+   `owned_by: "remote"` while holding port 1337 *on this machine*, so the panel said "remote is
+   answering" and the graph drew a wire from something that read like the cloud. He reasonably
+   assumed it was DeepSeek Harness over the API. It is not: DeepSeek Harness's own port (19387)
+   does not answer as a model server at all, and there is no local DeepSeek endpoint to wire to.
+
+### The decision
+
+**Three rules.**
+
+1. **A row lists everything that exists.** An entry that cannot be honoured is shown switched off
+   **with its reason**, never hidden. Hiding answers "can I use this?" with silence; showing it
+   greyed answers the question the row was opened to ask. Hence a new `DialRow` (options carrying
+   `isEnabled` + `reason`) beside the existing `PickerRow`, which stays for lists whose entries are
+   all equally usable (vaults, models).
+2. **A choice that can be honoured is a real action.** Choosing a persona that an endpoint is
+   serving takes the endpoint *and* the model with it, so the rows underneath agree with the row
+   just chosen. Choosing one that nothing serves moves nothing — there is nowhere to move it to,
+   and its entry is switched off. Choosing the harness driving Sea-Star points the engine at the
+   servers that app owns; it still does not pretend to attach a dormant app.
+3. **A server that names a place does not get to name itself.** `VAGUE_OWNERS` (`remote`, `local`,
+   `host`, `server`, `api`) is treated as no owner at all, and the app observed holding the socket
+   is used instead. A server that names itself properly (`omlx`, `apple`) keeps its own name,
+   because a product name beats the bundle that ships it. Endpoint labels carry their **port**, so
+   one app serving from two ports is two distinguishable entries.
+
+The cascade's sentence and the dial's entry are decided by **one rule** (`servingPlacement(of:)`),
+so a persona can never be described as unserved while its dial entry is choosable. That also fixed a
+real case: the roster qualifies its models (`omlx/qwen3-large`) while endpoints list them bare, so
+an agent that *was* being served had been reading as "built for X, X is not serving it".
+
+### The consequences
+
+- **`remote` is gone from the panel**: the Inference row reads `Atomic Chat · 1337`, and the
+  Working-now band reads "Atomic Chat is answering — serving Dirk-…". The graph draws the same
+  node, so its local wires stop looking like a cloud connection.
+- The Harness row shows the roster with the rung as each entry's reason — `Installed, not running`,
+  `Up, not answering yet` — which is the foundation §2 degradation contract applied to a menu.
+- `VAGUE_OWNERS` is deliberately **not** merged into `GENERIC_OWNERS`: dropping `remote` outright
+  would send the name to the port table, and 1337's known port is Osaurus, so Atomic Chat would be
+  relabelled as a different product (D-015's warning, and the test that pins it).
+- `placement(of:)` now resolves through `servingPlacement`, so the agent sentence and the dial
+  cannot drift apart.
+- **95 Swift tests in 17 suites**, **164 Python tests**, ruff clean; app rebuilt, relaunched and
+  screenshotted.
+
+### Open
+
+- **"Which harnesses are using this endpoint" is still unanswerable.** With oMLX selected, the
+  panel cannot say who is reading from it, because nothing reads a harness's provider config.
+  `~/.config/opencode/opencode.json` names `atomic/Dirk-…` — the one link of the founder's chain
+  still missing, and now the blocker for the last thing he asked for on this panel. It is the same
+  reader recommended in D-015, D-017 and three handoffs, and still not built.
+- **Choosing a harness re-points the endpoint; it does not attach the app.** Whether the cockpit
+  should go further — for example offering to *ask* a running harness to attach, over MCP — is a
+  Scope question for the founder, not an implementation detail.
+
+---
+
+## D-019 — The two text readings are Facts and Path, and the choice lives in the header
+
+### The problem
+
+The panel carried two text layouts, called `Stack` and `Chain`. Both survived D-003 (which retired
+only the `Both` comparison mode), so both were still reachable — but their names described *how they
+were laid out* rather than *what they communicate*, which is why the founder could not tell from the
+header which one was meant to be the product. The toggle itself had also migrated into the reading's
+drawer (D-016), which the founder read as over-engineered for a choice with two options.
+
+The founder's correction was specific: the fork was a *comparison* that was run up and never closed
+by a decision, and the terms "stack" and "chain" were the wrong vocabulary.
+
+### The decision
+
+- The two readings are **Facts** and **Path**. Facts is the column you scan; Path is the journey a
+  request travels (vault → harness → agent → inference). Both stay — the founder judged that Facts
+  carries something Path cannot and vice versa, so this is two valid readings rather than a
+  winner-take-all.
+- The `PanelLayout` cases are renamed `.facts` and `.path`, but their **raw values deliberately stay
+  `"stack"` and `"chain"`** so a stored preference from before the rename still resolves. The case
+  names are the truth; the raw values are a migration.
+- The toggle moves **out of the drawer into the header**, shown only in the list reading (it is that
+  reading's layout, so it has no meaning over the graph). Two Apple SF Symbols, the active one lit,
+  with the hover text carrying the label.
+- The text reading's drawer is removed — layout was its only content. The graph drawer is untouched:
+  it keeps Depth and the harness roster, which is its proper home.
+
+### The consequences
+
+- The header carries three controls again in the list reading (mode pair, Facts/Path pair, Settings).
+  This reverses part of D-016's "the header is a mode switch and Settings, and nothing else" — the
+  founder asked for it explicitly, so it is a decision, not a regression.
+- `PanelLayoutTests` follows the rename; the stored-preference round-trip test still passes on the
+  old raw values, which is what pins the migration.
+- `Stack`/`Chain` survive only as raw values and as internal widget names (`ChainCard`, `ChainLink`),
+  which were left alone — they are components, not readings.
+
+### Revisit when
+
+The Path reading gets too tall in the narrow list column, or the Facts column stops carrying
+something Path cannot.
+
+---
+
+## D-020 — "Up but not attached" is its own visual state; a running IDE is not a dead install
+
+### The problem
+
+The founder's key moment: with two IDEs open at once — OpenCode and DeepSeek Harness — *neither
+appeared* on the text panel or the graph. Investigation showed this was **not** a detection failure.
+`doctor` reported both correctly as `Running`, and the bridge carried them in `latent_harnesses[]`
+with `rung: "running"` (OpenCode under `cli:opencode`, D-015's CLI identity).
+
+The gap was one layer up, in the drawing. The 2D pool gave every node `glow = 0` unless it was
+`isLive`, and a running-but-unattached harness is correctly *not* `isLive` — nothing answered on a
+port and it is not driving the engine. So a running IDE rendered **pixel-identical** to an app that
+was installed and never launched. The engine had told the two rungs apart; the drawing threw the
+distinction away. In the dial, the same harness was listed with `isEnabled: false`, which reads as
+broken rather than as *up*.
+
+### The decision
+
+- **`HarnessRung.isUp`** (`self != .present`) is the honest "a process owns it, or something answered
+  in its name" test, distinct from `isAttached`.
+- A node that is `isUp` but **not** `isLive` gets a **steady glow** (`0.34`, radius 5, presence
+  `0.72`) and its glyph's `isActive` set, so it reads as lit. Steady and **never pulsing**: the
+  breath stays reserved for `isLive`, because being up is not the same as carrying work, and
+  foundation §2 forbids claiming a rung that was not reached.
+- A `.present` (installed, never run) harness is unchanged: no glow, presence `0.5`. The two
+  dormant-looking rungs are now genuinely distinguishable.
+
+### The consequences
+
+- `isLive` semantics are untouched — no test changed meaning, and the "exactly four live nodes" pin
+  still holds. This is purely a drawing change on top of the rung the engine already reported.
+- The 3D room reads `isLive` directly (`GraphScene.isLive`), so the deep still treats a running
+  harness as not-live. Making the deep match the flat pool's rung-aware treatment is **not** done —
+  it follows whenever the deep is next looked at.
+
+### Revisit when
+
+The graph grows a third "up but idle" rung, or the founder wants a running harness to breathe as
+well as glow.
+
+---
+
+## D-021 — A configured provider is a rung-0 declaration; an MCP URL is never a model route
+
+### The problem
+
+The founder's ask: *"the IDEs need to be shown to be hooked up to whatever they may
+be hooked up to. They might be getting inference from somewhere else."* This was the
+**harness-config reader**, recommended in D-015, D-017 and D-018 and flagged as the
+single blocker across four handoffs. It is built as `src/sea_star/providers.py`.
+
+The premise the handoffs recorded turned out to be stale: they cite
+`~/.config/opencode/opencode.json` naming `"model": "atomic/Dirk-…"`. That entry no
+longer exists. The live file declares **two MCP servers and no model at all**. So
+the reader had to find the fact from wherever it actually lives — and, more
+importantly, had to not mistake what is there.
+
+### The decision
+
+- **A configured provider is a declaration, never a connection.** Foundation §2 rung 0.
+  A configured provider holds no socket, so no probe could ever have shown this
+  edge — it is the one link of the cascade only a config read can supply. It is
+  drawn as a stated binding, never as liveness, and the graph gains no node kind.
+- **Only an inference surface may produce a claim.** `_is_model_route` admits a
+  URL ending in `/v1`, `/v2`, `/models`, `/completions`, `/embeddings`, or a bare
+  loopback port with no path; it rejects anything whose path names `/mcp`. This
+  exists because the first implementation did exactly what the project already
+  logged once as D-010 ("a port is not a server"): it accepted any URL and
+  reported **`https://mcp.exa.ai/mcp` as OpenCode's model provider**. The presence
+  of a URL is not the shape of a model claim.
+- **Derived fields only.** The claim carries `(provider, base_url, model)` and
+  nothing else. API keys, tokens and the raw document never enter the result, and
+  the dataclass is frozen. A test asserts a config full of secrets yields a claim
+  containing none of them.
+- **Resolution is by identity, both ways**, so the engine's short key (`opencode`)
+  finds the app the graph calls `OpenCode` — and a harness nobody declared for
+  gets `nil`, never a neighbour's claim.
+- **A claim resolves to an endpoint only when Sea-Star can already see that
+  endpoint answering.** A declaration for an unseen port, or a cloud route, stays a
+  label on the node's subtitle. Inventing a node for it would be a new claim.
+- **Focus views read the same `isLive` facts as the whole-pool view.** The focus
+  edge layer previously drew *every* wire blue-white, so a live connection and a
+  dormant one became indistinguishable the moment you clicked a star — the exact
+  confusion the founder spotted, and a regression of the whole-pool rule.
+
+### The consequences
+
+- Bridge key `providers[]` is additive; `schema_version` stays `1`; an older engine
+  yields `[]` and the app says nothing rather than inventing a picture.
+- On this machine the honest reading is **empty**: OpenCode declares no model, so
+  Sea-Star reports no declaration. That is the correct answer, not a failure — and
+  it is why the reader had to be built on evidence rather than on the handoff's
+  remembered example.
+- 15 new Python tests (179 total), 7 new Swift tests (102 total, 18 suites).
+
+### Revisit when
+
+A harness is found whose settings name its inference somewhere this reader cannot
+reach, or when the founder wants a declaration to create its own endpoint node
+rather than only annotate an existing harness.
+
+---
+
+## D-022 — A workspace is where a harness is pointed, not a row of marker files
+
+**Date:** 2026-10-08 · **Founder:** in session · **Tier:** 2 (architecture bet)
+
+### The decision
+
+**The Workspace panel row is removed.** A workspace becomes a property of a harness:
+the directory that harness is pointed at. Every marker-file scan that fed the row is
+gone with it.
+
+### Context
+
+The row appeared in a session with no decision behind it, and the founder reopened it
+with: *"it's a meaningless sort of word… what comes up as displayed is like a string to
+a markdown file for agents. Let's redefine that as being more connected to CLI."*
+
+Three defects, all verified rather than argued:
+
+1. **It was a mirror.** It detected agent artefacts in
+   `FileManager.default.currentDirectoryPath` — the directory the *app* booted from.
+   For a menu-bar app that is arbitrary, so the row described Sea-Star rather than the
+   person's machine.
+2. **It was another hardcoded name list.** `.claude`, `.cursor`, `.opencode`, `.codex`,
+   `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` — the same defect as `KNOWN_HARNESS_COMMANDS`,
+   and the trap the foundation exists to escape.
+3. **It sat at the wrong level.** Vault/Harness/Agent/Inference are things you *use*; a
+   workspace is a *property* of one of them.
+
+### Consequences
+
+- The row disappears; **nothing replaces it in the panel**, so the panel loses a row.
+- Where a harness is pointed is read from the process (`lsof -a -p <pid> -d cwd`),
+  which is also what makes a CLI agent distinguishable from a desktop app: a CLI has a
+  working directory, an app usually has none and then says nothing.
+- The engine-side workspace plumbing is **kept** and reused: `agents/` directories
+  beneath the pointed-at directory are the agents that harness can reach (D-023).
+- `docs/WORKSPACE-IMPLEMENTATION.md` now records the failure rather than describing
+  the row as shipped.
+
+### Revisit when
+
+A person has harnesses pointed at many directories at once and wants the graph to draw
+those locations as places in their own right.
+
+---
+
+## D-023 — Agents are read by shape, not from one harness's private store
+
+**Date:** 2026-10-08 · **Founder:** in session · **Tier:** 2 (architecture bet)
+
+### The decision
+
+The agent roster reads **two families of source and unions them**: a harness's own
+store, and **agent files as a shape** — a Markdown file with a delimited header
+(`name`, `description`, `model`) inside a directory named `agents/`.
+
+### Context
+
+The cockpit showed **"no roster found"**, which the founder read correctly as
+meaningless. It was not measuring anything: it looked in exactly one place, one
+harness's private JSON store, and presented the result as *"you have no agents"*.
+The person may have had a dozen agents written as files.
+
+Research into how agent tooling actually works showed the definition format is a
+convention, not a product: agent files are Markdown with a small header, living in an
+`agents/` directory — **the same directory name the JSON store already uses**. So the
+*layout* is the discriminator and no product name appears in the code.
+
+- **The directory name is the convention; the file shape tells you which tool.**
+- A harness invented tonight is read because its files have the shape.
+- Sources are **unioned, not first-match-wins**: returning the first non-empty source
+  reported a roster that existed and silently omitted the rest — the same lie as
+  reporting none, and harder to spot because the row looked populated.
+- The header reader recognises plain `key: value` scalars and deliberately stops
+  there. `tools`, `effort` and `mcpServers` are not read because nothing acts on
+  them, and reading less keeps this from becoming a second implementation of somebody
+  else's configuration format. No YAML dependency was added.
+- An unterminated header, a README, or a file with no name yields **no agent** rather
+  than a phantom one.
+
+### Consequences
+
+- On this machine the honest reading is **empty**: `~/.claude` exists but holds no
+  `agents/` directory. That is now a true reading of both families rather than one.
+- 8 new Python tests, including one proving a dot-directory nobody in this codebase
+  has heard of (`.vibeweaver/agents/`) is read purely by its layout.
+
+### Revisit when
+
+An agent definition needs a field Sea-Star must act on — a declared model it cannot
+currently honour, or a tools list it should be filtering by.
+
+---
+
+## D-024 — One agent is one root process, and an unnamed one still counts
+
+**Date:** 2026-10-08 · **Founder:** in session · **Tier:** 2 (architecture bet)
+
+### The decision
+
+An agent **instance** is a root process that behaves like an agent. Helpers collapse
+into their parent. **An instance with no name is still reported.**
+
+### Context
+
+The founder's framing, which set the design: *"I've got OpenCode in two instances
+running right now, and essentially even if they don't have names, they are still
+agents. Because that's what I'm talking to."*
+
+A desktop agent is a dozen processes — app, CLI, helpers, renderers. On this machine
+OpenCode is **8 processes right now**. Counting them would call one conversation
+eight agents. But a naive collapse that folded the CLI into the app would hide the
+second conversation entirely.
+
+So: a candidate whose ancestor **of the same product** is also a candidate is a
+helper, and is dropped. Product matching reads the `.app` bundle in the path, falling
+back to the executable stem — no product name is hardcoded. Two OpenCode instances
+therefore stay two agents.
+
+**Running this live caught a category error before it shipped.** The first candidate
+set included `oMLX`, which is an inference *server*, not an agent. Filing it as an
+agent is precisely the error that made the cockpit unreadable once already — and
+Atomic Chat genuinely does **both**: drives Sea-Star *and* serves the model it drives
+it through. Forcing either single label loses half the truth, so **two roles are
+recorded separately** (`is_attached`, `serves_models`) and the caller decides the
+wording.
+
+### Consequences
+
+- Live on this machine: 5 candidate processes → 5 instances, with oMLX marked *serves
+  models* and Atomic Chat marked *drives Sea-Star* — each fact attached to the thing
+  it is true of.
+- Declining to show work in progress because no persona file exists is the same
+  blindness the name-less CLI had (D-025), and is refused.
+- A pid whose working directory cannot be read is **absent**, never guessed.
+- 5 new Python tests.
+
+### Revisit when
+
+Sub-agent work needs to be attributed to a named parent, which requires modelling the
+hierarchy rather than flattening each process into one root.
+
+---
+
+## D-025 — A CLI is recognised by what it serves, not by what it is called
+
+**Date:** 2026-10-08 · **Founder:** in session · **Tier:** 2 (architecture bet)
+
+### The decision
+
+A CLI agent is recognised as **the process holding a loopback port that answers as a
+model server**, whatever its executable is called. The six known command names remain
+as an additive hint and are **never a gate**.
+
+### Context
+
+`running_command_harnesses()` matched on process name against `KNOWN_HARNESS_COMMANDS`
+— six names. The comment claimed a missing name was harmless because other families
+would still find the harness. **For a headless CLI that is false:** a bare CLI has no
+bundle, no `Info.plist`, no port and no client connection, so the name list is the
+*only* mechanism that can see it. Any agent invented after that dict was written was
+invisible, permanently.
+
+Worse, the claim was **an agent's rationalisation, not a founder decision** — nobody
+asked and it was never approved. The founder's requirement had been stated plainly:
+*"if a CLI is invented overnight from some vibe coder and someone downloads it, then
+it's gotta hop in there."*
+
+The codebase already held the right pattern in `recon.MODEL_VOCABULARY`, whose own
+source says a vocabulary *"generalises to software nobody has written yet; a list of
+app names cannot, and this module deliberately has none."* The CLI family was the
+outlier against a rule the project had already written down.
+
+### Consequences
+
+- Only ports **proven** to answer with a model list count (only `config` speaks HTTP,
+  and is the sole source of that proof). A port with no known owner is skipped rather
+  than guessed at.
+- Verified with controls rather than assertion: on this machine 9 things listen on
+  loopback and only the model-serving ones qualify — `ControlCenter` (5000, 7000),
+  `rapportd` and `python3.11` all stay out, and `TextEdit` launched as a live control
+  does not appear.
+- The port **sweep list is not a gate either**: reconnaissance observes every listening
+  port and threads them in, so an unknown port is probed regardless.
+- 5 new Python tests, including one asserting a CLI named `nightfall-agent` is found
+  *while a test asserts that name is absent* from `KNOWN_HARNESS_COMMANDS`.
+
+### Revisit when
+
+A process behaves like an agent but serves no model — a headless agent with a remote
+endpoint only. That case is invisible today and the honest answer is that it is not
+yet solved.
+
+---
+
+## D-026 — The cockpit watches continuously, and only redraws on real change
+
+**Date:** 2026-10-08 · **Founder:** in session · **Tier:** 3 (runtime behaviour)
+
+### The decision
+
+The cockpit re-reads the machine **every 2 seconds while open**, and **a reading is
+adopted only when it differs** from the last one.
+
+### Context
+
+Two separate failures, both reported by the founder:
+
+**It did not listen.** It read the machine three times — on open, on Refresh, and after
+a setting changed — and **never in the background**. So working in DeepSeek Harness for
+an extended period left the panel describing a machine that had stopped existing. The
+founder's report: *"as soon as any harness fires up, it's gotta be able to hear it
+update… I was building it in DeepSeek Harness for a while and it never actually saw
+that as live."* Cancellation is the off-switch, so a closed cockpit costs nothing.
+
+**Then it flickered.** Watching made every node blink every two seconds: `adopt`
+assigned the report unconditionally and the graph model is a computed property rebuilt
+on every render pass, so each poll restarted the pulse animation from zero. The Logs
+panel also gained an identical line every two seconds, and the status dot flipped
+colour on each poll.
+
+The founder's assessment: *"it really shouldn't be happening and possibly could give
+somebody an epileptic fit."* **A rapid full-brightness flicker is a genuine hazard for
+photosensitive users, not an irritation** — and it would have shipped unflagged.
+
+### Consequences
+
+- `adopt` returns `Bool` and assigns only on a real difference (`DoctorReport` is
+  already `Equatable`). Everything downstream is a function of change, not of the clock.
+- `logs.append` is gated on the same change, so the Logs panel no longer scrolls for
+  ever.
+- The status dot no longer reads `isRefreshing`: a background poll is not a "checking"
+  state and must not be drawn as one. `isRefreshing` still governs the Refresh button.
+- 102 Swift tests in 18 suites pass.
+
+### Revisit when
+
+The 2-second interval proves too eager on battery, or too slow to feel live.

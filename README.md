@@ -18,6 +18,22 @@ Sea-Star does the same with your notes — and helps you find the right one.
 
 </div>
 
+<!--
+  SCREENSHOT PLACEHOLDERS
+  The repo has no app screenshots yet, and no claim is made here that has not been
+  measured. When they are captured, drop them in below with alt text that says what
+  the image actually shows. Capture guide:
+
+    ./script/build_and_run.sh run          # build + launch the cockpit
+    screencapture -x -C /tmp/shot.png     # -C includes the cursor
+    click the menu-bar star to open the popover
+
+  Three worth having, in this order:
+    1. Graph mode  — the starfield, Sea-Star at the centre, lit wires  (~626x786)
+    2. Facts mode  — the four rows + Working now                        (~340 wide)
+    3. Path mode   — the same facts as connected cards
+-->
+
 ***
 
 ## At a glance
@@ -30,14 +46,14 @@ Sea-Star does the same with your notes — and helps you find the right one.
   Claude Desktop, Cursor or TRAE, and can borrow other MCP servers as its own tools.
 - ⚙️ **Runtime-agnostic** — any OpenAI-compatible endpoint works unchanged: Osaurus,
   Ollama, LM Studio, llama.cpp, MLX, vLLM, Unsloth Studio.
-- 🖱️ **Two front doors** — a terminal-first CLI today, a native macOS app in build.
-  Anything you can click, you can also type.
+- 🖱️ **Two front doors** — a terminal-first CLI, and a native macOS menu-bar app that
+  wraps the same engine. Anything you can click, you can also type.
 
 ***
 
 ## Documentation
 
-Five pages, one for wherever you're starting from. Start at the
+One page for wherever you're starting from. Start at the
 **[docs index](docs/README.md)** if you're unsure.
 
 | I want to…                                                   | Read                                               |
@@ -46,7 +62,13 @@ Five pages, one for wherever you're starting from. Start at the
 | Run it day to day — by clicking or by typing                 | [docs/use-the-app.md](docs/use-the-app.md)         |
 | Connect Sea-Star to Osaurus / Claude Desktop / Cursor / TRAE | [docs/connect.md](docs/connect.md)                 |
 | See every command, tool, setting and runtime                 | [docs/reference.md](docs/reference.md)             |
+| Know how it actually works — architecture, the capability ladder, privacy | [docs/TECHNICAL.md](docs/TECHNICAL.md) |
 | Fix something that's broken                                  | [docs/troubleshooting.md](docs/troubleshooting.md) |
+| Know the rules the code must keep                            | [docs/foundation.md](docs/foundation.md)           |
+
+The landing page is a single static file — [`site/index.html`](site/index.html), open
+it in a browser. The palette, the type and the voice rules live in
+**[docs/brand.md](docs/brand.md)**.
 
 ***
 
@@ -155,25 +177,30 @@ uv run sea-star serve
 > `pip install seastar-mcp` lands with the first PyPI release. Until then, the
 > `uvx --from git+...` form above is the one-liner to use.
 
-### App (coming)
+### App (built, still being refined)
 
-A native macOS app — no terminal at all — is in build. It wraps this same engine,
-so nothing you set up here changes when it lands. Until then, the terminal track
-above *is* the product.
+A native macOS menu-bar app — no terminal at all — wraps this same engine, so nothing
+you set up here changes when you use it. It shows what is actually running on your
+machine, in two readings of the same four facts, and it never claims more than it can
+prove. The terminal track above stays exactly as useful as it is today.
+
+**This is 0.1.0 and it is not released yet.** The repository is currently private.
 
 ## Two ways to run it
 
-The same engine, two front doors. **Terminal-first** works today. **GUI-first** is
-the app in build. Every action maps both ways:
+The same engine, two front doors. **The app** is the everyday reading; **the terminal**
+does everything the app does, and is how you debug it. Every action maps both ways:
 
-| What you want to do            | GUI (coming)            | Terminal (now)                         |
-| ------------------------------ | ----------------------- | -------------------------------------- |
-| Detect vault / runtime / model | Detects on launch       | `uv run sea-star doctor`               |
-| Machine-readable status        | —                       | `uv run sea-star doctor --json`        |
-| Start the MCP server           | Starts with the app     | `uv run sea-star serve`                |
-| Create `seastar.toml`          | Choose folder in-app    | `uv run sea-star init`                 |
-| Ask the vault a question       | Type in the window      | `uv run sea-star ask "…"`              |
-| Keep the engine green          | —                       | `uv run ruff check . && uv run pytest` |
+| What you want to do            | App                          | Terminal                              |
+| ------------------------------ | ---------------------------- | ------------------------------------- |
+| Detect vault / runtime / model | Detects on launch            | `uv run sea-star doctor`              |
+| Machine-readable status        | Feeds the cockpit            | `uv run sea-star doctor --json`       |
+| Start the MCP server           | Start / Refresh in the panel | `uv run sea-star serve`               |
+| Create `seastar.toml`          | Choose folder in-app         | `uv run sea-star init`                |
+| Ask the vault a question       | Ask your agent               | `uv run sea-star ask "…"`             |
+| Switch vault / harness / model | The rows, in Facts or Path   | `SEASTAR_*` env or `seastar.toml`     |
+| Read the logs                  | The Logs panel               | `~/Library/Logs/Sea-Star/sea-star.log` |
+| Keep the engine green          | —                            | `uv run ruff check . && uv run pytest` |
 
 The app never hides a capability: anything you can click, you can also type.
 
@@ -373,19 +400,37 @@ exclude = ["delete_note"]
 
 ```
 src/sea_star/
-  cli.py         # `sea-star init | doctor | serve | ask`
-  config.py      # config + runtime/vault autodetection
-  inference.py   # runtime-agnostic OpenAI-compatible adapter
-  vault.py       # Obsidian vault index, search, read/write, citation
-  tools.py       # built-in tools (vault search/read/write/list)
-  agent.py       # the agent loop (plan → tool call → answer)
-  mcp_server.py  # exposes the agent over MCP
-  mcp_client.py  # consumes other MCP servers as tools
+  cli.py           # `sea-star init | doctor | serve | ask`
+  config.py        # config + runtime probing + vault autodetection
+  inference.py     # the one path to a model; OpenAI-compatible
+  vault.py         # the only module that touches vault files
+  tools.py         # tool registry + built-in vault tools
+  agent.py         # the bounded agent loop (plan -> tool -> answer)
+  mcp_server.py    # exposes ask_seastar, vault_*, machine_report
+  mcp_client.py    # consumes other MCP servers as its own tools
+  recon.py         # one-shot reads of this machine's process/socket tables
+  harnesses.py     # harness discovery + the rung each one reached
+  connections.py   # records which process spawned serve (stdio attachment)
+  providers.py     # what a harness *declares* it gets models from
+  register.py      # the ask-once store at ~/.seastar/register.json
+  agents.py        # agent roster reading
+macapp/            # the native macOS menu-bar cockpit (AppKit + SwiftUI)
+  SeaStar/
+    App/           # the AppKit shell: status item, popover, app menu
+    Views/         # cockpit, graph, panel, settings, onboarding
+    Models/        # the decoded bridge report
+    Services/      # engine invocation, server lifecycle, logs, updates
+    Support/       # palette, strings, links
+    Shaders/       # the caustic shimmer
 ```
+
+**[docs/TECHNICAL.md](docs/TECHNICAL.md)** explains the architecture, the capability
+ladder that decides what Sea-Star is allowed to claim, and the known debt.
 
 ## Roadmap
 
 - [x] Runtime-agnostic inference adapter
+- [x] Native macOS menu-bar cockpit
 
 - [x] Vault search / read / write with citations
 

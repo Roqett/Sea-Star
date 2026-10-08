@@ -8,6 +8,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Harness: DeepSeek Harness
 
+Date: 2026-10-06 19:50 ACDT
+
+Summary of Changes:
+- `src/sea_star/config.py` — `VAGUE_OWNERS` (`remote`, `local`, `host`, `server`, `api`) is treated as no owner at all, and `probe_runtimes` takes an `owners` map (port → the app holding it) to name an endpoint after the app that owns its socket. A server naming itself properly keeps its own name. Deliberately not merged into `GENERIC_OWNERS`: 1337's known port is Osaurus, so dropping `remote` outright would mislabel Atomic Chat as another product (D-015, D-018).
+- `src/sea_star/cli.py` — the reconnaissance table is read the other way as well and threaded into the probe, so `Runtime:` reads `Atomic Chat -> http://127.0.0.1:1337/v1` instead of `remote -> …`.
+- `macapp/SeaStar/Services/ServerController.swift` — `DialOption`; `harnessDial` (every known harness app, the attached one choosable, the rest switched off with their rung as the reason); `agentDial` (personas whose model nothing serves switched off); `servingPlacement(of:)` resolving a roster's qualified id (`omlx/qwen3-large`) against what endpoints actually list; `selectAgent` now cascades — the endpoint and the model follow a persona that can be honoured — and `selectHarness` points the engine at the servers the chosen app owns. `placement(of:)` resolves through the same rule, so the sentence and the dial cannot disagree.
+- `macapp/SeaStar/Views/CockpitPanel.swift` — `DialRow`, a menu over everything that exists including the entries that cannot be chosen (ticked for the one in use, greyed with its reason for the rest), replacing the Harness `StatusRow` and the Agent `PickerRow`; endpoint labels gain their port.
+- `macapp/SeaStar/Support/Strings.swift` — the words a switched-off dial entry needs: the reason for an unknown rung, "nothing is serving its model", and the `name — reason` join.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — a suite for the panel's dials: the harness roster and its rungs, a persona nothing serves (the engine's real Patchdog case) being switched off rather than moving something, the cascade moving endpoint + model, an unserved persona moving nothing, and the sentence and the entry agreeing for every persona. The fixture gained a fourth agent and a qualified model id. 95 Swift tests in 17 suites.
+- `.trae/specs/mac-app/spec.md` — §8.2/§8.3 rewritten: the Harness row is the roster dial, and an endpoint is labelled by the app that owns its port, with its port.
+- `DECISIONS.md` — D-018.
+
+Harness: DeepSeek Harness
+
+Date: 2026-10-06 19:40 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/EntityGraphModel.swift` — a sixth kind, `.core`: one `seastar` node at the middle of both drawings, excluded from `majors`, never `isLive`. It is wired to the vault it lives in, the hosts driving it and the one endpoint it reads through, and `standingEdges` names the wires the whole-pool reading draws (the ring's bindings plus the hub's; a satellite's spokes stay for the focus reading) (D-017).
+- `macapp/SeaStar/Services/ServerController.swift` — `endpoints(ownedBy:)`, the reverse of `bundledOwner(of:)`: the endpoints a named app's own process was observed to hold a port for, restricted to the ones that actually answered as model servers.
+- `macapp/SeaStar/Views/EntityGraphView.swift` — the single vault→endpoint ribbon becomes a `wireLayer` over `standingEdges`: green-and-orange with the D-002 crawl while something live is on the wire, blue-white when it is only a stated binding, Sea-Star's own wires drawn heavier. The core is placed at the centre of the layout, sized above the vault, and `layout(in:)` is internal so the arrangement can be checked without a window.
+- `macapp/SeaStar/Views/GraphScene.swift` — the deep colours a wire by the same liveness facts (`GraphScenePlan.isLive`) and draws Sea-Star's heavier (`touchesCore`), so flying between the two readings cannot change which connections look live.
+- `macapp/SeaStar/Support/Palette.swift` — `coreGlow` (mauve): the palette's structural voice, so the hub is not the vault's bone.
+- `macapp/SeaStar/Support/Strings.swift` — the hub's own card: Observing / No endpoint answering, Driven by, Reading through, Answering now.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — a suite for the hub (one core, off the ring, at the middle of both readings, never live, wired to the right three things, its card honest), the ownership wire pinned on both an attached and an unattached app, the wire set pinned, and the plan's live/`core` wire facts pinned. 90 Swift tests in 16 suites.
+- `.trae/specs/mac-app/spec.md` — §8.7 rewritten where it still described the old drawing: the ring of majors, the hub at the centre, the real node colours, and what a wire may claim.
+- `DECISIONS.md` — D-017.
+
+Harness: DeepSeek Harness
+
 Date: 2026-10-02 17:30 ACST
 
 Summary of Changes:
@@ -657,6 +686,48 @@ Summary of Changes:
 - `README.md` — added a Documentation section linking the docs index; linked Way 2 to the connect guide.
 - `.gitignore` — added `INBOX/` so the document-staging folder never ships or commits.
 
+Harness: DeepSeek Harness
+
+Date: 2026-10-06 14:55 ACDT
+
+Summary of Changes:
+- `src/sea_star/config.py` — `read_omlx_loaded_model()` reads oMLX's own admin route for the model that is actually `loaded` (the chat `llm`, not its built-in `markitdown` helper), and `probe_runtimes()` moves it to the front so `RuntimeProbe.model` is *observed* rather than guessed. OpenAI's `/v1/models` lists what an endpoint offers and has no field for which model is loaded, so believing its first entry named a model oMLX was not running — the cockpit read "answering as Dirk-Qwen3.8" while oMLX was serving MiMo-V2.6.
+- `tests/test_config.py` — tests for the reader (picks the chat model over the helper, `None` when nothing is loaded or the route is absent) and for the probe preference, plus an autouse fixture that keeps every probe test off the machine's real oMLX admin route.
+- `macapp/SeaStar/Views/EntityGraphView.swift` — the pool's hover is one cursor hit-test (`hitNode`) instead of a per-node `.onHover`: the topmost node (the last-drawn agent) was swallowing every hover and staying lit wherever the pointer sat, so the cursor never highlighted what it was over. The vault→inference ribbon now crawls — drawn at twice the link's length and slid along a one-length track, driven by the frame clock the pool already runs on, which is the "scale ×2 / 8pt sweep" D-002 promised and the graph never got. Node labels and the tip note counter-scale and counter-turn against the pool's zoom and turn, so their glyphs are never resampled by the canvas transform that was making them soft beside the crisp card and list.
+- `macapp/SeaStar/Views/GraphReadoutCard.swift` — fact values wrap instead of truncating in the middle ("Stops when oM-el lives here" was a clipped claim, which is worse than a taller card); the card widens 240 → 268 to suit.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — four tests pinning the hover rule: the node under the cursor, empty water, an overlap resolving to the node drawn on top, and the hit's outer bound.
+
+Harness: DeepSeek Harness
+
+Date: 2026-10-06 15:10 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/HarnessTray.swift` — new: the harness roster moves into a QuickTime-4-style **drawer** at the foot of the graph (D-014). One centred control slides it out; an Aqua grip — two thin rules on a recessed capsule — closes it; the tray grows out of the panel's own lower edge rather than opening a window or a popover. No `NSDrawer`, no deprecated API.
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — graph mode hosts the drawer in place of the always-visible `HarnessVisibilityList`, and **an open drawer is paid for out of the pool**: `graphHeight` gives up 214pt while it is open, so the panel's capped height is unchanged and the whole roster stays on screen (the first build simply grew the panel and cut the last row in half). `isTrayOpen` lives here for that reason.
+- `macapp/SeaStar/Support/Strings.swift` — the drawer's own strings (`trayTitle`, `trayHelp`, `trayCloseHelp`), so no user-facing copy is hardcoded in the view.
+- `.trae/specs/mac-app/spec.md` §8.7 — records the drawer, its grip, and the pool-gives-way height rule.
+- `DECISIONS.md` — D-014, with the height rule and the reference it is built from.
+
+Harness: DeepSeek Harness
+
+Date: 2026-10-06 15:50 ACDT
+
+Summary of Changes:
+- `src/sea_star/harnesses.py` — **CLI harnesses are found while they are running.** Some harnesses ship no `.app` at all — OpenCode, Goose and the DeepSeek Harness run as bare binaries — so the `ps` scan, which looked only for `.app` bundles, could never see one: a demonstrably open OpenCode read as latent, or as nothing. New `KNOWN_HARNESS_COMMANDS` + `running_command_harnesses()` report them with the rung they have actually reached (`running`), under a namespaced `cli:<name>` identity that can never collide with a bundle id. A running CLI harness also stands in for its installed desktop sibling, so one product cannot appear twice.
+- `src/sea_star/config.py` — `probe_runtimes(extra_ports=…)`: the ports reconnaissance **observed** listening are probed as well as the fixed sweep list. A harness puts its own model server wherever it likes — Atomic Chat's Apple foundation server answers on 3355, which the sweep never looked at — so a live endpoint was sitting in Sea-Star's own socket table and was never spoken to. The caller threads the ports in; `config` still only asks a port, it does not survey the machine.
+- `src/sea_star/cli.py` — `_build_report` reads the socket table once, gives its loopback ports to the probe, and reuses that same reading for the bridge's `listening` list (it had been read twice).
+- `macapp/SeaStar/Views/HarnessTray.swift` — the drawer tab is a **grip, not a labelled bar**: the name and the chevron are gone (what it does is the hover label now) and the three rules are drawn directly at 34×2 instead of taken from `line.3.horizontal`, whose own lines are short and thin and read as a menu icon rather than the QuickTime tab's wide grooves.
+- `tests/test_harnesses.py` — four tests pinning the CLI family (reported running, standing in for the desktop sibling, dropped when attached, never invented when stopped), and `_detect` now pins `commands` so no test reads the machine's real process table.
+
+Harness: DeepSeek Harness
+
+Date: 2026-10-06 16:30 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/CockpitTray.swift` — **new, and replaces `HarnessTray.swift`.** The drawer is generic now: it holds whatever belongs to the reading it sits under, which is what let the header shed a whole pair of buttons. `TrayChoiceRow` gives a drawer a labelled row of mutually exclusive choices, so a two-way setting can live at the foot of the reading it affects.
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — the header carries **three** controls instead of five: the mode pair and Settings. The **depth** choice moved into the graph's drawer, beside the roster it already held, and the **layout** choice into the text reading's own drawer — so a control for a reading you are not in is no longer sitting in a header both readings share. `depthToggle` and `layoutToggle` are deleted. The title and subtitle are pinned to one line: the narrow text reading was rendering the app's own name as "Sea-" / "Star", which reads as a broken title rather than a title.
+- `macapp/SeaStar/Support/Strings.swift` — the drawers' titles (`Harnesses`, `Reading`, `Depth`, `Layout`) and a hover label that takes the drawer's name, so the closed ledge stays an unlabelled grip.
+
 ### Added
 
 - **Runtime-agnostic inference** (`inference.py`): talks the OpenAI-compatible
@@ -699,3 +770,101 @@ Summary of Changes:
   declared a bridged MCP server).
 
 [Unreleased]: https://github.com/Roqett/Sea-Star/commits/main
+
+Harness: OpenCode
+
+Date: 2026-10-07 12:31 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Services/ServerController.swift` — restored the Swift build: `FileManager.default.currentDirectoryURL` is not a real property and stopped the entire Mac app from compiling, so the tree and the running binary had drifted apart. Now `URL(fileURLWithPath: FileManager.default.currentDirectoryPath)`. Adds `HarnessRung.isUp` — "a process owns it, or something answered in its name" — distinct from `isAttached`, which stays "driving Sea-Star now".
+- `macapp/SeaStar/Views/EntityGraphView.swift` — a harness that is **up but not attached** now gets its own visual state instead of the dead grey a dormant install gets (D-020). The 2D pool gave every non-`isLive` node `glow = 0`, which drew a running IDE pixel-identical to an app that never launched, undoing the distinction the engine had correctly reported. It now takes a steady `0.34` glow at radius 5, presence `0.72`, with its glyph lit. Steady and never pulsing: the breath stays reserved for `isLive`, because being up is not the same as carrying work and foundation §2 forbids claiming a rung not reached. `.present` harnesses are unchanged.
+- `macapp/SeaStar/Support/Strings.swift`, `Views/CockpitPanel.swift`, `Views/CockpitPopoverView.swift` — `Stack`/`Chain` renamed **Facts**/**Path** (D-019), named for what they communicate rather than how they are laid out. Both readings stay; the toggle moves out of the drawer into the header as two SF Symbols with hover text, shown only in the list reading. The text reading's drawer is removed — layout was its only content. The graph drawer is untouched.
+- `PanelLayout` cases renamed `.facts`/`.path` while their **raw values stay `"stack"`/`"chain"`**, so a stored preference from before the rename still resolves. The case names are the truth; the raw values are a migration.
+- `macapp/SeaStarTests/DoctorReportTests.swift` — the panel-layout suite follows the rename; the stored-preference round-trip test now pins that the old raw values still resolve.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — the existing "never flattened to one grey state" test now also asserts the rung distinction survives into `isUp`, and that being up is never mistaken for being attached.
+- `DECISIONS.md` — D-019 (Facts and Path, and the toggle's move to the header) and D-020 ("up but not attached" is its own visual state).
+- `docs/WORKSPACE-IMPLEMENTATION.md` — recorded as incomplete rather than shipped: the fifth row detects against the process's current directory, which is meaningless for a menu-bar app outside a project, and it is not in the foundation's four rows. Left in the tree, not displayed as agreed.
+
+Harness: OpenCode
+
+Date: 2026-10-07 14:05 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/EntityGraphView.swift` — focus views no longer flatten liveness: the focus edge layer drew *every* wire blue-white, so clicking a star made a live connection and a dormant one indistinguishable — the exact confusion the whole-pool reading had already solved. It now reads the same `isLive` facts and draws live wires green-orange at 3pt, resting ones blue-white at 2pt.
+- `src/sea_star/providers.py` — **new.** Reads what a harness *declares* it gets models from (`~/.config/opencode/opencode.json` and the same shape for five other harnesses). A configured provider holds no socket, so this is the one link of the cascade no port probe could ever have shown — the harness-config reader recommended in D-015/D-017/D-018 and flagged as the blocker across four handoffs. Derived fields only `(provider, base_url, model)`; API keys and the raw document never enter the result, and the dataclass is frozen.
+- `src/sea_star/providers.py` — an **MCP server URL is never read as a model route.** The first implementation accepted any URL and reported `https://mcp.exa.ai/mcp` as OpenCode's model provider on this machine, because the live `opencode.json` declares two MCP servers and no model at all. `_is_model_route` admits only an inference surface (`/v1`, `/v2`, `/models`, `/completions`, `/embeddings`, or a bare loopback port) and rejects `/mcp` paths. This is D-010's lesson again — *the presence of a URL is not the shape of a claim* — and the stale premise in four handoffs is corrected: they cite a `"model": "atomic/Dirk-…"` entry that no longer exists.
+- `src/sea_star/cli.py` — `providers[]` on the bridge (additive; `schema_version` unchanged; always one JSON object). An older engine yields `[]`.
+- `macapp/SeaStar/Models/DoctorReport.swift` — `ConfiguredProviderInfo` and the `providers` key, decoding an older engine's absence as "this build did not look" rather than "no harness uses a model".
+- `macapp/SeaStar/Services/ServerController.swift` — `declaredProvider(forHarnessNamed:)`, matching the engine's short key (`opencode`) against the graph's display name (`OpenCode`) in both directions, space/dash-insensitively. A miss returns `nil` rather than borrowing a neighbour's claim.
+- `macapp/SeaStar/Views/EntityGraphModel.swift` — a harness node's subtitle names what it is *configured for* ("Configured for atomic · atomic/Dirk"), and a local declaration resolves to an endpoint **only when Sea-Star can already see that endpoint answering** — so a wire never points at a node that was never drawn. A cloud route or an unseen port stays a label. Never liveness: the node's rung and `isLive` are untouched.
+- `tests/test_providers.py` — **new,** 15 tests. The negative cases carry the weight: an MCP URL is never a model route, malformed JSON degrades to absent rather than failing, an unlisted harness is unread rather than invisible, and a config full of `apiKey`/`authToken`/`password` yields a claim containing none of them.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — 7 new tests for the declaration's honesty contract (never live; never borrowed; cloud and unseen-port claims stay labels), plus the shared fixture gains OpenCode and TraeCode.
+- `docs/web-canvas-3d.md` — **new.** The browser 3D canvas investigated and measured rather than argued: `3d-force-graph` 1.80.1 is MIT and viable, **364 KB gzipped** against a 4.8 MB bundle (~7%), but WebKit is a new framework dependency, the model must be serialised across a rendering seam, and its nodes are **spheres** — the sea-star glyph is the identity this app is built on. Verdict: not yet; fix the crowding natively, and prefer the split panel.
+- `DECISIONS.md` — D-021 (a configured provider is a rung-0 declaration; an MCP URL is never a model route).
+- `CHANGELOG.md` — appended a **second** entry for this session rather than editing the earlier one, per the append-only rule.
+- Counts: **179 Python tests**, **102 Swift tests in 18 suites**, ruff clean.
+
+Harness: OpenCode
+
+Date: 2026-10-07 14:35 ACDT
+
+Summary of Changes:
+- `docs/brand.md` — **new.** The brand and style reference this repository never had. Assembled from records that already existed and had drifted apart: the palette from `Palette.swift` (the code, which is authoritative), the Carpet Sea Star rationale from the handover, the voice from `foundation.md`. Covers the name and identity split (`Roqett/Sea-Star` the repo, **Up Periscope** the licence/bundle id), why the eight-armed *Meridiastra calcar* is the creature, the ten hex values with **the meaning each one carries** (plum is API inference because it is the only node that leaves the house; teal is local inference; bone is the vault so it does not compete with a model's green; mauve is Sea-Star and is deliberately not bone), the two-layer adaptive-chrome/fixed-dark-pool rule, type, motion discipline, the marks, and a voice section with a words-we-don't-use table. Records that the source art is eight-pointed and must not be "fixed", and that `assets/sea-star.png` predates the current icon art.
+- `site/index.html` — **new.** A single-file static landing page: hero, a real example answer with its citation, the trilemma the product solves, the cascade as four steps, the cockpit in three readings, runtimes, install, FAQ, an honest status line. Styling is inline and uses the brand hexes as CSS variables, with `prefers-color-scheme` light and dark, `prefers-reduced-motion` honoured, and every colour used for the meaning `brand.md` assigns it. **Three screenshot placeholders** carry HTML comments with the exact capture procedure and what each image must show — no image is claimed that has not been taken.
+- `docs/TECHNICAL.md` — **new.** The technical overview for a developer who is not the founder. Architecture and module map, then the substantial part: the capability ladder as a table with how each rung is obtained, the degradation contract and its enforcement in tests, how "no name is ever a precondition" is actually implemented (vocabulary over lists, roles over names, degrade-don't-vanish) with **the three category errors it has caught**, recognition without launching anything, the symmetry clause *and where MCP cannot help and why*, the privacy envelope with both derived-fields-only modules, the testing strategy, a failure-mode table, six items of known debt, and the bridge contract with a note on the stale `server.state`.
+- `README.md` — documentation table gains the technical overview and the foundation, and the count is no longer hardcoded ("Five pages"). App section corrected from "in build / coming" to built-and-refining, with the unreleased/private status stated where a reader would otherwise assume otherwise. The two-front-doors table now reflects the app as it is, including the Facts/Path rows, the Logs panel and the log path. Project layout updated with the eight modules that did not exist when the list was written, plus the `macapp/` tree. Screenshot placeholder block added with the capture procedure.
+- `docs/README.md` — index gains two doors (technical overview, brand & style) and the documentation map is brought up to date, including `one-pager.md`, `brand.md`, `TECHNICAL.md`, `web-canvas-3d.md` and `site/`.
+- Verified: HTML tag balance checked programmatically; code fences balanced in all three markdown files; no unescaped ampersands outside code spans. **179 Python tests, ruff clean** — no code changed.
+
+Harness: OpenCode
+
+Date: 2026-10-08 21:55 ACDT
+
+Summary of Changes:
+- `src/sea_star/agents.py` — **one agent, however many processes it is made of** (`detect_agent_instances`, `AgentInstance`). The founder's framing: *"they are still agents, even if they don't have names — that's what I'm talking to."* A desktop agent is a dozen processes (app, CLI, helpers, renderers) and counting them calls one conversation eight agents, so a candidate whose ancestor **of the same product** is also a candidate is a helper and is dropped. What survives is the root: one root, one agent. Two OpenCode instances the person is actually talking to therefore stay two agents, which is the case a naive collapse would have hidden. Product matching reads the `.app` bundle in the path, falling back to the executable stem, so no product name is hardcoded.
+- `src/sea_star/agents.py` — **an unnamed running agent is still reported.** No persona file, no name, and it appears. Declining to show work in progress because no definition exists is the same blindness the name-less CLI had.
+- `src/sea_star/agents.py` — **two roles recorded separately rather than forced into one category** (`is_attached`, `serves_models`). Running this live caught the mistake before it shipped: the first candidate set included `oMLX`, which is an inference *server*, not an agent. Filing a model server as an agent is exactly the error that made the cockpit unreadable once already, and Atomic Chat genuinely does both — drives Sea-Star *and* serves the model it drives it through. Forcing either label loses half the truth, so both facts are kept and the caller decides the wording.
+- `src/sea_star/agents.py` — `_instance_workspaces` reads each instance's working directory in one batched `lsof`, so "which project is this agent pointed at" is read rather than assumed; a pid whose directory cannot be read is absent rather than guessed.
+- **5 new tests**, including one asserting a dozen-process app collapses to one, one that a CLI beside an app stays its own agent, and one that a pure model server is flagged rather than either hidden or mislabelled.
+- Verified: **197 Python tests** (was 192), ruff clean. Live on this machine: 5 candidate processes → 5 instances, with oMLX marked *serves models* and Atomic Chat marked *drives Sea-Star* — each fact attached to the thing it is true of.
+
+Harness: OpenCode
+
+Date: 2026-10-08 21:20 ACDT
+
+Summary of Changes:
+- `src/sea_star/agents.py` — **the Agent row no longer reports one empty cupboard as the whole house.** The roster was read from a single harness's own store, so "no roster found" meant *I checked one place and it was empty* — while the person could have a dozen agents written as files. Two families are now read and **unioned**: a harness's own store, and **agent files as a shape** (a Markdown file with a delimited header carrying `name`, `description`, `model`, in a directory named `agents`). The directory name is the convention — the JSON store already uses it — so the *layout* is the discriminator and **no product name appears in the code**: a harness invented tonight is read because its files have the shape. First-match-wins is gone, because returning the first non-empty source reported a roster that existed and silently omitted the rest, which is the same lie as reporting none and harder to spot.
+- `src/sea_star/agents.py` — `candidate_agent_dirs` takes a `workspace`: where a harness is pointed decides which `agents/` directories it can reach, so project agents are found without asking anyone. The home sweep is one level of dot-directories only — personal agents, not a crawl of the disk.
+- `src/sea_star/agents.py` — the header reader recognises plain `key: value` scalars and **deliberately stops there**. `tools`, `effort` and `mcpServers` are not read because nothing acts on them, and reading less is what keeps this from becoming a second implementation of somebody else's config format. No YAML dependency added. An unterminated header, a README, or a file with no name yields no agent rather than a phantom one; a quoted value reads clean.
+- **8 new tests**, including one proving a dot-directory nobody in this codebase has heard of (`.vibeweaver/agents/`) is read purely by its layout, one proving a populated store cannot hide the agent files, and one that a README in an `agents/` folder is not an agent.
+- Verified: **192 Python tests** (was 184), ruff clean. Live on this machine: `~/.claude` exists but holds no `agents/` directory, so the empty roster is a true reading of both families rather than one — which is exactly the honesty the row existed for.
+
+Harness: OpenCode
+
+Date: 2026-10-08 20:50 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Services/ServerController.swift` — **stopped the two-second flash.** The founder's report: with the cockpit watching continuously, every node blinked every two seconds. Cause: `adopt` assigned `report` unconditionally, and the graph's model is a computed property rebuilt from the controller on every render pass — so each poll threw the whole graph away and restarted the pulse animation from zero. `adopt` now returns `Bool` and **only assigns when the reading actually differs** (`DoctorReport` is already `Equatable`). Everything downstream is now a function of real change rather than of the clock. This matters beyond irritation: a rapid full-brightness flicker is a genuine hazard for photosensitive users.
+- `macapp/SeaStar/Services/ServerController.swift` — `logs.append` in `refresh` is now gated on that same change, so the Logs panel no longer gains an identical "refresh ·…" line every two seconds and scrolls for as long as the cockpit is open.
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — the header status dot no longer reads `isRefreshing`. That was invisible when the cockpit read once and became a colour flip twice a second once it watched; a background poll is not a "checking" state and must not be drawn as one. `isRefreshing` still governs the Refresh button's enabled state, where it belongs.
+- Verified: **102 Swift tests in 18 suites** pass, ruff clean, 184 Python tests pass.
+
+Harness: OpenCode
+
+Date: 2026-10-08 18:45 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — **the cockpit now watches the machine.** It re-read every 2s while open (`watchTheMachine`, `watchInterval`), replacing a single read at open time. The gap this closes: the cockpit claims to tell the truth about this machine *now*, and one read made that false the moment anything changed — launching a harness, quitting one, or a model server coming up all left the panel describing a machine that had stopped existing. Cancellation is the off-switch (`.task` tears it down on close), so a closed cockpit costs nothing. Also: the Facts / Path switch now shows **its words** (`▤ Facts` / `⇣ Path`). As bare SF Symbols it was unreadable in use — the founder could not tell which reading was which without hovering each one, so the control failed at the only job it has. Hover text still carries the longer explanation.
+- `src/sea_star/harnesses.py` — **new family: a CLI recognised by what it does, not what it is called.** `serving_harness_processes` reports the process holding any loopback port already proven to answer with a model list. This closes the headless-CLI gap: a bare CLI agent has no bundle, no `Info.plist`, and — outside `KNOWN_HARNESS_COMMANDS` — no handle at all, so `running_command_harnesses` matching on process name left every agent invented after that dict was written invisible *permanently*. For a headless agent that is not a gap in coverage but the entire mechanism failing. A port that answers as a model server is evidence needing no name, which is the foundation's "no name is ever a precondition" applied to a process table, and it is the same principle `recon.MODEL_VOCABULARY` already documents in its own source. The six known names stay as an additive hint, never a gate. A serving port with no known owner is skipped rather than guessed at.
+- `src/sea_star/cli.py` — wires the new family into the bridge, threaded by hand from `probes` (the only module allowed to speak HTTP, and the only source of the "answers with a model list" proof) and `listening_services()` for the owner. `service.app_name` is preferred over `service.process` so an owned port reads as `oMLX` rather than `python3.11`.
+- `tests/test_harnesses.py` — **5 new tests**, including one asserting a CLI named `nightfall-agent` is found while a test asserts it is *absent* from `KNOWN_HARNESS_COMMANDS` (the hint-is-not-a-gate rule, stated as an executable claim), plus no-guess-on-unowned-port, no-contribution-without-proof, and one-product-one-row. That last test initially asserted the wrong winner and was corrected: a running process outranks its installed app, which is the pre-existing OpenCode rule, not a new one.
+- Verified: **184 Python tests** (was 179), ruff clean. Live on this machine with TextEdit launched as a control — it correctly does **not** appear, and `python3.11`/`ControlCenter`/`rapportd` do not leak in despite 9 loopback listeners. **102 Swift tests in 18 suites** pass.
+
+Harness: OpenCode
+
+Date: 2026-10-08 09:15 ACDT
+
+Summary of Changes:
+- `docs/HANDOVER-2026-10-08.md` — **new.** The cold-start handover for the session the founder asked for, superseding the 2026-10-02 snapshot in `NEXT-SESSION.md` (which is kept and relabelled as history). Nine sections: the state in one screen; how the session started and what the review found; the founder's decisions; what was built, with the three findings from the provider reader that matter more than the feature; **what is uncommitted and the four suggested commits**; what needs his eyes versus what is verifiable from code; loose ends; the traps; and the single next step. Records that the app was **not running** at handover and must be started before any visual check, and that `docs/WORKSPACE-IMPLEMENTATION.md` contradicts his decision not to display the Workspace row.
+- `docs/README.md` — the "start here" door now points at the 2026-10-08 handover, with `NEXT-SESSION.md` explicitly relabelled as the superseded 2026-10-02 snapshot kept for history.
+- No code changed. **179 Python tests, 102 Swift tests in 18 suites, ruff clean.**

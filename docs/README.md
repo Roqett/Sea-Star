@@ -15,9 +15,12 @@ schemas."* Pick the door that fits where you are right now.
 | Running it day to day — by clicking, or by typing | **[Use the app](use-the-app.md)** | The menu-bar Cockpit on one side, the exact terminal commands on the other. Two tracks, kept in step. |
 | Trying to make it work *with your agent app* | **[Connect it](connect.md)** | The exact steps to wire Sea-Star into Osaurus, Claude Desktop, Cursor or TRAE — plus what to say to the agents. |
 | A developer who wants the facts | **[Reference](reference.md)** | Commands, MCP tools, config keys, runtimes, environment variables. |
+| A developer who wants to know *how it works* | **[Technical overview](TECHNICAL.md)** | Architecture, the capability ladder, recognition without launching anything, the privacy envelope, the bridge contract, and known debt. |
+| Writing the docs, the site, or anything user-facing | **[Brand & style](brand.md)** | The palette and what each colour *means*, type, motion, marks, and the voice rules. |
 | Stuck on an error | **[Troubleshooting](troubleshooting.md)** | Every failure we know about, and the fix. |
 | A developer, or an agent, changing how Sea-Star behaves | **[Foundation](foundation.md)** | The binding rules — chiefly *"no name is ever a precondition"*, which keeps new harnesses working without new code. |
-| An agent picking the work up tomorrow | **[Next session](NEXT-SESSION.md)** | The state of the world, every loose end, and the to-do list. Read it before touching anything. |
+| An agent picking the work up tomorrow | **[Handover — 2026-10-08](HANDOVER-2026-10-08.md)** | The current state of the world, what changed, what the founder needs to look at, and the traps. **Start here.** |
+| An agent from an older session | **[Next session](NEXT-SESSION.md)** | The 2026-10-02 snapshot. Superseded by the handover above, kept for history. |
 
 ## The one-paragraph version
 
@@ -46,14 +49,20 @@ Sea-Star sits in the middle. The model and the vault connect to Sea-Star automat
 ```
 docs/
   README.md            ← you are here (index)
+  one-pager.md         what it is, for a reader (and a reviewer)
   foundation.md        the binding rules for how Sea-Star must behave
+  brand.md             palette, type, motion, marks, voice — for anything user-facing
+  TECHNICAL.md         architecture, the capability ladder, privacy, known debt
   start-here.md        zero-jargon explainer + quickstart
   use-the-app.md       the Cockpit (click) and the terminal (type), in step
   connect.md           wire Sea-Star into a host (Osaurus / Claude / Cursor / TRAE)
   reference.md         commands, tools, config, runtimes, env vars
   troubleshooting.md   errors and fixes
+  web-canvas-3d.md     the 3D-renderer question, measured rather than argued
   PROGRESS.md          live build state and session handoff (maintainer file)
+site/
+  index.html           the landing page (static; open it in a browser)
 ```
 
 The repository's front page ([`README.md`](../README.md)) is the shopfront — what Sea-Star
-is and why it exists. This folder is the manual.
+is and why it exists. This folder is the manual. Neither is the foundation.
