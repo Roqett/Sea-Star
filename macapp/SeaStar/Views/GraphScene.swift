@@ -84,7 +84,14 @@ enum GraphSceneBuilder {
     /// Non-isolated constants inside an otherwise main-actor enum: SceneKit's
     /// render thread compares the camera against these every frame, and a pose
     /// nobody can change is not something that needs an actor to protect it.
-    nonisolated(unsafe) static let homePosition = SCNVector3(0, 70, 240)
+    /// Where the camera waits. Far enough back that the ring's *near* side is not
+    /// dramatically bigger than its far side: at 240 with a radius of 120, the
+    /// closest node stood 120 units from the eye and the furthest 360, so
+    /// perspective made the front of the pool enormous and the founder's screenshot
+    /// opened on a giant coloured blob that was not special — merely near. Doubling
+    /// the distance roughly halves that disparity, which is what lets the height
+    /// axis be read instead of being shouted over by scale.
+    nonisolated(unsafe) static let homePosition = SCNVector3(0, 150, 430)
     nonisolated(unsafe) static let homePitch: CGFloat = -0.22
     /// The whole opening orientation, so "home" is one pose rather than a
     /// position and a pitch that could each be changed on their own.
@@ -282,25 +289,20 @@ enum GraphSceneBuilder {
         let holder = SCNNode()
         holder.name = "node-\(node.id)"
 
-        // The body. Its hue is the entity's own accent turned by its own id, so
-        // a given thing is the same shade here as it is in the pool.
-        let sphere = SCNSphere(radius: CGFloat(radius))
-        let material = SCNMaterial()
         let tinted = GraphSeed.shifted(node.accent, by: GraphSeed.hue(for: node.id) * 0.25)
-        material.diffuse.contents = NSColor(tinted)
-        material.emission.contents = NSColor(tinted)
-        material.lightingModel = .physicallyBased
-        material.roughness.contents = 0.35
-        material.metalness.contents = 0.1
-        // A selected body brightens rather than merely surviving: it is the one
-        // the card is describing, so it should be the thing your eye lands on.
-        material.emission.intensity = isSelected ? 1.0 : 0.6
-        material.transparency = isDimmed ? 0.25 : 1.0
-        material.transparencyMode = .aOne
-        sphere.firstMaterial = material
-        let body = SCNNode(geometry: sphere)
-        body.name = "body-\(node.id)"
-        holder.addChildNode(body)
+
+        // The body was a solid emissive SCNSphere with the sea-star art on a quad
+        // floating in front of it, so the thing you actually saw was the back of a
+        // coloured ball through a star-shaped window. That is what made the room
+        // "wacky blob pop art", and it is the whole difference between this reading
+        // and the 2D pool — the flat pool draws the creature and has no sphere at
+        // all, which is precisely why it looks right.
+        //
+        // So the sphere is gone. The node *is* the glyph now, the same art at the
+        // same weight the 2D uses. What is left in the room that the 2D does not
+        // have is the thing the 2D cannot offer: a third axis that carries the
+        // rung, and a camera you can turn. The roster does not stop being the same
+        // roster because the room is real.
 
         // The selected body's halo: a thin ring in the entity's own accent, and
         // the only selection cue in the pool. It is drawn in 3D rather than
@@ -327,9 +329,10 @@ enum GraphSceneBuilder {
             holder.addChildNode(halo)
         }
 
-        // The sea-star, floating just off the front of the body as a billboard:
-        // the 2D creature worn on a 3D sphere, so the roster stays
-        // recognisably the same roster rather than becoming a different product.
+        // The sea-star, as a billboard: the same 2D creature the flat pool draws, so the
+        // roster stays recognisably the same roster rather than becoming a different
+        // product. With the sphere gone this is no longer "art worn on a body" — it
+        // is the node.
         let art = glyph(for: node)
         let plane = SCNPlane(width: CGFloat(radius) * 2.6, height: CGFloat(radius) * 2.6)
         let starMaterial = SCNMaterial()
@@ -373,7 +376,7 @@ enum GraphSceneBuilder {
 
         // The name, small and mono, hung beneath. Readable when you fly close;
         // quiet enough not to shout across the pool.
-        if let label = makeLabel(for: node, isDimmed: isDimmed) {
+        if let label = makeLabel(for: node, isDimmed: isDimmed, radius: radius) {
             label.position = SCNVector3(0, -CGFloat(radius) * 1.6, 0)
             holder.addChildNode(label)
         }
@@ -448,7 +451,7 @@ enum GraphSceneBuilder {
 
     /// The entity's own name as a flat, always-facing label. A billboard, so it
     /// turns to you as you orbit instead of turning edge-on and vanishing.
-    private static func makeLabel(for node: GraphNode, isDimmed: Bool) -> SCNNode? {
+    private static func makeLabel(for node: GraphNode, isDimmed: Bool, radius: Float) -> SCNNode? {
         let text = SCNText(string: node.title, extrusionDepth: 0.2)
         text.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .semibold)
         text.flatness = 0.1
@@ -462,6 +465,11 @@ enum GraphSceneBuilder {
 
         let label = SCNNode(geometry: text)
         label.name = "label-\(node.id)"
+        // `SCNText` is sized in *world units*, not points: at 11pt against a node
+        // whose glyph is ~16 units across, the name was nearly as large as the thing
+        // it named — the oversized type all over the founder's screenshot. Scaled to
+        // the node's own radius so a caption reads as a caption at any pool size,
+        // which is also what keeps it quiet rather than shouting across the room.
         // `SCNText` grows from its own baseline origin, so shift the pivot by
         // half its width to centre the words under the body rather than
         // trailing off to one side. `boundingBox` is a `(min:max:)` pair, so
@@ -472,6 +480,9 @@ enum GraphSceneBuilder {
             0,
             0
         )
+        // Half the node's radius, expressed in the text's own world units.
+        let captionScale = max(radius * 0.5 / 11, 0.05)
+        label.scale = SCNVector3(captionScale, captionScale, captionScale)
         label.constraints = [SCNBillboardConstraint()]
         return label
     }

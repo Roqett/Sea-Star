@@ -818,6 +818,16 @@ Summary of Changes:
 
 Harness: OpenCode
 
+Date: 2026-10-08 22:55 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/GraphScene.swift` — **the spheres are gone, and that was the whole problem.** The founder's screenshot showed what he called "big old blobs in that wacky pop art thing, unlike the beauty of our 2D version, which is perfect". Each node was a solid emissive `SCNSphere` with the sea-star art on a quad floating in front of it, so the thing on screen was **the back of a coloured ball seen through a star-shaped window**. The flat pool has no sphere at all — it draws the creature directly — and that is precisely why the 2D looks right and this did not. The node *is* the glyph now: the same art at the same weight the 2D uses. What remains that the 2D cannot offer is the part the 2D cannot have — a third axis that carries the rung, and a camera you can turn. The roster does not stop being the same roster because the room is real.
+- `macapp/SeaStar/Views/GraphScene.swift` — **the camera was far too close, and the giant blob was not special, merely near.** It sat at z=240 while the pool's radius is 120, so the closest node stood 120 units from the eye and the furthest 360: a 3:1 size disparity that made the near side of the ring enormous and unreadable. Moved back to 430, which roughly halves the disparity and lets the height axis be read instead of being shouted over by scale.
+- `macapp/SeaStar/Views/GraphScene.swift` — **labels were sized in world units, not points.** `SCNText` at 11pt against a node whose glyph is ~16 units across made the name nearly as large as the thing it named — the oversized type across the whole screenshot. Now scaled to half the node's own radius, so a caption reads as a caption at any pool size and stays quiet rather than shouting across the room.
+- Verified: **102 Swift tests in 18 suites** pass, ruff clean. Awaiting the founder's eye — the three changes were each read off his screenshot rather than chosen in the abstract.
+
+Harness: OpenCode
+
 Date: 2026-10-08 22:35 ACDT
 
 Summary of Changes:
