@@ -34,6 +34,20 @@ struct GraphScenePlan: Equatable {
         self.focus = focus
         self.selectedID = selectedID
     }
+
+    /// Whether something answered on this entity during the read this plan came
+    /// from. Asked of the plan rather than of the live controller so the scene
+    /// builder stays a pure function of the plan — a pool can be built and
+    /// tested with no window and no engine behind it.
+    func isLive(_ id: String) -> Bool {
+        nodes.first { $0.id == id }?.isLive == true
+    }
+
+    /// Whether this binding has Sea-Star at one end. Its wires are drawn a touch
+    /// heavier, because they are the ones the hub exists to carry.
+    func touchesCore(_ edge: GraphEdge) -> Bool {
+        edge.from == EntityGraphModel.coreID || edge.to == EntityGraphModel.coreID
+    }
 }
 
 /// Builds the `SCNScene` for a plan.
@@ -199,9 +213,13 @@ enum GraphSceneBuilder {
         return root
     }
 
-    /// One binding, drawn as a thin lit cylinder from body to body. The wire
-    /// wears the blue-white nudibranch's own blue: a connection is
-    /// infrastructure, and infrastructure is cool.
+    /// One binding, drawn as a thin lit cylinder from body to body.
+    ///
+    /// A wire with something live on it wears the founder's green-and-orange
+    /// liveness ribbon; one that is only a binding the report states stays the
+    /// cool blue of infrastructure. That is the same rule the flat pool's wires
+    /// follow, read from the same `isLive` facts, so flying between the two
+    /// readings cannot change which connections look live.
     private static func makeWire(_ edge: GraphEdge, plan: GraphScenePlan) -> SCNNode {
         let from = plan.positions[edge.from]!
         let to = plan.positions[edge.to]!
@@ -209,10 +227,15 @@ enum GraphSceneBuilder {
         let wire = SCNNode()
         wire.name = "wire-\(edge.id)"
         let length = from.distance(to: to)
-        let cylinder = SCNCylinder(radius: 0.9, height: CGFloat(max(length, 0.1)))
+        let isLive = plan.isLive(edge.from) || plan.isLive(edge.to)
+        let tint = isLive ? Palette.neonGreen : Palette.electricBlue
+        let cylinder = SCNCylinder(
+            radius: plan.touchesCore(edge) ? 1.6 : 0.9,
+            height: CGFloat(max(length, 0.1))
+        )
         let material = SCNMaterial()
-        material.diffuse.contents = NSColor(Palette.electricBlue)
-        material.emission.contents = NSColor(Palette.electricBlue)
+        material.diffuse.contents = NSColor(tint)
+        material.emission.contents = NSColor(tint)
         material.lightingModel = .constant
         material.transparencyMode = .aOne
         material.blendMode = .add

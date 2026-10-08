@@ -84,6 +84,34 @@ struct DoctorReport: Decodable, Sendable, Equatable {
         }
     }
 
+    /// What a harness *says* it gets its models from, read out of that harness's
+    /// own settings. This is a **declaration, not a connection** — foundation §2
+    /// rung 0 — and the distinction is load-bearing: a configured provider holds
+    /// no socket, so no probe could ever have shown it. It is drawn as a stated
+    /// binding and never as liveness, and the absence of a ``baseURL`` is itself
+    /// the honest fact (a bare model name names a model but no place to get it).
+    struct ConfiguredProviderInfo: Decodable, Sendable, Equatable {
+        let harness: String
+        let provider: String
+        let baseURL: String?
+        let model: String?
+        /// `"configured"` today. Carried rather than assumed so a future claim
+        /// kind can be told apart from a declaration by whoever reads it.
+        let evidence: String
+        /// Whether the declared route is a loopback endpoint on this machine —
+        /// the only kind the graph can resolve to a node it already draws.
+        let isLocal: Bool
+
+        enum CodingKeys: String, CodingKey {
+            case harness
+            case provider
+            case baseURL = "base_url"
+            case model
+            case evidence
+            case isLocal = "local"
+        }
+    }
+
     /// One host currently attached to the engine over stdio. The engine
     /// records who spawned its `serve` process and prunes the record when the
     /// process dies, so this is proof of a live connection — the stdio
@@ -208,6 +236,10 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     /// so the panel can say the difference rather than showing a blank row.
     let agentSource: String?
     let latentHarnesses: [LatentHarnessInfo]?
+    /// What each harness *declares* it gets models from. `nil` from an engine
+    /// that predates the reader — the absence of the key is then "this build did
+    /// not look", never "no harness uses any model".
+    let providers: [ConfiguredProviderInfo]?
     /// What the engine found and has not been told about. `nil` from an engine
     /// that predates the register, which the panel reads as "nothing to ask".
     let candidates: [CandidateInfo]?
@@ -217,6 +249,9 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     /// connection records — the app then shows no attached host rather than
     /// inventing one.
     let mcpClients: [McpClientInfo]?
+    /// Workspace markers found in the current directory — the only evidence
+    /// family that proves *use* rather than installation.
+    let workspaceMarkers: [String]?
     let server: ServerState
     let servers: [BridgedServer]
 
@@ -233,10 +268,12 @@ struct DoctorReport: Decodable, Sendable, Equatable {
         case agents
         case agentSource = "agent_source"
         case latentHarnesses = "latent_harnesses"
+        case providers
         case candidates
         case modelLike = "model_like"
         case behaviour
         case mcpClients = "mcp_clients"
+        case workspaceMarkers = "workspace_markers"
         case server
         case servers
     }
@@ -260,6 +297,11 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     /// engine predates multi-harness detection (`runtimes` absent).
     var detectedRuntimes: [RuntimeInfo] { runtimes ?? [] }
 
+    /// What harnesses declare they use. Empty when the engine predates the
+    /// reader, which is read as "nothing declared" rather than as a claim that
+    /// no harness needs a model.
+    var declaredProviders: [ConfiguredProviderInfo] { providers ?? [] }
+
     /// Every agent the engine found. Empty when the engine predates agent
     /// discovery (`agents` absent), so the app degrades to the old graph.
     var detectedAgents: [AgentInfo] { agents ?? [] }
@@ -276,6 +318,10 @@ struct DoctorReport: Decodable, Sendable, Equatable {
     /// Every host attached over stdio right now. Empty when the engine
     /// predates connection records (`mcp_clients` absent).
     var attachedMcpClients: [McpClientInfo] { mcpClients ?? [] }
+    
+    /// Workspace markers found in the current directory. Empty when no
+    /// markers are found or the engine predates workspace detection.
+    var detectedWorkspaceMarkers: [String] { workspaceMarkers ?? [] }
 }
 
 /// The bridge answers with either the report or a fail-loud error object.

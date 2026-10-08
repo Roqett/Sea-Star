@@ -468,13 +468,19 @@ struct EntityGraphView: View {
     private func pool(at time: Double, animated: Bool) -> some View {
         GeometryReader { geo in
             let points = drifted(focusAwareLayout(in: geo.size), at: time, animated: animated)
+            // Read once per frame and handed down, rather than asked of the model
+            // inside each node and each wire: the model rebuilds its whole roster
+            // on every question, and this view runs on a 30Hz clock. The pool's
+            // geometry is already computed once above for the same reason.
+            let liveNodes = Set(nodes.filter(\.isLive).map(\.id))
+            let wires = model.standingEdges
             ZStack {
                 starBackdrop(in: geo.size)
                     .opacity(focused == nil ? 1 : 0)
                 if focused == nil {
-                    connectionLayer(points, time: time, animated: animated)
+                    wireLayer(wires, points, liveNodes: liveNodes, time: time, animated: animated)
                 } else {
-                    focusEdgeLayer(points)
+                    focusEdgeLayer(points, liveNodes: liveNodes)
                 }
                 ForEach(drawOrder) { node in
                     if let point = points[node.id] {
@@ -483,6 +489,14 @@ struct EntityGraphView: View {
                 }
                 if focused == nil {
                     tipCallout(points, in: geo.size)
+                }
+            }
+            .onContinuousHover { phase in
+                switch phase {
+                case .active(let location):
+                    hovered = Self.hitNode(at: location, nodes: drawOrder, positions: points)?.id
+                case .ended:
+                    hovered = nil
                 }
             }
             .scaleEffect(scale)
@@ -520,6 +534,42 @@ struct EntityGraphView: View {
     /// bodies, not two things that happen to agree.
     private static func phase(for id: String) -> Double {
         GraphSeed.phase(for: id)
+    }
+
+    /// The side length of a node's glyph, by kind. One number, held here so the
+    /// hover hit-test below and the drawing above cannot drift apart on how big a
+    /// node is to land on.
+    static func nodeSize(_ kind: GraphNode.Kind) -> CGFloat {
+        switch kind {
+        case .core: return 34
+        case .model: return 17
+        case .agent: return 21
+        case .vault: return 27
+        case .harness: return 23
+        case .inference: return 23
+        }
+    }
+
+    /// The node under a cursor point, if any. Walks the draw order top-down (last
+    /// drawn is topmost) so overlapping satellites resolve to the one actually on
+    /// top, and hits within a circle a touch wider than the glyph so a star is
+    /// easy to land on. Pure and static so the rule can be tested without a
+    /// window.
+    static func hitNode(
+        at point: CGPoint,
+        nodes: [GraphNode],
+        positions: [String: CGPoint]
+    ) -> GraphNode? {
+        for node in nodes.reversed() {
+            guard let position = positions[node.id] else { continue }
+            let radius = nodeSize(node.kind) / 2 + 2
+            let dx = point.x - position.x
+            let dy = point.y - position.y
+            if dx * dx + dy * dy <= radius * radius {
+                return node
+            }
+        }
+        return nil
     }
 
     private func growConnection() {
@@ -587,11 +637,22 @@ struct EntityGraphView: View {
     /// The major nodes stand on the tips of an N-pointed star, evenly around a
     /// circle — so the count of majors is the count of points. Models ring the
     /// active harness, pulled in toward the middle so they never clip the edge.
-    private func layout(in size: CGSize) -> [String: CGPoint] {
+    ///
+    /// Sea-Star holds the middle itself. It is the one place in the pool that is
+    /// not a point on a ring, and it is placed before the ring so that adding it
+    /// could not have shifted a single other body — the arrangement everything
+    /// else has is untouched by the hub appearing in it.
+    ///
+    /// Internal rather than private, like `nodeSize` and `hitNode` above: where
+    /// the pool puts each thing is a claim about the pool that both readings and
+    /// the tests have to be able to check without opening a window.
+    func layout(in size: CGSize) -> [String: CGPoint] {
         var points: [String: CGPoint] = [:]
         let centre = CGPoint(x: size.width / 2, y: size.height / 2)
         let outer = starOuterRadius(in: size)
         let majorNodes = majors
+
+        points[EntityGraphModel.coreID] = centre
 
         for (index, node) in majorNodes.enumerated() {
             let angle = -Double.pi / 2
@@ -715,39 +776,87 @@ struct EntityGraphView: View {
         }
     }
 
+    /// Every wire the whole-pool reading draws: the ring's own bindings, and
+    /// Sea-Star's.
+    ///
+    /// This is the layer the founder kept asking for. It used to draw exactly
+    /// one ribbon — from the vault toward the endpoint currently being read —
+    /// which meant that connecting an app to Sea-Star changed a *node* and never
+    /// a *wire*: a new star appeared in the pool with nothing joining it to
+    /// anything, and the picture sat still while the machine changed underneath
+    /// it. A hub in the middle with wires into it is the whole point of the
+    /// exercise.
     @ViewBuilder
-    private func connectionLayer(
+    private func wireLayer(
+        _ wires: [GraphEdge],
         _ points: [String: CGPoint],
+        liveNodes: Set<String>,
         time: Double,
         animated: Bool
     ) -> some View {
-        if let vault = points["vault"],
-           let active = activeInferenceID,
-           let target = points[active],
-           vault != target {
-            let dx = target.x - vault.x
-            let dy = target.y - vault.y
-            let length = max(sqrt(dx * dx + dy * dy), 1)
-            // The orange-to-green art means one thing only: the endpoint this
-            // link reaches answered during the latest read. Selection alone
-            // does not earn it — a harness picked but not answering stays
-            // blue-white wiring, so the ribbon never claims a probe result.
-            NudiStrip(
-                style: model.node(active)?.isLive == true ? .greenOrange : .blueWhite,
-                height: 3,
-                expands: false
-            )
-                .frame(width: length, height: 3)
-                // Reveal from the vault end, so the ribbon grows *out of* the
-                // vault toward the harness it just connected to.
-                .mask(alignment: .leading) {
-                    Rectangle().frame(width: length * connectProgress)
-                }
-                .rotationEffect(.radians(atan2(dy, dx)))
-                .position(x: (vault.x + target.x) / 2, y: (vault.y + target.y) / 2)
-                .opacity(animated ? 0.8 + 0.2 * (0.5 + 0.5 * sin(time * 0.9)) : 1)
-                .shadow(color: Palette.harnessGlow.opacity(0.6), radius: 5)
+        ForEach(wires) { edge in
+            if let from = points[edge.from], let to = points[edge.to], from != to {
+                wire(edge, from: from, to: to, liveNodes: liveNodes, time: time, animated: animated)
+            }
         }
+    }
+
+    /// One wire, from one body to another.
+    ///
+    /// The orange-to-green art means one thing only, and it is the same claim the
+    /// single ribbon always made: **something live is on this wire** — an app the
+    /// engine recorded driving Sea-Star, or the endpoint it is reading right now.
+    /// Being drawn at all earns nothing; a binding the report merely states stays
+    /// cool blue-white wiring. The crawl is D-002's sweep, and it rides the frame
+    /// clock the pool already runs on rather than any new timer.
+    ///
+    /// Sea-Star's own wires are drawn a touch heavier than the rest, because they
+    /// are the reading the founder asked for rather than one of the ring's facts.
+    @ViewBuilder
+    private func wire(
+        _ edge: GraphEdge,
+        from: CGPoint,
+        to: CGPoint,
+        liveNodes: Set<String>,
+        time: Double,
+        animated: Bool
+    ) -> some View {
+        let dx = to.x - from.x
+        let dy = to.y - from.y
+        let length = max(sqrt(dx * dx + dy * dy), 1)
+        let touchesCore = edge.from == EntityGraphModel.coreID
+            || edge.to == EntityGraphModel.coreID
+        let isLive = liveNodes.contains(edge.from) || liveNodes.contains(edge.to)
+        // The one ribbon that grows out of its end when the reading changes: the
+        // link from the vault to the endpoint Sea-Star is reading through. The
+        // rest are facts about the machine and are simply there.
+        let isConnectionRibbon = activeInferenceID.map {
+            (edge.from == "vault" && edge.to == $0) || (edge.to == "vault" && edge.from == $0)
+        } ?? false
+        let height: CGFloat = touchesCore ? 3 : 2
+        let crawl = isLive && animated
+            ? CGFloat((time * 0.35).truncatingRemainder(dividingBy: 1)) * length
+            : 0
+        let breath = animated ? 0.75 + 0.25 * (0.5 + 0.5 * sin(time * 0.9)) : 1
+        NudiStrip(
+            style: isLive ? .greenOrange : .blueWhite,
+            height: height,
+            expands: false
+        )
+            .frame(width: length * 2, height: height)
+            .offset(x: -crawl)
+            .frame(width: length, height: height, alignment: .leading)
+            .clipped()
+            .mask(alignment: .leading) {
+                Rectangle().frame(width: length * (isConnectionRibbon ? connectProgress : 1))
+            }
+            .rotationEffect(.radians(atan2(dy, dx)))
+            .position(x: (from.x + to.x) / 2, y: (from.y + to.y) / 2)
+            .opacity(isLive ? breath : 0.7)
+            .shadow(
+                color: (isLive ? Palette.harnessGlow : Palette.electricBlue).opacity(0.5),
+                radius: isLive ? 5 : 3
+            )
     }
 
     /// The links out of a focused star: a nudibranch strip runs from it to each
@@ -755,24 +864,35 @@ struct EntityGraphView: View {
     /// bound. A strip is an edge between two entities, drawn once per
     /// relationship the report knows.
     ///
-    /// These stay blue-white whatever the neighbour is. The edge is a binding
-    /// the report states; whether the far end answered is a separate fact the
-    /// neighbour's own liveness bar already carries. Colouring the wire too
-    /// would say it twice, and say it for the whole fan of neighbours at once.
+    /// These read from the same `isLive` facts as the whole-pool layer, so a
+    /// focus reading never flattens liveness: a wire to something that answered
+    /// is the green-orange lit strip, a wire to something merely bound is the
+    /// blue-white resting one. This layer used to draw every wire blue-white,
+    /// which made a live connection and a dormant one indistinguishable the
+    /// moment you clicked a star — the exact confusion the whole-pool reading
+    /// had already solved.
     @ViewBuilder
-    private func focusEdgeLayer(_ points: [String: CGPoint]) -> some View {
+    private func focusEdgeLayer(_ points: [String: CGPoint], liveNodes: Set<String>) -> some View {
         if let focused, let origin = points[focused] {
             ForEach(Array(neighbours(of: focused).sorted()), id: \.self) { id in
                 if let target = points[id] {
+                    let isLive = liveNodes.contains(id) || liveNodes.contains(focused)
                     let dx = target.x - origin.x
                     let dy = target.y - origin.y
                     let length = max(sqrt(dx * dx + dy * dy), 1)
-                    NudiStrip(style: .blueWhite, height: 2, expands: false)
-                        .frame(width: length, height: 2)
+                    NudiStrip(
+                        style: isLive ? .greenOrange : .blueWhite,
+                        height: isLive ? 3 : 2,
+                        expands: false
+                    )
+                        .frame(width: length, height: isLive ? 3 : 2)
                         .rotationEffect(.radians(atan2(dy, dx)))
                         .position(x: (origin.x + target.x) / 2, y: (origin.y + target.y) / 2)
-                        .opacity(0.85)
-                        .shadow(color: Palette.harnessGlow.opacity(0.5), radius: 4)
+                        .opacity(isLive ? 0.95 : 0.7)
+                        .shadow(
+                            color: (isLive ? Palette.neonGreen : Palette.electricBlue).opacity(0.5),
+                            radius: isLive ? 4 : 3
+                        )
                 }
             }
         }
@@ -817,8 +937,10 @@ struct EntityGraphView: View {
                 x: min(max(point.x - 98, 88), max(88, size.width - 168)),
                 y: min(max(point.y - 26, 52), max(52, size.height - 12))
             )
-            // The note stays upright and legible even when the pool has been
-            // turned on its side.
+            // The note stays upright and sharp even when the pool has been
+            // turned or zoomed: it counters both, so its text is never resampled
+            // by the pool's own transform.
+            .scaleEffect(1 / max(scale, 0.01))
             .rotationEffect(.radians(-rotation.radians))
             .animation(.spring(response: 0.34, dampingFraction: 0.78), value: tipExpanded)
         }
@@ -837,19 +959,20 @@ struct EntityGraphView: View {
         let isFocused = focused == node.id
         let inFocus = focused != nil && focusSet.contains(node.id)
         let faded = focused != nil && !inFocus
-        let size: CGFloat
-        switch node.kind {
-        case .model: size = 17
-        case .agent: size = 21
-        case .vault: size = 27
-        case .harness: size = 23
-        case .inference: size = 23
-        }
+        let size = Self.nodeSize(node.kind)
         // A harness that is up but not answering stays dimmer than a connected
         // one: it exists, but it is driving nothing, and the eye should read that
         // at once. Unrelated stars, when something is focused, fade almost away.
         let unproven = node.rung.map { !$0.isAttached } ?? false
-        let presence: Double = (unproven ? 0.5 : 1) * (faded ? 0.12 : 1)
+        // A harness that is up but not driving anything gets its own voice:
+        // a real, steady glow a notch below the connected breath. Before this,
+        // every non-live node took `glow = 0`, which drew a running IDE
+        // pixel-identical to an app that never launched — the two rungs the
+        // engine carefully told apart were flattened back into one grey by the
+        // drawing. Steady, never pulsing: the breath is reserved for work, and
+        // being up is not the same as carrying it.
+        let isUpNotLive = !node.isLive && node.rung?.isUp == true
+        let presence: Double = (unproven ? (isUpNotLive ? 0.72 : 0.5) : 1) * (faded ? 0.12 : 1)
         // A slow breath in the glow, each orb on its own phase. Only a node that
         // actually answered breathes — a still one is telling you nothing is on
         // its port, which is a fact, not a lack of decoration.
@@ -860,12 +983,20 @@ struct EntityGraphView: View {
         // and a teal local runtime blue — decoration eating the one distinction
         // the palette is carrying.
         let accent = GraphSeed.shifted(node.accent, by: GraphSeed.hue(for: node.id) * 0.06)
-        let glow = isActive ? 0.95 : (node.isLive ? 0.35 + 0.3 * pulse : 0)
-        let glyph = SeaStarGlyph(accent: accent, seed: phase, isActive: isActive || node.isLive)
+        let glow: Double = if isActive {
+            0.95
+        } else if node.isLive {
+            0.35 + 0.3 * pulse
+        } else if isUpNotLive {
+            0.34
+        } else {
+            0
+        }
+        let glyph = SeaStarGlyph(accent: accent, seed: phase, isActive: isActive || node.isLive || isUpNotLive)
             .frame(width: size, height: size)
             .shadow(
                 color: accent.opacity(glow * presence),
-                radius: isActive ? 10 : (node.isLive ? 4 + 3 * pulse : 1)
+                radius: isActive ? 10 : (node.isLive ? 4 + 3 * pulse : (isUpNotLive ? 5 : 1))
             )
 
         return Group {
@@ -884,6 +1015,13 @@ struct EntityGraphView: View {
                     .foregroundStyle(Palette.bone)
                     .lineLimit(1)
                     .fixedSize()
+                    // Text drawn inside the pool would be resampled by the
+                    // pool's zoom and turn, which is what made these labels look
+                    // soft next to the card and the list. Countering both keeps
+                    // the glyphs rendered at their own scale, so they stay sharp
+                    // however the pool is held — and upright, always readable.
+                    .scaleEffect(1 / max(scale, 0.01))
+                    .rotationEffect(.radians(-rotation.radians))
                     .offset(y: size / 2 + 12)
             }
         }
@@ -893,10 +1031,6 @@ struct EntityGraphView: View {
         // strips off more than once, and every session defended them instead of
         // removing them. They said nothing the glow did not already say.
         .position(point)
-        .onHover { hovering in
-            if hovering { hovered = node.id }
-            else if hovered == node.id { hovered = nil }
-        }
         .onTapGesture { handleTap(node) }
         .animation(.easeInOut(duration: 0.18), value: isActive)
     }
@@ -1141,6 +1275,11 @@ struct EntityGraphView: View {
     private func select(_ node: GraphNode) {
         selected = node.id
         switch node.kind {
+        case .core:
+            // Sea-Star is the one thing in the pool that is not a knob. There is
+            // nothing to switch to: it is already the reader, and clicking it
+            // opens its card like any other node.
+            break
         case .vault:
             if let path = node.subtitle { controller.selectVault(path) }
         case .inference:

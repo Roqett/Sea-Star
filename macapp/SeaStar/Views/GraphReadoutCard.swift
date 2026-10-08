@@ -45,8 +45,13 @@ struct GraphReadoutCard: View {
                             Text(row.value)
                                 .font(.system(size: 9, design: .monospaced))
                                 .foregroundStyle(Palette.bone.opacity(0.92))
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                                // A value is a sentence ("Stops when oMLX quits —
+                                // Sea-Star's own model lives here"), not an
+                                // identifier, so it wraps rather than truncating
+                                // in the middle: a clipped claim is worse than a
+                                // taller card.
+                                .fixedSize(horizontal: false, vertical: true)
+                                .multilineTextAlignment(.leading)
                         }
                     }
                 }
@@ -54,7 +59,7 @@ struct GraphReadoutCard: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .frame(width: 240, alignment: .leading)
+        .frame(width: 268, alignment: .leading)
         .background(Palette.pool.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)

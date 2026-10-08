@@ -67,6 +67,9 @@ struct CockpitPopoverView: View {
     @State private var isImportingVault = false
     @State private var isLogsExpanded = false
     @State private var isLogsHovering = false
+    /// Whether the graph's harness drawer is slid out. Lives here rather than in
+    /// the drawer because opening it changes how tall the pool may be.
+    @State private var isTrayOpen = false
 
     /// Which reading of the cockpit the person prefers (spec §8.7). Empty until
     /// they choose on first launch, after which the header toggle swaps it.
@@ -79,7 +82,7 @@ struct CockpitPopoverView: View {
     /// (DECISIONS.md D-001). This lives here rather than inside the panel so the
     /// header toggle and the panel share one source of truth — two `@AppStorage`s
     /// on one key would agree by luck, not by design.
-    @AppStorage("SeaStar.panelLayout") private var layoutRaw = PanelLayout.stack.rawValue
+    @AppStorage("SeaStar.panelLayout") private var layoutRaw = PanelLayout.facts.rawValue
 
     private var layout: PanelLayout { PanelLayout.resolved(from: layoutRaw) }
 
@@ -134,7 +137,13 @@ struct CockpitPopoverView: View {
         // The deep pool is a room you fly a camera around in, so it asks for
         // more height than the flat drawing, which is read at a glance and is
         // happy in a shallower box.
-        let desired: CGFloat = depth == .flat ? 560 : 600
+        //
+        // An open drawer is paid for out of the pool: the panel's height is
+        // capped, so a tray that simply grew would open below the fold. The
+        // graph gives way instead, which is the same "the panel extends" idea
+        // read against a screen that will not get any taller.
+        let drawer: CGFloat = isTrayOpen ? 214 : 0
+        let desired: CGFloat = (depth == .flat ? 560 : 600) - drawer
         return max(240, min(desired, maxPopoverHeight - chrome))
     }
 
@@ -156,7 +165,7 @@ struct CockpitPopoverView: View {
         .frame(maxHeight: maxPopoverHeight)
         .background(Palette.canvas)
         .environment(\.seaStarCockpitOpen, isOpen)
-        .task { await controller.refresh() }
+        .task { await watchTheMachine() }
         .fileImporter(
             isPresented: $isImportingVault,
             allowedContentTypes: [.folder]
@@ -205,7 +214,24 @@ struct CockpitPopoverView: View {
             case .deep:
                 GraphSceneView(controller: controller, height: graphHeight)
             }
-            HarnessVisibilityList(controller: controller)
+            // What belongs to the graph lives in a drawer at its foot rather than
+            // beside it: the roster (a graph being read should not be
+            // half-covered by its own legend) and the depth choice (which is only
+            // meaningful inside the graph, so it does not belong in a header both
+            // readings share).
+            CockpitTray(isOpen: $isTrayOpen, title: Strings.Views.trayTitle) {
+                TrayChoiceRow(
+                    title: Strings.Views.depthTitle,
+                    options: Strings.Views.Depth.allCases.map {
+                        ($0.rawValue, $0.symbol, $0.label)
+                    },
+                    selected: depth.rawValue,
+                    choose: { raw in
+                        if let option = Strings.Views.Depth(rawValue: raw) { chooseDepth(option) }
+                    }
+                )
+                HarnessVisibilityList(controller: controller)
+            }
         }
     }
 
@@ -220,9 +246,15 @@ struct CockpitPopoverView: View {
                 Text(Strings.Header.title)
                     .font(.headline)
                     .foregroundStyle(Palette.ink)
+                    // The name is one word and must stay one line: in the narrow
+                    // text reading the header used to squeeze it into "Sea-" /
+                    // "Star", which reads as a broken title rather than a title.
+                    .lineLimit(1)
+                    .fixedSize()
                 Text(Strings.Header.subtitle)
                     .font(.caption)
                     .foregroundStyle(Palette.inkMuted)
+                    .lineLimit(1)
             }
 
             Spacer()
@@ -230,10 +262,6 @@ struct CockpitPopoverView: View {
             statePill
 
             modeToggle
-
-            if mode == .graph {
-                depthToggle
-            }
 
             if mode == .list {
                 layoutToggle
@@ -279,6 +307,39 @@ struct CockpitPopoverView: View {
                             in: RoundedRectangle(cornerRadius: 5)
                         )
                         .contentShape(RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
+                .help(option.help)
+            }
+        }
+    }
+
+    /// The Facts / Path switch, shown only in the list reading — it is that
+    /// reading's layout, so it moved out of the drawer up to the header, where
+    /// the founder wanted it (2026-10-07). Icon *and* word: as bare symbols the
+    /// control was unreadable in use — the founder could not tell which reading
+    /// was which without hovering each one, which means the switch failed at the
+    /// only job it has. The hover text still carries the longer explanation.
+    private var layoutToggle: some View {
+        HStack(spacing: 2) {
+            ForEach(PanelLayout.allCases) { option in
+                Button {
+                    chooseLayout(option)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: option.symbol)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(option.label)
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    }
+                    .foregroundStyle(layout == option ? Palette.ink : Palette.inkMuted)
+                    .padding(.horizontal, 6)
+                    .frame(height: 20)
+                    .background(
+                        layout == option ? Palette.ink.opacity(0.12) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 5)
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 5))
                 }
                 .buttonStyle(.plain)
                 .help(option.help)
@@ -361,67 +422,41 @@ struct CockpitPopoverView: View {
         )
     }
 
+    /// How often the cockpit re-reads the machine while it is on screen.
+    ///
+    /// The cockpit's whole claim is that it tells the truth about this machine
+    /// *now*. A single read at open time made that claim false the moment
+    /// anything changed: launching a harness, quitting one, or a model server
+    /// coming up all left the panel describing a machine that had stopped
+    /// existing. Two seconds is short enough that a harness firing up is
+    /// noticed while you are still looking at it, and the read is one process
+    /// listing plus a loopback port scan.
+    ///
+    /// Cancellation is the whole off-switch: `.task` tears this down when the
+    /// cockpit closes, so a closed cockpit costs nothing and a background
+    /// process is not kept alive to poll on its behalf.
+    private static let watchInterval: Duration = .milliseconds(2000)
+
+    /// Poll until the cockpit closes. Each `refresh` is awaited before the next
+    /// one starts, so a slow read delays the next tick rather than stacking
+    /// probes on top of each other.
+    private func watchTheMachine() async {
+        while !Task.isCancelled {
+            await controller.refresh()
+            do {
+                try await Task.sleep(for: Self.watchInterval)
+            } catch {
+                return  // cancelled — the cockpit closed mid-wait
+            }
+        }
+    }
+
     private func chooseLayout(_ option: PanelLayout) {
         withAnimation(.easeInOut(duration: 0.18)) { layoutRaw = option.rawValue }
     }
 
-    /// How deep the graph is drawn: the flat pool, the 3D deep, or the two
-    /// together (spec §8.7).
-    ///
-    /// Built exactly like `layoutToggle` and for the same reason: the depth is
-    /// only meaningful once you are in the graph, so like the layout toggle it
-    /// only appears in that mode. Two toggles in the header, never three — the
-    /// one for the mode you are not in is a control for something invisible.
-    private var depthToggle: some View {
-        HStack(spacing: 2) {
-            ForEach(Strings.Views.Depth.allCases) { option in
-                Button {
-                    chooseDepth(option)
-                } label: {
-                    Image(systemName: option.symbol)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(depth == option ? Palette.ink : Palette.inkMuted)
-                        .frame(width: 24, height: 20)
-                        .background(
-                            depth == option ? Palette.ink.opacity(0.12) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 5)
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 5))
-                }
-                .buttonStyle(.plain)
-                .help("\(option.label) — \(option.help)")
-            }
-        }
-    }
-
     private func chooseDepth(_ option: Strings.Views.Depth) {
         withAnimation(.easeInOut(duration: 0.18)) { depthRaw = option.rawValue }
-    }
-
-    /// The A/B toggle for the two readings, plus the side-by-side that exists
-    /// only to help choose between them (DECISIONS.md D-001). It sits in the
-    /// header beside the mode toggle and looks like it: the same pair of symbols,
-    /// the active one lit, no text menu.
-    private var layoutToggle: some View {
-        HStack(spacing: 2) {
-            ForEach(PanelLayout.allCases) { option in
-                Button {
-                    chooseLayout(option)
-                } label: {
-                    Image(systemName: option.symbol)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(layout == option ? Palette.ink : Palette.inkMuted)
-                        .frame(width: 24, height: 20)
-                        .background(
-                            layout == option ? Palette.ink.opacity(0.12) : Color.clear,
-                            in: RoundedRectangle(cornerRadius: 5)
-                        )
-                        .contentShape(RoundedRectangle(cornerRadius: 5))
-                }
-                .buttonStyle(.plain)
-                .help("\(option.label) — \(option.help)")
-            }
-        }
     }
 
     /// Vaults read better as their folder name in the menu; the row itself shows
@@ -566,15 +601,17 @@ struct CockpitPopoverView: View {
             .background(Palette.vermilion.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    private var stateText: String {
+    // The status dot reports the machine's state, never the app's own housekeeping.
+        // `isRefreshing` used to drive it, which was invisible when the cockpit
+        // read once and became a colour flip every two seconds once it watched —
+        // a background poll is not a "checking" state and must not look like one.
+        private var stateText: String {
         if controller.isServerRunning { return Strings.States.running }
-        if controller.isRefreshing { return Strings.States.checking }
         return controller.isReady ? Strings.States.ready : Strings.States.notReady
     }
 
     private var stateColour: Color {
         if controller.isServerRunning { return Palette.neonGreen }
-        if controller.isRefreshing { return Palette.working }
         return controller.isReady ? Palette.neonGreen : Palette.offline
     }
 }

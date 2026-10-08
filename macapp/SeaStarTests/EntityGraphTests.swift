@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import SeaStar
@@ -104,6 +105,16 @@ struct GraphLivenessTests {
         // graph has to be able to say both.
         #expect(installed?.rung == .present)
         #expect(up?.rung == .running)
+
+        // D-020: the rung has to carry a *drawing* consequence too, or the pool
+        // flattens the two back into one grey. An app that never launched is
+        // not up; a running one is. `isUp` is the honest test, and it is what
+        // the glow reads.
+        #expect(installed?.rung?.isUp == false)
+        #expect(up?.rung?.isUp == true)
+        // Neither may be `isAttached`: up is not the same as driving Sea-Star.
+        #expect(installed?.rung?.isAttached == false)
+        #expect(up?.rung?.isAttached == false)
     }
 
     /// "Installed" is not "answering". Both endpoints are detected and both are
@@ -179,20 +190,38 @@ struct GraphLivenessTests {
     /// A harness app that is not attached is driving nothing, so it knows about
     /// nothing. Drawing it wired to the vault would imply a connection that was
     /// never observed — the exact lie the ladder exists to prevent.
-    @Test("an unattached harness is wired to nothing")
+    ///
+    /// There is one observed connection a non-attached app *can* have, and it is
+    /// not an exception to that rule: the engine reads which process holds each
+    /// model-server port, so an app whose own server is answering is genuinely
+    /// connected to it. Unsloth Studio here owns port 8009 and answers on it, so
+    /// the wire is drawn; Xcode owns nothing and is wired to nothing.
+    @Test("an unattached harness is wired to nothing it was not observed doing")
     func unattachedHarnessHasNoEdges() {
         let model = EntityGraphModel(controller: controller())
         #expect(model.neighbours(of: "harness:app:com.apple.dt.Xcode").isEmpty)
-        #expect(model.neighbours(of: "harness:app:ai.unsloth.studio").isEmpty)
+        #expect(
+            model.neighbours(of: "harness:app:ai.unsloth.studio")
+                == ["inference:http://127.0.0.1:8009/v1"]
+        )
     }
 
     /// The opposite case, and the one the founder asked for by name: an app that
-    /// *is* attached is wired to the vault it is driving, so clicking it tells
-    /// you what it is connected to rather than showing an empty card.
-    @Test("an attached harness is wired to the vault it drives")
-    func attachedHarnessIsWiredToTheVault() {
+    /// *is* attached is wired to the vault it is driving, to Sea-Star itself, and
+    /// to the server its own process owns.
+    ///
+    /// The endpoint is the load-bearing part. It calls itself `osaurus`, which is
+    /// nobody's name — on the real machine the identical case is Atomic Chat's
+    /// inbuilt server calling itself `remote`. Only the port-ownership fact can
+    /// find it, which is why this test would have failed for two sessions.
+    @Test("an attached harness is wired to the vault, to Sea-Star, and to its own server")
+    func attachedHarnessIsWiredUp() {
         let model = EntityGraphModel(controller: controller())
-        #expect(model.neighbours(of: "harness:chat.atomic.app") == ["vault"])
+        #expect(model.neighbours(of: "harness:chat.atomic.app") == [
+            "inference:http://127.0.0.1:1337/v1",
+            "seastar",
+            "vault",
+        ])
     }
 
     /// The founder's rule for the readout, pinned so it cannot quietly come
@@ -254,6 +283,104 @@ struct GraphLivenessTests {
             #expect(known.contains(edge.to), "unknown head \(edge.to)")
             #expect(edge.from != edge.to, "an edge to itself")
         }
+    }
+}
+
+/// The founder asked for "an actual big one hanging in the middle there with
+/// live connections for whenever it's live as well", and the reason it needed
+/// building is that **a picture cannot carry an edge**: the middle of the pool
+/// held a decorative outline, so "everything connects to Sea-Star" was a claim
+/// the graph had no way to draw.
+///
+/// These pin the three things that make the hub honest: there is exactly one and
+/// it is *not* on the ring, it is at the middle of both readings, and — the one
+/// that keeps the rest from being decoration — it is never itself live, because
+/// nothing on this machine can probe the thing doing the probing.
+@Suite("Sea-Star is a body in the pool, not the frame around it")
+@MainActor
+struct GraphCoreTests {
+    private var coreID: String { EntityGraphModel.coreID }
+
+    private func model(ready: Bool = true) -> EntityGraphModel {
+        EntityGraphModel(controller: Fixture.controller(ready: ready))
+    }
+
+    @Test("the pool holds one Sea-Star, and it is not a point on the ring")
+    func thereIsExactlyOneCore() {
+        let model = model()
+        #expect(model.nodes.filter { $0.kind == .core }.count == 1)
+        #expect(model.node(coreID)?.title == Strings.Detail.seaStar)
+        #expect(model.majors.filter { $0.kind == .core }.isEmpty)
+    }
+
+    @Test("Sea-Star is drawn at the middle of both readings")
+    func seaStarHoldsTheMiddle() {
+        // The flat pool: 400×300 puts the middle at (200, 150).
+        let pool = EntityGraphView(controller: Fixture.controller())
+            .layout(in: CGSize(width: 400, height: 300))
+        #expect(pool[coreID] == CGPoint(x: 200, y: 150))
+
+        // The deep, from the same id. Two drawings of one arrangement, which is
+        // the only reason there are two bodies at all.
+        let space = GraphSpace3D(model: model())
+        #expect(space.positions()[coreID] == space.centre)
+        #expect(space.centre == .origin)
+    }
+
+    @Test("Sea-Star is never live, however ready the machine is")
+    func seaStarIsNeverLive() {
+        #expect(model().node(coreID)?.isLive == false)
+        #expect(model(ready: false).node(coreID)?.isLive == false)
+        // The four live things are the same four — a fifth name here would be
+        // the hub claiming a heartbeat it cannot have.
+        #expect(model().nodes.filter(\.isLive).count == 4)
+    }
+
+    @Test("Sea-Star is wired to the vault, the host driving it, and the endpoint it reads")
+    func seaStarIsWiredUp() {
+        #expect(model().neighbours(of: coreID) == [
+            "harness:chat.atomic.app",
+            "inference:http://127.0.0.1:1337/v1",
+            "vault",
+        ])
+        // An app that is installed and idle is not driving Sea-Star, so there is
+        // nothing to draw between them. "Connected" has to mean something the
+        // other end is doing.
+        #expect(!model().neighbours(of: coreID).contains("harness:app:com.apple.dt.Xcode"))
+    }
+
+    @Test("the whole-pool reading draws Sea-Star's wires and holds the spokes back")
+    func thePoolDrawsTheHubsWires() {
+        let ids = Set(model().standingEdges.map(\.id))
+
+        #expect(ids.contains(GraphEdge(from: coreID, to: "vault").id))
+        #expect(ids.contains(GraphEdge(from: coreID, to: "harness:chat.atomic.app").id))
+        #expect(
+            ids.contains(GraphEdge(from: coreID, to: "inference:http://127.0.0.1:1337/v1").id)
+        )
+
+        // A model's spoke to the endpoint offering it is a real binding, but
+        // drawn alongside every other one it turns the flat pool into a bag of
+        // string — the founder's own complaint about the 2D reading. It is a
+        // focus-reading edge, and the deep still draws it always.
+        #expect(
+            !ids.contains(GraphEdge(from: "model:qwen3", to: "inference:http://127.0.0.1:1337/v1").id)
+        )
+    }
+
+    @Test("Sea-Star's card names what it is driving through, and claims no heartbeat")
+    func seaStarCardIsHonest() {
+        let graph = model()
+        let core = try! #require(graph.node(coreID))
+        let rows = graph.facts(for: core)
+
+        #expect(rows.contains { $0.label == Strings.Detail.status && $0.value == Strings.Detail.observing })
+        #expect(rows.contains { $0.label == Strings.Detail.drivenBy && $0.value == "Atomic Chat" })
+        #expect(rows.contains { $0.label == Strings.Detail.readingThrough && $0.value == "osaurus" })
+        // With nothing answering, the card says so rather than going blank.
+        let cold = model(ready: false)
+        let coldRows = cold.facts(for: try! #require(cold.node(coreID)))
+        #expect(coldRows.contains { $0.label == Strings.Detail.status && $0.value == Strings.Detail.notObserving })
     }
 }
 
@@ -330,9 +457,15 @@ struct GraphSpace3DTests {
         // Absent rather than defaulted to the centre — which is the whole
         // reason the layout returns a dictionary and not a defaulted lookup.
         // A body parked on the centre is a body you cannot click.
-        for node in model.nodes {
+        //
+        // The core is the one deliberate exception, and the opposite of that
+        // failure: it is at the centre *on purpose*, because being the thing
+        // everything else is wired to is its whole job in the pool. It is
+        // tested for in its own suite rather than waved through here.
+        for node in model.nodes where node.kind != .core {
             #expect(space.positions()[node.id] != space.centre)
         }
+        #expect(space.positions()[EntityGraphModel.coreID] == space.centre)
     }
 
     /// The majors ring the pool, so their horizontal distance from the centre is
@@ -381,7 +514,7 @@ struct GraphSpace3DTests {
 
     /// Size is a fact about the roster, not about how you are looking at it —
     /// which is why it lives on the kind rather than in either renderer.
-    @Test("a vault outweighs everything else in the pool")
+    @Test("a vault outweighs the ring, and Sea-Star outweighs the vault")
     func vaultIsTheHeavyweight() {
         // The ring of majors first — vault, then the harnesses and the
         // endpoints they read from — and the satellites a model and an agent
@@ -390,6 +523,13 @@ struct GraphSpace3DTests {
         #expect(GraphNode.Kind.harness.scale > GraphNode.Kind.inference.scale)
         #expect(GraphNode.Kind.inference.scale > GraphNode.Kind.agent.scale)
         #expect(GraphNode.Kind.agent.scale > GraphNode.Kind.model.scale)
+
+        // And then the hub, which is not on that ring and is not measured
+        // against it. Sea-Star is the biggest thing in the pool deliberately:
+        // the founder asked for "an actual big one hanging in the middle", and a
+        // hub drawn smaller than the things wired into it reads as one more node
+        // with an odd address rather than as the middle of the picture.
+        #expect(GraphNode.Kind.core.scale > GraphNode.Kind.vault.scale)
     }
 
     /// The layout's actual job is to make the ontology *legible in space*: a
@@ -565,6 +705,24 @@ struct GraphScenePlanTests {
         #expect(cold != warm)
     }
 
+    /// The deep decides two things about a wire before it draws it — whether
+    /// anything live is on it (so it can wear the liveness ribbon rather than
+    /// plain blue) and whether Sea-Star is at one end (so it can be drawn
+    /// heavier). Both are read off the plan, so they are pinned here rather than
+    /// left to the scene builder's own judgement about which facts matter.
+    @Test("the plan knows which wires are live, and which carry Sea-Star")
+    func thePlanKnowsItsWires() {
+        let scene = plan()
+
+        // Something answered on the attached host, so a wire touching it has a
+        // live end; the idle app has not, and its wire stays infrastructure blue.
+        #expect(scene.isLive("harness:chat.atomic.app"))
+        #expect(!scene.isLive("harness:app:com.apple.dt.Xcode"))
+
+        #expect(scene.touchesCore(GraphEdge(from: EntityGraphModel.coreID, to: "vault")))
+        #expect(!scene.touchesCore(GraphEdge(from: "vault", to: "harness:chat.atomic.app")))
+    }
+
     @Test("the whole-pool reading is the empty one")
     func emptyFocusIsTheWholePool() {
         let scene = plan()
@@ -583,7 +741,8 @@ enum Fixture {
         model: String = "qwen3",
         agents: Bool = true,
         latent: Bool = true,
-        attached: Bool = true
+        attached: Bool = true,
+        extraJSON: String = ""
     ) throws -> DoctorReport {
         let json = """
         {
@@ -612,13 +771,20 @@ enum Fixture {
               "base_url": "http://127.0.0.1:8000/v1",
               "model": "qwen3-large",
               "models": ["qwen3-large"]
+            },
+            {
+              "name": "unsloth",
+              "base_url": "http://127.0.0.1:8009/v1",
+              "model": "",
+              "models": []
             }
           ],
           \(agents ? """
           "agents": [
             { "name": "Mariner", "model": "\(model)", "description": "reads and answers" },
-            { "name": "Cartographer", "model": "qwen3-large", "description": "draws the map" },
-            { "name": "Drifter", "model": null, "description": "rides whatever is set" }
+            { "name": "Cartographer", "model": "omlx/qwen3-large", "description": "draws the map" },
+            { "name": "Drifter", "model": null, "description": "rides whatever is set" },
+            { "name": "Bosun", "model": "omlx/KAT-Coder-V2.5-Dev-OptiQ-4bit", "description": "nowhere to be served" }
           ],
           "agent_source": "osaurus",
           """ : "")
@@ -641,6 +807,18 @@ enum Fixture {
               "rung": "running"
             },
             {
+              "name": "OpenCode",
+              "bundle_id": "cli:opencode",
+              "path": "OpenCode",
+              "rung": "running"
+            },
+            {
+              "name": "TraeCode",
+              "bundle_id": "com.trae.app",
+              "path": "/Applications/Trae.app",
+              "rung": "present"
+            },
+            {
               "name": "Xcode",
               "bundle_id": "com.apple.dt.Xcode",
               "path": "/Applications/Xcode.app",
@@ -648,7 +826,24 @@ enum Fixture {
             }
           ],
           """ : "")
+          \(extraJSON.isEmpty ? "" : "\(extraJSON),")
           "server": { "state": "running" },
+          "model_like": [
+            {
+              "port": 1337,
+              "app_name": "Atomic Chat",
+              "app_path": "/Applications/Atomic Chat.app",
+              "base_url": "http://127.0.0.1:1337/v1",
+              "answering": true
+            },
+            {
+              "port": 8009,
+              "app_name": "Unsloth Studio",
+              "app_path": "/Applications/Unsloth Studio.app",
+              "base_url": "http://127.0.0.1:8009/v1",
+              "answering": true
+            }
+          ],
           "servers": []
         }
         """
@@ -668,7 +863,8 @@ enum Fixture {
         model: String = "qwen3",
         agents: Bool = true,
         latent: Bool = true,
-        attached: Bool = true
+        attached: Bool = true,
+        extraJSON: String = ""
     ) -> ServerController {
         let controller = ServerController(command: nil)
         controller.adopt(
@@ -677,7 +873,8 @@ enum Fixture {
                 model: model,
                 agents: agents,
                 latent: latent,
-                attached: attached
+                attached: attached,
+                extraJSON: extraJSON
             )
         )
         return controller
@@ -685,6 +882,102 @@ enum Fixture {
 
     enum FixtureError: Error {
         case notAReport
+    }
+}
+
+/// The panel is a cockpit of dials, and a dial's job is to answer "what else is
+/// on this machine, and why can't I use it?" (D-018). The founder's words: *"it
+/// should be able to select whatever is live, or if it exists, it should be
+/// greyed out on the dropdown … all selections in that panel should then just
+/// reflect anything connected to it."*
+///
+/// Two rules are pinned here: an entry that cannot be honoured is **shown,
+/// switched off, with its reason** rather than hidden; and a choice that *can* be
+/// honoured is a real action that the rows underneath follow.
+@Suite("The panel's dials show what exists and refuse what cannot be")
+@MainActor
+struct PanelDialTests {
+    @Test("the Harness dial shows the app driving Sea-Star, and the rest with their rung")
+    func harnessDialShowsTheRoster() {
+        let dial = Fixture.controller().harnessDial
+
+        let attached = dial.first { $0.label == "Atomic Chat" }
+        #expect(attached?.isEnabled == true)
+        #expect(attached?.reason == nil)
+
+        // Every other app is *there* — hidden entries would answer "can I use
+        // this?" with silence — and each carries the rung that explains it.
+        let xcode = dial.first { $0.label == "Xcode" }
+        #expect(xcode?.isEnabled == false)
+        #expect(xcode?.reason == HarnessRung.present.label)
+
+        let unsloth = dial.first { $0.label == "Unsloth Studio" }
+        #expect(unsloth?.isEnabled == false)
+        #expect(unsloth?.reason == HarnessRung.running.label)
+
+        #expect(Set(dial.map(\.id)).count == dial.count, "an app is listed twice")
+    }
+
+    @Test("the Agent dial switches off a persona nothing is serving, and says why")
+    func agentDialGreysTheUnserved() {
+        let dial = Fixture.controller().agentDial
+
+        // Mariner (the current model) and Cartographer (`omlx/qwen3-large` — the
+        // endpoint lists it bare, so the id needs no more than unwrapping) are
+        // both usable. Drifter has no bound model, which is a real state.
+        for usable in ["Mariner", "Cartographer", "Drifter"] {
+            #expect(dial.first { $0.label == usable }?.isEnabled == true, "\(usable)")
+            #expect(dial.first { $0.label == usable }?.reason == nil, "\(usable)")
+        }
+
+        // Bosun's model is a real Osaurus-shaped entry that no endpoint offers —
+        // the founder's Patchdog, in the fixture. Shown, switched off, with the
+        // reason rather than moving something when it is chosen.
+        let bosun = dial.first { $0.label == "Bosun" }
+        #expect(bosun?.isEnabled == false)
+        #expect(bosun?.reason == Strings.Rows.nothingServingItsModel)
+    }
+
+    @Test("choosing a persona something serves takes the endpoint and the model with it")
+    func choosingAServedAgentCascades() {
+        let controller = Fixture.controller()
+        controller.selectAgent("Cartographer")
+
+        // The rows underneath agree with the one just chosen, which is what
+        // makes this a control rather than a label that moves nothing.
+        #expect(controller.selectedAgentName == "Cartographer")
+        #expect(controller.inferenceOverride?.baseURL == "http://127.0.0.1:8000/v1")
+        #expect(controller.inferenceOverride?.name == "omlx")
+        // And the model is the id *the endpoint* uses, not the roster's
+        // qualified spelling of it.
+        #expect(controller.modelOverride == "qwen3-large")
+    }
+
+    @Test("choosing a persona nothing serves moves nothing")
+    func choosingAnUnservedAgentStaysPut() {
+        let controller = Fixture.controller()
+        controller.selectAgent("Bosun")
+
+        #expect(controller.selectedAgentName == "Bosun")
+        #expect(controller.inferenceOverride == nil)
+        #expect(controller.modelOverride == nil)
+    }
+
+    @Test("the sentence about a persona and its dial entry are decided by one rule")
+    func placementAgreesWithTheDial() {
+        let controller = Fixture.controller()
+
+        for agent in controller.agentOptions {
+            let servable = controller.servingPlacement(of: agent) != nil
+            let bound = !(agent.model ?? "").isEmpty
+            let enabled = controller.agentDial.first { $0.label == agent.name }?.isEnabled
+            #expect(enabled == (servable || !bound), "\(agent.name)")
+
+            // A persona that is served must never be described as unserved, and
+            // vice versa: the row and its sentence read from the same resolution.
+            let sentence = controller.placement(of: agent)
+            #expect(sentence.contains("not serving it") == (bound && !servable), "\(agent.name)")
+        }
     }
 }
 
@@ -733,5 +1026,197 @@ struct AgentPlacementTests {
             return
         }
         #expect(controller.placement(of: agent) == "Rides whatever the endpoint is serving.")
+    }
+}
+
+/// The pool's hover follows the cursor, not the last node drawn. The founder hit
+/// this when hovering the graph always lit up Patchdog — the topmost node — no
+/// matter where the pointer actually was. The rule is now a pure hit-test over
+/// the laid-out positions, so it is pinned here against hand-built nodes rather
+/// than a live window.
+@Suite("The pool hover follows the cursor, not the last node drawn")
+struct GraphHoverTests {
+    private func node(_ id: String, _ kind: GraphNode.Kind) -> GraphNode {
+        GraphNode(id: id, kind: kind, title: id, subtitle: nil, accent: .white, isLive: false)
+    }
+
+    @Test("a cursor on a node returns that node")
+    func hitsTheNodeUnderTheCursor() {
+        let a = node("vault", .vault)
+        let positions = ["vault": CGPoint(x: 100, y: 100)]
+        #expect(
+            EntityGraphView.hitNode(at: CGPoint(x: 100, y: 100), nodes: [a], positions: positions)?.id == "vault"
+        )
+    }
+
+    @Test("a cursor on empty water returns nothing")
+    func missesEmptySpace() {
+        let a = node("vault", .vault)
+        let positions = ["vault": CGPoint(x: 100, y: 100)]
+        #expect(
+            EntityGraphView.hitNode(at: CGPoint(x: 400, y: 400), nodes: [a], positions: positions) == nil
+        )
+    }
+
+    @Test("overlapping nodes resolve to the one drawn on top")
+    func overlapResolvesToTopmost() {
+        // Agents are appended after the majors, so the agent is drawn last and
+        // sits on top. A cursor over the shared point must name the agent, not
+        // the vault underneath it.
+        let vault = node("vault", .vault)
+        let agent = node("agent:Patchdog", .agent)
+        let positions = [
+            "vault": CGPoint(x: 100, y: 100),
+            "agent:Patchdog": CGPoint(x: 100, y: 100),
+        ]
+        #expect(
+            EntityGraphView.hitNode(
+                at: CGPoint(x: 100, y: 100),
+                nodes: [vault, agent],
+                positions: positions
+            )?.id == "agent:Patchdog"
+        )
+    }
+
+    @Test("a node's padding is still part of the hit, and beyond it is not")
+    func paddingBoundsTheHit() {
+        // A vault is 27pt across, so the hit radius is 27/2 + 2 = 15.5.
+        let vault = node("vault", .vault)
+        let positions = ["vault": CGPoint(x: 100, y: 100)]
+
+        #expect(
+            EntityGraphView.hitNode(at: CGPoint(x: 114, y: 100), nodes: [vault], positions: positions)?.id == "vault"
+        )
+        #expect(
+            EntityGraphView.hitNode(at: CGPoint(x: 130, y: 100), nodes: [vault], positions: positions) == nil
+        )
+    }
+}
+
+/// A harness that *declares* where it gets models from is saying something the
+/// machine's sockets cannot: a configured provider holds no connection at all,
+/// so no probe could ever have drawn this wire. It is the link the founder named
+/// — *"the IDEs need to be shown to be hooked up to whatever they may be hooked
+/// up to"* — and the whole point of the reader is that it stays honest about
+/// being a declaration rather than a connection.
+@Suite("A declared provider is a rung-0 claim, never liveness")
+@MainActor
+struct ConfiguredProviderTests {
+    /// A harness whose settings name a provider, matched by the display-name /
+    /// short-key gap that is the real-world case: the engine files the claim
+    /// under `opencode`, the graph knows the app as `OpenCode`.
+    private func subject(providerJSON: String, withEndpoint: Bool = true) -> ServerController {
+        Fixture.controller(extraJSON: providerJSON)
+    }
+
+    private func localClaim(
+        provider: String = "atomic",
+        model: String = "atomic/Dirk",
+        baseURL: String? = "http://127.0.0.1:1337/v1"
+    ) -> String {
+        """
+        "providers": [
+          {
+            "harness": "opencode",
+            "provider": "\(provider)",
+            \(baseURL.map { "\"base_url\": \"\($0)\"," } ?? "")
+            "model": "\(model)",
+            "evidence": "configured",
+            "local": true
+          }
+        ]
+        """
+    }
+
+    private func model(_ controller: ServerController) -> EntityGraphModel {
+        EntityGraphModel(controller: controller)
+    }
+
+    @Test("a harness's node says what it is configured for")
+    func nodeSubtitleNamesTheDeclaration() {
+        let subject = self.subject(providerJSON: localClaim())
+        let node = model(subject).node("harness:app:cli:opencode")
+        #expect(node?.subtitle?.contains("Configured for atomic") == true)
+        #expect(node?.subtitle?.contains("atomic/Dirk") == true)
+    }
+
+    /// The load-bearing honesty test: a declaration is a statement in a settings
+    /// file. It must not make a node live, and it must not change its rung.
+    @Test("a declaration never makes the harness live")
+    func declarationIsNotLiveness() {
+        let subject = self.subject(providerJSON: localClaim())
+        let node = model(subject).node("harness:app:cli:opencode")
+        #expect(node?.isLive == false)
+        #expect(node?.rung == .running)
+    }
+
+    /// A declaration resolves to an endpoint only when Sea-Star can already see
+    /// that endpoint answering — otherwise the wire would point at nothing.
+    @Test("a local declaration onto a visible endpoint is wired")
+    func localDeclarationOntoAVisibleEndpointIsWired() {
+        let subject = self.subject(providerJSON: localClaim())
+        #expect(
+            model(subject).neighbours(of: "harness:app:cli:opencode")
+                .contains("inference:http://127.0.0.1:1337/v1")
+        )
+    }
+
+    @Test("a declaration naming a port no endpoint answers is not wired")
+    func declarationOntoAnInvisiblePortDrawsNoWire() {
+        // The harness is configured for 9999, but nothing answering there is a
+        // node Sea-Star draws. The claim is still shown; the wire is not invented.
+        let subject = self.subject(
+            providerJSON: localClaim(baseURL: "http://127.0.0.1:9999/v1")
+        )
+        #expect(
+            model(subject).node("harness:app:cli:opencode")?.subtitle?.contains("atomic/Dirk") == true
+        )
+        #expect(
+            !model(subject).neighbours(of: "harness:app:cli:opencode")
+                .contains { $0.hasPrefix("inference:") }
+        )
+    }
+
+    /// A cloud route is a real fact about where someone works, and there is no
+    /// node on this machine to wire it to. Kept as a label, never as liveness.
+    @Test("a cloud declaration is a label and never a local wire")
+    func cloudDeclarationDrawsNoLocalWire() {
+        let subject = self.subject(
+            providerJSON: """
+            "providers": [
+              {
+                "harness": "opencode",
+                "provider": "openrouter",
+                "base_url": "https://openrouter.ai/api/v1",
+                "model": "some/model",
+                "evidence": "configured",
+                "local": false
+              }
+            ]
+            """
+        )
+        let model = model(subject)
+        #expect(model.node("harness:app:cli:opencode")?.subtitle?.contains("openrouter") == true)
+        #expect(
+            !model.neighbours(of: "harness:app:cli:opencode").contains { $0.hasPrefix("inference:") }
+        )
+    }
+
+    @Test("a harness nobody declared for has no claim, and no neighbour's either")
+    func identityMatchingDoesNotBorrow() {
+        let subject = self.subject(providerJSON: localClaim())
+        #expect(subject.declaredProvider(forHarnessNamed: "OpenCode") != nil)
+        #expect(subject.declaredProvider(forHarnessNamed: "TraeCode") == nil)
+        // And an app the person hid keeps whatever it had; hiding is not forgetting.
+        #expect(model(subject).node("harness:app:com.trae.app") != nil)
+    }
+
+    /// An engine without the key must read as "this build did not look", never
+    /// as "no harness uses any model" — which would be a claim about the machine.
+    @Test("an engine predating the reader yields nothing and invents nothing")
+    func olderEngineYieldsNothing() {
+        let subject = Fixture.controller()
+        #expect(subject.declaredProvider(forHarnessNamed: "OpenCode") == nil)
+        #expect(subject.report?.declaredProviders.isEmpty == true)
     }
 }

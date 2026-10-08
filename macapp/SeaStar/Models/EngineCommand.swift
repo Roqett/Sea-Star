@@ -19,23 +19,28 @@ struct EngineCommand: Sendable, Equatable {
         /// the person made in the app (`SEASTAR_VAULT`, `SEASTAR_MODEL`) onto the
         /// engine — the same knobs `resolve_vault`/`load_config` already read.
         var environment: [String: String] = [:]
+        /// The workspace path to check for agent artefacts — proves *use* rather
+        /// than installation.
+        var workspaceURL: URL?
     }
 
     func invocation(
         _ subcommand: String,
         _ extra: [String] = [],
-        environment: [String: String] = [:]
+        environment: [String: String] = [:],
+        workspace: URL? = nil
     ) -> Invocation {
         Invocation(
             executableURL: executableURL,
             arguments: baseArguments + [subcommand] + extra,
             workingDirectoryURL: workingDirectoryURL,
-            environment: environment
+            environment: environment,
+            workspaceURL: workspace
         )
     }
 
-    func doctor(environment: [String: String] = [:]) -> Invocation {
-        invocation("doctor", ["--json"], environment: environment)
+    func doctor(environment: [String: String] = [:], workspace: URL? = nil) -> Invocation {
+        invocation("doctor", ["--json"], environment: environment, workspace: workspace)
     }
 
     func serve(environment: [String: String] = [:]) -> Invocation {

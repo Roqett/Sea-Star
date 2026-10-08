@@ -57,6 +57,13 @@ enum Palette {
     /// glow warm, apart from the cool infrastructure (vault, harness, model)
     /// they run on (spec §8.7).
     static let agentGlow = orange
+    /// Sea-Star itself: the one entity that is not a thing it watches. Mauve is
+    /// the palette's quiet structural voice — the colour the pool's own rays and
+    /// rules are already drawn in — which is exactly the claim: this is the
+    /// frame become a body, not another party in the pool. It is deliberately
+    /// *not* the vault's bone, or the hub and the memory it lives in would read
+    /// as the same kind of thing.
+    static let coreGlow = mauve
 
     /// Log ink and ground, drawn from the blue-white nudibranch strip and
     /// adaptive alongside the panel they sit in.

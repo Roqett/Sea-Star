@@ -2,27 +2,41 @@ import AppKit
 import SwiftUI
 
 /// One thing in the rockpool: the vault, a harness driving Sea-Star, an
-/// inference endpoint, a model, or an agent.
+/// inference endpoint, a model, an agent — or Sea-Star itself.
 ///
-/// There are five kinds because the ontology has four rows and one of them holds
+/// There are six kinds because the ontology has four rows and one of them holds
 /// two things that used to be filed together: a **harness** is the app that
 /// drives Sea-Star, an **inference** endpoint is where models come from. Calling
 /// both "harness" was the bug that made the pool unreadable.
+///
+/// The sixth is `.core`, and it exists because a picture cannot carry an edge.
+/// Until Sea-Star was a node, "everything connects to Sea-Star" was a claim the
+/// graph had no way to draw: the middle of the pool held a decorative outline,
+/// and a wire with nothing at its end is not a wire. The core is deliberately
+/// **never live** — nothing on this machine can probe the prober — so what
+/// lights up is its *edges*, not its glow.
 ///
 /// Internal rather than file-private because the graph has two bodies. The 2D
 /// pool and the 3D one are two *drawings* of one model, and the whole value of
 /// having both is that they cannot disagree about what is in the pool.
 struct GraphNode: Identifiable, Hashable {
     enum Kind: Sendable, Hashable {
-        case vault, harness, inference, model, agent
+        case core, vault, harness, inference, model, agent
 
         /// Relative size, as a fraction of a vault's. One number per kind, held
         /// here rather than in a renderer, because "how big is a model next to a
         /// vault" is a fact about the roster rather than about how you are
         /// looking at it — the 2D pool and the 3D one must not disagree about
         /// what is the heavyweight.
+        ///
+        /// The core outweighs the vault on purpose. Everything else in the pool
+        /// is a peer measured against the memory they share, and the vault is
+        /// the heavyweight *among those*; Sea-Star is not on that ring at all,
+        /// and a hub drawn smaller than the things wired to it would read as one
+        /// more node with an unusual address.
         var scale: Double {
             switch self {
+            case .core: return 1.18
             case .vault: return 1.0
             case .harness: return 0.86
             case .inference: return 0.82
@@ -41,6 +55,8 @@ struct GraphNode: Identifiable, Hashable {
     /// A harness with a live `serve` process, an endpoint that answered, and the
     /// model that endpoint is serving can be live; a vault is not on a port, and
     /// an endpoint that did not answer is not live however installed it is.
+    /// Sea-Star itself is never live either, and for a stronger reason: it is the
+    /// thing doing the observing, so nothing on this machine can probe it.
     let isLive: Bool
     /// How far a `.harness` climbed the foundation's ladder; `nil` for every
     /// other kind. On the node because the graph draws the rung: "installed",
@@ -166,6 +182,12 @@ struct GraphSpace3D {
         let majors = model.majors
         let count = max(majors.count, 1)
 
+        // Sea-Star holds the middle, in the deep exactly as in the flat pool.
+        // The two bodies are two drawings of one arrangement, so this cannot be
+        // decided in one of them: a core at the origin in the pool and on the
+        // ring in the deep would be the same lie told twice, differently.
+        points[EntityGraphModel.coreID] = centre
+
         // The majors ring the pool on the horizontal plane, evenly and
         // deterministically — the same "the count of majors is the count of
         // points" rule the 2D star uses, so the two readings agree on shape.
@@ -264,10 +286,38 @@ struct GraphSpace3D {
 struct EntityGraphModel {
     let controller: ServerController
 
+    /// The one id in the pool that is not a `kind:identity` pair, because there
+    /// is only one Sea-Star and its name is not a lookup key into a roster.
+    /// Held here so the pool, the deep, the layout and the tests cannot each
+    /// spell it differently.
+    static let coreID = "seastar"
+
     // MARK: - Contents
 
     var nodes: [GraphNode] {
         var nodes: [GraphNode] = []
+
+        // Sea-Star itself, and it goes in first so it is drawn as the ground of
+        // the picture rather than as something floating over it. The id is a
+        // bare word rather than a `kind:` prefix because there is exactly one of
+        // these and it is a proper noun, not an entry in a roster.
+        //
+        // It is not given a vault or a host to be "about": its own reading is in
+        // `facts(for:)`, which can see the whole report. What it needs from the
+        // node list is a place, an accent and — above all — a *thing for the
+        // edges to attach to*, which is the whole reason it exists.
+        nodes.append(GraphNode(
+            id: Self.coreID,
+            kind: .core,
+            title: Strings.Detail.seaStar,
+            subtitle: nil,
+            accent: Palette.coreGlow,
+            // Never live, however ready the machine is. Stated here rather than
+            // left to the renderer, because a renderer that decided this for
+            // itself could decide differently in the deep.
+            isLive: false
+        ))
+
         if let vault = controller.report?.vault.path {
             nodes.append(GraphNode(
                 id: "vault",
@@ -295,11 +345,17 @@ struct EntityGraphModel {
             ))
         }
         for app in controller.visibleLatentHarnesses where !isAttached(app) {
+            // A harness that declares where it gets models from says so on the
+            // node itself. This is the answer the founder was missing — "it is
+            // running, but what is it *hooked up to*?" — and it is a rung-0
+            // declaration, never drawn as liveness.
+            let declaration = controller.declaredProvider(forHarnessNamed: app.name)
             nodes.append(GraphNode(
                 id: "harness:app:\(app.bundleID)",
                 kind: .harness,
                 title: app.name,
-                subtitle: app.path,
+                subtitle: declaration.map(Self.declarationSummary)
+                    ?? app.path,
                 accent: Palette.harnessGlow,
                 // Nothing here has answered a port; the rung says how far it got.
                 isLive: false,
@@ -369,8 +425,13 @@ struct EntityGraphModel {
     /// The majors: everything that is not a satellite. These wear the star. A
     /// satellite is a model or an agent — a thing that orbits an endpoint —
     /// rather than a peer of the vault, its harnesses and its endpoints.
+    ///
+    /// The core is not a major either, and that is the load-bearing half of this
+    /// rule: a major's place is a point on the ring, and the core's place is the
+    /// middle. Counting it here would both steal a point from the star and put
+    /// Sea-Star in orbit around itself.
     var majors: [GraphNode] {
-        nodes.filter { $0.kind != .model && $0.kind != .agent }
+        nodes.filter { $0.kind != .model && $0.kind != .agent && $0.kind != .core }
     }
 
     /// The endpoint the report is currently reading models from.
@@ -403,6 +464,27 @@ struct EntityGraphModel {
         return result
     }
 
+    /// The wires the whole-pool reading draws: every binding between two things
+    /// on the ring, plus every binding Sea-Star has.
+    ///
+    /// Deliberately *not* all of `edges`. A model's spokes to the endpoints
+    /// offering it, and an agent's spokes to the model it rides, are real
+    /// bindings — but drawn all at once in the flat pool they turn a dozen nodes
+    /// into a bag of string, which is the founder's own complaint about the 2D
+    /// reading. They are held back for the focus reading, where the pool is
+    /// showing one company and those spokes *are* the picture.
+    ///
+    /// The core is exempt from that thinning because its edges are the entire
+    /// reason it is in the pool: "anything that is connected, we can see
+    /// connected" is a claim about Sea-Star's own company.
+    var standingEdges: [GraphEdge] {
+        let ring = Set(majors.map(\.id))
+        return edges.filter { edge in
+            if edge.from == Self.coreID || edge.to == Self.coreID { return true }
+            return ring.contains(edge.from) && ring.contains(edge.to)
+        }
+    }
+
     /// Everything directly related to one entity, by id — the company a focus
     /// reading keeps lit. Each kind wires to what the report already knows: the
     /// vault to the harnesses driving it and the endpoint it reads through, a
@@ -415,18 +497,55 @@ struct EntityGraphModel {
         guard let node = node(id) else { return [] }
         var related: Set<String> = []
         switch node.kind {
+        case .core:
+            // Sea-Star's own company, and it is deliberately short. It lives in
+            // the vault, the apps that drive it call it over stdio (the engine
+            // has their process records, so that is proof), and it reads models
+            // through exactly one endpoint at a time.
+            //
+            // What is *not* here matters as much: not every endpoint that
+            // happens to be up, and not every harness app on the disk. "Sea-Star
+            // is connected to X" has to mean something X is doing with it.
+            related.insert("vault")
+            for attached in controller.attachedHarnesses {
+                related.insert("harness:\(attached.id)")
+            }
+            if let active = activeInferenceID { related.insert(active) }
+
         case .vault:
+            related.insert(Self.coreID)
             for attached in controller.attachedHarnesses {
                 related.insert("harness:\(attached.id)")
             }
             if let active = activeInferenceID { related.insert(active) }
 
         case .harness:
-            // A connected harness is by definition driving this vault. An app
-            // that is merely up drives nothing yet, so it is wired to nothing —
-            // an edge would be an invention.
+            // An app that owns a model server *is* connected to it, and this is
+            // observed rather than assumed: the engine reads which process holds
+            // the socket, so ownership is the machine's own answer to "who is
+            // serving this". It is the wire that was missing for two sessions —
+            // Atomic Chat's inbuilt server calls itself `remote`, so a match on
+            // the server's self-reported name could never find its owner.
+            for endpoint in controller.endpoints(ownedBy: node.title) {
+                related.insert("inference:\(endpoint.baseURL)")
+            }
+            // What it *says* it uses. A configured provider holds no socket, so
+            // no probe could ever have drawn this edge — it is the one link of
+            // the cascade that only a config read can supply. It is resolved
+            // only to an endpoint Sea-Star can already see answering, so the
+            // wire never points at something that was never drawn, and it is
+            // never coloured as live.
+            if let declared = declaredEndpoint(forHarnessNamed: node.title) {
+                related.insert(declared)
+            }
+            // A connected harness is by definition driving this vault, and it is
+            // driving Sea-Star too — it calls `ask_seastar`, which is the only
+            // reason the engine has a process record for it at all. An app that
+            // is merely up drives nothing yet, so that edge would be an
+            // invention.
             if node.isLive {
                 related.insert("vault")
+                related.insert(Self.coreID)
                 // An app that names an endpoint (oMLX, Osaurus) owns that
                 // endpoint: a real match on the name, never a guess from a port.
                 for endpoint in controller.inferenceOptions
@@ -470,10 +589,46 @@ struct EntityGraphModel {
         return related.intersection(known).subtracting([id])
     }
 
+    /// What a harness declares it gets models from, matched onto the graph by
+    /// identity. `nil` when the harness declares nothing — which is a real answer
+    /// and is drawn as an absence, never as a guess.
+    ///
+    /// A declaration resolves to an endpoint only when it names one Sea-Star can
+    /// already see answering. A declaration with no base URL names a *model* but
+    /// no place, and a cloud route names somewhere this machine has no node at
+    /// all; in both cases the claim is still worth showing, so it is kept as a
+    /// label and the harness node carries it as a subtitle rather than becoming a
+    /// wire to something that was never drawn.
+    func declaredProvider(forHarnessNamed name: String) -> DoctorReport.ConfiguredProviderInfo? {
+        controller.declaredProvider(forHarnessNamed: name)
+    }
+
+    /// The endpoint node a declaration points at, when Sea-Star can see that
+    /// endpoint answering. `nil` otherwise — see above.
+    func declaredEndpoint(forHarnessNamed name: String) -> String? {
+        guard let claim = declaredProvider(forHarnessNamed: name),
+              let baseURL = claim.baseURL,
+              claim.isLocal
+        else { return nil }
+        let id = "inference:\(baseURL)"
+        return node(id) == nil ? nil : id
+    }
+
+    /// One line saying what a harness declares it uses. Deliberately names the
+    /// *declaration*, because that is what it is: the harness is configured for
+    /// this, which is not the same fact as anything using it.
+    static func declarationSummary(_ claim: DoctorReport.ConfiguredProviderInfo) -> String {
+        if let model = claim.model {
+            return "Configured for \(claim.provider) · \(model)"
+        }
+        return "Configured for \(claim.provider)"
+    }
+
     // MARK: - Inspection
 
     func kindLabel(_ kind: GraphNode.Kind) -> String {
         switch kind {
+        case .core: return Strings.Detail.seaStar
         case .vault: return Strings.Detail.vault
         case .harness: return Strings.Detail.harness
         case .inference: return Strings.Detail.inference
@@ -499,6 +654,31 @@ struct EntityGraphModel {
     func facts(for node: GraphNode) -> [(label: String, value: String)] {
         guard let report = controller.report else { return [] }
         switch node.kind {
+        case .core:
+            // Sea-Star's own card. Four rows at most, and every one of them is
+            // something the report can actually answer: whether anything is
+            // answering at all, which app is driving it, which endpoint it is
+            // reading through, and what answered during the latest read. There
+            // is deliberately no "status: live" here — see `isLive`.
+            var rows: [(label: String, value: String)] = [
+                (
+                    Strings.Detail.status,
+                    report.ready ? Strings.Detail.observing : Strings.Detail.notObserving
+                ),
+            ]
+            let drivers = controller.attachedHarnesses.map(\.name)
+            if !drivers.isEmpty {
+                rows.append((Strings.Detail.drivenBy, drivers.joined(separator: ", ")))
+            }
+            if let current = controller.currentInference {
+                rows.append((Strings.Detail.readingThrough, current.name))
+            }
+            let answering = nodes.filter(\.isLive).map(\.title).sorted()
+            if !answering.isEmpty {
+                rows.append((Strings.Detail.liveNow, nameList(answering)))
+            }
+            return rows
+
         case .vault:
             var rows: [(label: String, value: String)] = [
                 (Strings.Detail.notes, report.vault.noteCount.formatted()),

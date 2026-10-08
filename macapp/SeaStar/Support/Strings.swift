@@ -38,6 +38,7 @@ enum Strings {
         static let harness = "Harness"
         static let agent = "Agent"
         static let inference = "Inference"
+        static let workspace = "Workspace"
         static let model = "Model"
         static let notes = "Notes"
         /// The list of installed harnesses and whether each floats on the graph.
@@ -49,6 +50,17 @@ enum Strings {
         static let nothingToReport = "Nothing to report — no app is doing anything Sea-Star can see."
         static let nothingToDecide = "Nothing to decide — everything on this machine has been named."
         static let noHarnessesInstalled = "No other harness apps are installed."
+        /// The reason a harness in the dial cannot be chosen, for an engine too
+        /// old to have said which rung it reached. Admitting ignorance, rather
+        /// than borrowing the words of a rung nobody observed.
+        static let unknownRung = "Nothing answered for it"
+        /// The reason a persona in the dial cannot be chosen: its model is bound,
+        /// but no endpoint answering right now offers it.
+        static let nothingServingItsModel = "nothing is serving its model"
+        /// What a disabled entry in a dial reads as: the name, then why not.
+        static func stillOff(_ label: String, _ reason: String) -> String {
+            "\(label) — \(reason)"
+        }
         static func noteCount(_ count: Int) -> String {
             count == 1 ? "1 note" : "\(count) notes"
         }
@@ -96,6 +108,8 @@ enum Strings {
             "Which persona inside that harness you are talking to."
         static let inferenceHelp =
             "Where the model call goes. Choose the endpoint here; the model list below follows it."
+        static let workspaceHelp =
+            "Agent artefacts in the current directory — the only evidence that proves *use*."
         static let modelHelp =
             "The model that endpoint is serving. Choosing one changes what Sea-Star thinks with."
 
@@ -134,26 +148,27 @@ enum Strings {
         static let nothing = "Nothing in flight."
     }
 
-    /// The ways to lay the same four rows out, so the choice is a picture
-    /// rather than an argument (DECISIONS.md D-001).
+    /// The two ways to read the same rows, named by what they communicate rather
+    /// than how they are laid out (founder, 2026-10-07): Facts is the column you
+    /// scan, Path is the journey a request travels.
     enum PanelVariant {
-        /// A vertical list of rows — the familiar reading, everything scannable.
-        static let stack = "Stack"
-        static let stackHelp = "Four rows, one under the next"
-        /// Connected cards that read as a chain of cause: each row hands off to
-        /// the one below it, which is what actually happens to a request.
-        static let chain = "Chain"
-        static let chainHelp = "Linked cards, reading top to bottom"
+        /// A vertical list of facts — the familiar reading, everything scannable.
+        static let facts = "Facts"
+        static let factsHelp = "The facts, one under the next — scan down the column"
+        /// Connected cards that read as the path a request travels: vault to
+        /// harness to agent to inference, each handing off to the next.
+        static let path = "Path"
+        static let pathHelp = "The path a request travels — each row hands off to the next"
         static func label(_ variant: PanelLayout) -> String {
             switch variant {
-            case .stack: return stack
-            case .chain: return chain
+            case .facts: return facts
+            case .path: return path
             }
         }
         static func help(_ variant: PanelLayout) -> String {
             switch variant {
-            case .stack: return stackHelp
-            case .chain: return chainHelp
+            case .facts: return factsHelp
+            case .path: return pathHelp
             }
         }
     }
@@ -169,6 +184,8 @@ enum Strings {
         /// connected": nothing is wrong, it simply means no app is driving
         /// Sea-Star at this moment.
         static let noHarness = "None attached"
+        /// No workspace markers found in the current directory.
+        static let noneDetected = "None detected"
     }
 
     enum Actions {
@@ -222,6 +239,15 @@ enum Strings {
         /// are zoomed into and returns the pool to its whole reading (spec §8.7).
         static let exitFocus = "Exit focus"
         static let exitFocusHelp = "Show the whole pool again"
+
+        /// The QuickTime-style drawer (spec §8.7): a ledge at the foot of the
+        /// graph reading, holding what belongs to it — the depth choice and the
+        /// harness roster. The text reading's own layout moved up to the header,
+        /// so its drawer was removed.
+        static let trayTitle = "Harnesses"
+        static let depthTitle = "Depth"
+        static func trayHelp(_ what: String) -> String { "Slide out: \(what)" }
+        static let trayCloseHelp = "Slide the drawer away"
 
         /// The same hint for the deep pool. Different verbs, because the deep
         /// hands orbit to the camera rather than implementing them itself: you
@@ -337,6 +363,21 @@ enum Strings {
         static let rungListening = "Answering on its port"
         static let rungRunning = "Up, not answering yet"
         static let rungPresent = "Installed, not running"
+        /// The one entity in the pool that is not a thing being watched. It wears
+        /// its own name rather than a kind word, because "Sea-Star" *is* the kind.
+        static let seaStar = "Sea-Star"
+        /// What the core node is doing, in two words a person can act on. It is
+        /// never "live": nothing on this machine can probe the thing doing the
+        /// probing, and inventing a heartbeat for it would be the one claim the
+        /// graph cannot support.
+        static let observing = "Observing"
+        static let notObserving = "No endpoint answering"
+        /// Who is driving Sea-Star right now, and what it is reading through.
+        static let drivenBy = "Driven by"
+        static let readingThrough = "Reading through"
+        /// What answered during the latest read, named rather than counted — the
+        /// same rule the endpoint card already follows.
+        static let liveNow = "Answering now"
         /// The second line of the Harness card when no app is attached at all.
         /// Said as a sentence, so it cannot be confused with a rung, which is a
         /// fact about some particular app.

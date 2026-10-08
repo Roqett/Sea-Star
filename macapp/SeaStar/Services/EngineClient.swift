@@ -29,8 +29,8 @@ enum EngineClientError: Error, LocalizedError, Equatable {
 struct EngineClient: Sendable {
     var command: EngineCommand
 
-    func doctor(environment: [String: String] = [:]) async throws -> DoctorResponse {
-        let outcome = try await run(command.doctor(environment: environment))
+    func doctor(environment: [String: String] = [:], workspace: URL? = nil) async throws -> DoctorResponse {
+        let outcome = try await run(command.doctor(environment: environment, workspace: workspace))
         let output = outcome.standardOutput
         guard !output.isEmpty else {
             let detail = String(data: outcome.standardError, encoding: .utf8) ?? ""

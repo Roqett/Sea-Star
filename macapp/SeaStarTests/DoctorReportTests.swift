@@ -631,10 +631,10 @@ struct IconRosterTests {
 struct PanelLayoutTests {
     /// An unset or corrupt stored value must land on the reading this panel has
     /// always been, never on a blank screen.
-    @Test("an unset preference opens the stack")
-    func unsetDefaultsToStack() {
-        #expect(PanelLayout.resolved(from: "") == .stack)
-        #expect(PanelLayout.resolved(from: "nonsense") == .stack)
+    @Test("an unset preference opens the facts")
+    func unsetDefaultsToFacts() {
+        #expect(PanelLayout.resolved(from: "") == .facts)
+        #expect(PanelLayout.resolved(from: "nonsense") == .facts)
     }
 
     @Test("a stored preference is honoured every way")
@@ -653,11 +653,11 @@ struct PanelLayoutTests {
         }
     }
 
-    /// The two layouts and nothing else. The side-by-side comparison was retired
-    /// once the founder picked a reading; if a case drops, the header toggle
+    /// The two readings and nothing else. The side-by-side comparison was retired
+    /// once the founder kept both as readings; if a case drops, the header toggle
     /// silently loses a button.
-    @Test("there are two layouts")
-    func twoLayouts() {
+    @Test("there are two readings")
+    func twoReadings() {
         #expect(PanelLayout.allCases.count == 2)
     }
 }

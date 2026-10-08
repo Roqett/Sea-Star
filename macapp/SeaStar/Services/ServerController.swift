@@ -75,6 +75,13 @@ enum HarnessRung: String, Sendable, Equatable, CaseIterable {
     /// Whether Sea-Star can currently hand this harness a question.
     var isAttached: Bool { self == .connected }
 
+    /// Whether the harness is demonstrably *up*: a process owns it right now, or
+    /// something answered on a port in its name. Distinct from `isAttached` — a
+    /// running IDE is alive without being the thing driving Sea-Star — and this
+    /// is what lets the graph draw an "up, not wired to me" harness as a lit star
+    /// rather than the same dead grey as an app that never launched.
+    var isUp: Bool { self != .present }
+
     /// The rung as it should read to a person, not as a ladder number.
     var label: String {
         switch self {
@@ -116,6 +123,23 @@ struct LatentHarnessOption: Identifiable, Equatable, Sendable {
         default: return nil
         }
     }
+}
+
+/// One entry in a panel dial, and whether choosing it would do anything.
+///
+/// The founder's rule for the panel (D-018): a row lists **everything that
+/// exists**, and an entry that cannot be honoured is shown *greyed with the
+/// reason* rather than hidden. Hiding it would answer "can I use this?" with
+/// silence; showing it switched off answers the question the row was opened to
+/// ask — what else is on this machine, and why is it not in play.
+struct DialOption: Identifiable, Equatable, Sendable {
+    let id: String
+    /// What the person reads in the menu. The reason rides in the label of the
+    /// disabled ones, because a menu has nowhere else to put it.
+    let label: String
+    let isEnabled: Bool
+    /// Why this one cannot be chosen. `nil` on anything choosable.
+    let reason: String?
 }
 
 /// A harness app that is attached to the engine over stdio *right now*: it
@@ -355,20 +379,128 @@ final class ServerController {
         return report?.hasKnownAgentSource == true ? .roster(options) : .unconfirmed
     }
 
-    /// The persona the person has chosen, if any. Kept in memory only: an
-    /// agent is a reading of the cockpit, not a server setting, so it is not
-    /// persisted and not sent to the engine as an override.
-    private(set) var selectedAgentName: String?
-
-    /// Choose which persona the panel reads. This deliberately does *not*
-    /// restart the server or set an environment override — the engine has no
-    /// knob for "talk to this agent", and pretending otherwise would make the
-    /// control look load-bearing when it is not. What it genuinely changes is
-    /// what the panel shows.
+    /// The persona the persona-label dial reads, and the cascade it drives.
+    ///
+    /// Choosing an agent is a **real action** where it can be honoured (D-018):
+    /// if something is serving the model that persona rides, the endpoint and the
+    /// model both follow, so the rows underneath agree with the row just chosen.
+    /// That is what "reflect in all other settings that are relevant" means, and
+    /// it is the difference between a dial and a label.
+    ///
+    /// A persona whose model nothing is serving is left where it is — there is
+    /// nowhere to move it to, and the row says so rather than moving anyway.
     func selectAgent(_ name: String) {
         guard agentOptions.contains(where: { $0.name == name }) else { return }
         selectedAgentName = name
+        guard let agent = selectedAgent, let placement = servingPlacement(of: agent) else {
+            return
+        }
+        var moved = false
+        if report?.baseURL != placement.endpoint.baseURL,
+           inferenceOverride?.baseURL != placement.endpoint.baseURL {
+            inferenceOverride = placement.endpoint
+            moved = true
+        }
+        if modelOverride != placement.model {
+            modelOverride = placement.model
+            moved = true
+        }
+        if moved { applySelection() }
     }
+
+    /// Where a persona's model is actually being served, if anywhere: the
+    /// endpoint that offers it and the model id *that endpoint* uses.
+    ///
+    /// The id needs unwrapping because a roster qualifies its models with the app
+    /// they come from (`omlx/KAT-Coder-…`) while an endpoint lists them bare. The
+    /// whole string is tried first, then the part after the provider prefix — in
+    /// that order, so a model whose own name contains a slash still matches
+    /// itself before anything is stripped off it.
+    func servingPlacement(of agent: AgentOption) -> (endpoint: InferenceOption, model: String)? {
+        guard let raw = agent.model, !raw.isEmpty else { return nil }
+        let bare = raw.split(separator: "/", maxSplits: 1).last.map(String.init)
+        let candidates = bare == raw ? [raw] : [raw, bare].compactMap { $0 }
+        for candidate in candidates {
+            if let endpoint = inferenceOptions.first(where: { $0.models.contains(candidate) }) {
+                return (endpoint, candidate)
+            }
+        }
+        return nil
+    }
+
+    /// Choose which app Sea-Star reads through, as the Harness row's action.
+    ///
+    /// A harness cannot be made to attach itself (D-001, D-004), so this does not
+    /// pretend to attach one. What it can honour is the rest of "use this app":
+    /// point the engine at the servers that app *owns*, read from the socket
+    /// rather than guessed from a name. An app that owns nothing answering leaves
+    /// the reading where it is — and its dial entry is switched off anyway.
+    func selectHarness(_ id: String) {
+        guard let app = harnessDial.first(where: { $0.id == id }) else { return }
+        guard let server = endpoints(ownedBy: app.label).first else { return }
+        selectInference(server.baseURL)
+    }
+
+    /// Every harness app this machine knows about, as the Harness row's dial.
+    ///
+    /// The attached app is the only choosable entry and the rest carry the rung
+    /// that explains them, because the app genuinely cannot make another app
+    /// attach itself to it (D-001, D-004): a row that looked switchable for a
+    /// dormant app would be a lie about what the cockpit can do. What the dial
+    /// adds is the *roster* — the founder's "whatever is live, or if it exists,
+    /// greyed out" — which was previously nowhere in the panel at all.
+    var harnessDial: [DialOption] {
+        var seen: Set<String> = []
+        var options: [DialOption] = []
+        for attached in attachedHarnesses {
+            let key = (attached.bundleID ?? attached.name).lowercased()
+            guard seen.insert(key).inserted else { continue }
+            options.append(DialOption(
+                id: attached.id,
+                label: attached.name,
+                isEnabled: true,
+                reason: nil
+            ))
+        }
+        for app in latentHarnessOptions {
+            guard seen.insert(app.bundleID.lowercased()).inserted else { continue }
+            options.append(DialOption(
+                id: app.bundleID,
+                label: app.name,
+                // Nothing here has answered: the rung is the reason it cannot be
+                // chosen, in the foundation's own words (§2's degradation
+                // contract — show the rung reached, and show the rung).
+                isEnabled: false,
+                reason: app.rung?.label ?? Strings.Rows.unknownRung
+            ))
+        }
+        return options
+    }
+
+    /// Every persona on the roster, as the Agent row's dial, with the ones that
+    /// cannot be honoured switched off.
+    ///
+    /// A persona with no bound model is choosable: it rides whatever the endpoint
+    /// is serving, which is a real state rather than a broken one. A persona
+    /// whose model nothing is currently offering is not, and says so.
+    var agentDial: [DialOption] {
+        agentOptions.map { agent in
+            let served = servingPlacement(of: agent) != nil
+            let bound = !(agent.model ?? "").isEmpty
+            return DialOption(
+                id: agent.name,
+                label: agent.name,
+                isEnabled: served || !bound,
+                reason: served || !bound ? nil : Strings.Rows.nothingServingItsModel
+            )
+        }
+    }
+
+    /// The persona the person has chosen, if any. Kept in memory only: an
+    /// agent is a reading of the cockpit, not a server setting, so it is not
+    /// persisted — though choosing one it *can* honour now moves the endpoint and
+    /// the model with it (D-018).
+    private(set) var selectedAgentName: String?
 
     /// The persona the panel is currently reading, resolved from its name.
     ///
@@ -397,9 +529,13 @@ final class ServerController {
         guard let model = agent.model, !model.isEmpty else {
             return Strings.Rows.agentRidesWhatever
         }
-        let serving = inferenceOptions.first { $0.models.contains(model) }
-        if let endpoint = serving {
-            return Strings.Rows.agentRunsOn(model, endpoint.name)
+        // Resolved through the one rule that also decides whether the dial entry
+        // can be chosen, so the sentence and the control cannot disagree: a
+        // qualified roster id (`omlx/qwen3-large`) is matched against what the
+        // endpoints actually list, and the endpoint it is really served by names
+        // itself rather than the app the roster came from.
+        if let served = servingPlacement(of: agent) {
+            return Strings.Rows.agentRunsOn(served.model, served.endpoint.name)
         }
         if let provider = agent.provider,
            let named = inferenceOptions.first(where: { $0.name.caseInsensitiveCompare(provider) == .orderedSame }) {
@@ -414,6 +550,29 @@ final class ServerController {
     /// connection, so the person decides which ones float on the graph — but a
     /// running one is drawn as running, not smeared into the same grey as a
     /// dormant install.
+    /// What a harness *declares* it gets models from, matched by identity rather
+    /// than by exact name: the engine files the claim under a short key
+    /// (`opencode`), while the graph knows the app by its display name
+    /// (`OpenCode`). Matching both ways, space- and dash-insensitively, so a
+    /// renamed display form still finds its claim — and a miss returns `nil`,
+    /// which the caller reads as "declared nothing" rather than guessing.
+    func declaredProvider(
+        forHarnessNamed name: String
+    ) -> DoctorReport.ConfiguredProviderInfo? {
+        let needle = Self.identityKey(name)
+        guard !needle.isEmpty else { return nil }
+        return report?.declaredProviders.first { claim in
+            let key = Self.identityKey(claim.harness)
+            return key == needle || (key.count >= 3 && needle.contains(key))
+                || (needle.count >= 3 && key.contains(needle))
+        }
+    }
+
+    /// A name reduced to something comparable: case-folded, no spaces or dashes.
+    private static func identityKey(_ name: String) -> String {
+        name.lowercased().filter { !$0.isWhitespace && $0 != "-" && $0 != "_" }
+    }
+
     var latentHarnessOptions: [LatentHarnessOption] {
         report?.detectedLatentHarnesses.map {
             LatentHarnessOption(
@@ -463,11 +622,16 @@ final class ServerController {
         defer { isRefreshing = false }
 
         do {
-            let response = try await EngineClient(command: command).doctor(environment: environment)
+            let workspaceURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            let response = try await EngineClient(command: command).doctor(environment: environment, workspace: workspaceURL)
             switch response {
             case .report(let report):
-                adopt(report)
-                logs.append("refresh · \(report.runtime) · \(report.model.isEmpty ? "no model" : report.model)")
+                // Only log a reading that changed. The cockpit now polls while it
+                // is open, so an unconditional line here would append the same
+                // entry every two seconds and scroll the Logs panel for ever.
+                if adopt(report) {
+                    logs.append("refresh · \(report.runtime) · \(report.model.isEmpty ? "no model" : report.model)")
+                }
             case .failure(let failure):
                 apply(failure: failure)
             }
@@ -484,9 +648,21 @@ final class ServerController {
     /// graph draws is a function of this value, so being able to set it is the
     /// difference between testing the honesty contract and only testing that the
     /// plumbing compiles.
-    func adopt(_ report: DoctorReport) {
+    func adopt(_ report: DoctorReport) -> Bool {
+        // A report that says the same thing is not news, and treating it as news
+        // is actively harmful now that the cockpit watches continuously: every
+        // assignment invalidates the view, the graph model is rebuilt from
+        // scratch, and the pulse animation restarts — so the lit nodes blinked
+        // every two seconds. Worse, a rapid full-brightness flicker is a genuine
+        // hazard for photosensitive users, not just an irritation.
+        //
+        // So a reading is adopted only when it *differs*. Everything downstream —
+        // the graph, the panel, the animation phase — is then a function of real
+        // change, which is what makes watching safe to leave open.
+        guard self.report != report else { return false }
         self.report = report
         self.message = nil
+        return true
     }
 
     /// The app whose inbuilt server is answering on this endpoint, if any.
@@ -499,6 +675,26 @@ final class ServerController {
     func bundledOwner(of baseURL: String) -> String? {
         guard let url = URL(string: baseURL), let port = url.port else { return nil }
         return report?.modelServers.first { $0.port == port }?.appName
+    }
+
+    /// The endpoints this named app is *serving from*, read the other way round.
+    ///
+    /// This is the reverse of ``bundledOwner(of:)`` and it is what makes a
+    /// harness drawable as connected to its own server. A name match cannot find
+    /// it — Atomic Chat's inbuilt server answers as `remote`, which is nobody's
+    /// name — but port ownership can, because the engine saw which process holds
+    /// the socket. Only endpoints that also appear in ``inferenceOptions`` are
+    /// returned, so a port that merely looked like a model server is never
+    /// claimed as one: the wire means "this app serves models here", not "this
+    /// app has a socket here".
+    func endpoints(ownedBy app: String) -> [InferenceOption] {
+        let owned = Set(
+            (report?.modelServers ?? [])
+                .filter { $0.appName?.caseInsensitiveCompare(app) == .orderedSame }
+                .map(\.baseURL)
+        )
+        guard !owned.isEmpty else { return [] }
+        return inferenceOptions.filter { owned.contains($0.baseURL) }
     }
 
     /// Whether the endpoint Sea-Star is currently using belongs to another app.
