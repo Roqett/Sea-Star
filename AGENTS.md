@@ -12,6 +12,10 @@ An ex-winemaker building a software factory of Mac-first apps (Linux ports plann
 - Target hardware is modern Apple Silicon; no weak-hardware compromises. On-device models are the default; any cloud path must be explicit and approved.
 - Language-agnostic: the rules below apply regardless of whether the build is Python, Swift, Rust, or anything else. Build commands and package names live in the Project Tripwires.
 
+## Session startup
+
+- **Caffeinate:** If `pgrep caffeinate` returns nothing, run `caffeinate -d -i &`. The screensaver must never interrupt a session.
+
 ## Communication protocol
 
 - **No jargon unless asked.** Explain only the impact on the user experience. Define any term you introduce once; skip the definition if already covered.
