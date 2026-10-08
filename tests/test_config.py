@@ -21,6 +21,7 @@ from sea_star.config import (
     load_config,
     probe_endpoint,
     probe_runtimes,
+    read_omlx_loaded_model,
     read_osaurus_default_model,
     resolve_vault,
     scan_ports,
@@ -39,6 +40,24 @@ def _clean_env(monkeypatch):
         "SEASTAR_SCAN_PORTS",
     ):
         monkeypatch.delenv(key, raising=False)
+
+
+async def _no_loaded_model(base_url, *, timeout=1.5):
+    """Stand-in for a runtime that will not say which model it is serving."""
+
+    return
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_loaded_model(monkeypatch):
+    """Keep every test off this machine's real oMLX admin route.
+
+    ``probe_runtimes`` asks a self-named oMLX which model is loaded. Without this
+    the probe tests would reach the running server and start depending on
+    whatever it happens to be serving.
+    """
+
+    monkeypatch.setattr("sea_star.config.read_omlx_loaded_model", _no_loaded_model)
 
 
 def _write_obsidian(home: Path, vaults: dict) -> None:
@@ -122,6 +141,47 @@ async def test_probe_runtimes_falls_back_to_port_name(monkeypatch):
     assert [probe.name for probe in await probe_runtimes()] == ["omlx"]
 
 
+async def test_probe_runtimes_names_an_endpoint_after_the_app_that_owns_it(monkeypatch):
+    """A server that names a *place* cannot label itself.
+
+    Atomic Chat's inbuilt server answers ``owned_by: "remote"`` while holding
+    port 1337 on this machine, which the cockpit then read as though the cloud
+    were involved. The reconnaissance table knows which app holds the socket, so
+    that is the name — and a server that names itself properly keeps its own,
+    because a product name beats the bundle that happens to ship it.
+    """
+
+    async def fake(base_url, *, timeout=1.5):
+        return {
+            "http://127.0.0.1:1337/v1": (["Dirk"], "remote"),
+            "http://127.0.0.1:8009/v1": (["Dirk"], "omlx"),
+        }.get(base_url)
+
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
+    probes = await probe_runtimes(owners={1337: "Atomic Chat", 8009: "Unsloth Studio"})
+    assert [(probe.name, probe.base_url) for probe in probes] == [
+        ("Atomic Chat", "http://127.0.0.1:1337/v1"),
+        ("omlx", "http://127.0.0.1:8009/v1"),
+    ]
+
+
+async def test_probe_runtimes_keeps_a_vague_name_when_nothing_observed_it(monkeypatch):
+    """With no observation to go on, the server's vague self-name is kept.
+
+    Falling through to the port table here would be the tempting fix and the
+    wrong one: 1337's known port is Osaurus and the server on it belongs to
+    Atomic Chat (D-015), so a port number would name a competitor product with
+    more confidence than the evidence carries. Only an *observed owner* — the app
+    whose process holds the socket — may correct a vague name.
+    """
+
+    async def fake(base_url, *, timeout=1.5):
+        return (["m"], "remote") if base_url == "http://127.0.0.1:1337/v1" else None
+
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
+    assert [probe.name for probe in await probe_runtimes()] == ["remote"]
+
+
 def _serve_models(monkeypatch, payload: dict) -> None:
     transport = httpx.MockTransport(lambda request: httpx.Response(200, json=payload))
     real_client = httpx.AsyncClient
@@ -139,6 +199,76 @@ async def test_probe_endpoint_keeps_specific_owner(monkeypatch):
 async def test_probe_endpoint_drops_generic_owner(monkeypatch):
     _serve_models(monkeypatch, {"data": [{"id": "m", "owned_by": "library"}]})
     assert await probe_endpoint("http://127.0.0.1:8000/v1") == (["m"], None)
+
+
+# The bug this pins: ``/v1/models`` lists what an endpoint *offers* and has no
+# field for which model is loaded, so reading its first entry claimed a model
+# oMLX was not running. oMLX's admin route carries the truth.
+async def test_read_omlx_loaded_model_picks_the_chat_model_not_its_helper(monkeypatch):
+    _serve_models(
+        monkeypatch,
+        {
+            "models": [
+                {"id": "Dirk-Qwen3.8", "loaded": False},
+                {"id": "MiMo-V2.6", "loaded": True, "model_type": "llm", "is_helper": False},
+                {
+                    "id": "MarkItDown",
+                    "loaded": True,
+                    "model_type": "markitdown",
+                    "virtual": True,
+                },
+            ]
+        },
+    )
+    assert await read_omlx_loaded_model("http://127.0.0.1:8009/v1") == "MiMo-V2.6"
+
+
+async def test_read_omlx_loaded_model_is_none_when_nothing_is_loaded(monkeypatch):
+    _serve_models(monkeypatch, {"models": [{"id": "Dirk-Qwen3.8", "loaded": False}]})
+    assert await read_omlx_loaded_model("http://127.0.0.1:8009/v1") is None
+
+
+async def test_read_omlx_loaded_model_is_none_when_the_route_is_absent(monkeypatch):
+    # A server that has no such route (Ollama, vLLM) must not become an error —
+    # it is simply a runtime that cannot be asked.
+    transport = httpx.MockTransport(lambda request: httpx.Response(404))
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        "sea_star.config.httpx.AsyncClient",
+        lambda *args, **kwargs: real_client(*args, transport=transport, **kwargs),
+    )
+    assert await read_omlx_loaded_model("http://127.0.0.1:11434/v1") is None
+
+
+async def test_probe_runtimes_trusts_the_model_omlx_says_it_loaded(monkeypatch):
+    async def fake(base_url, *, timeout=1.5):
+        return (["Dirk-Qwen3.8", "MiMo-V2.6"], "omlx") if base_url.endswith("8009/v1") else None
+
+    async def loaded(base_url, *, timeout=1.5):
+        return "MiMo-V2.6"
+
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
+    monkeypatch.setattr("sea_star.config.read_omlx_loaded_model", loaded)
+
+    probes = await probe_runtimes()
+    assert [(probe.name, probe.models, probe.model) for probe in probes] == [
+        ("omlx", ("MiMo-V2.6", "Dirk-Qwen3.8"), "MiMo-V2.6")
+    ]
+
+
+async def test_probe_runtimes_ignores_a_loaded_model_the_endpoint_does_not_serve(monkeypatch):
+    async def fake(base_url, *, timeout=1.5):
+        return (["Dirk-Qwen3.8", "MiMo-V2.6"], "omlx") if base_url.endswith("8009/v1") else None
+
+    async def loaded(base_url, *, timeout=1.5):
+        return "a model nobody advertises"
+
+    monkeypatch.setattr("sea_star.config.probe_endpoint", fake)
+    monkeypatch.setattr("sea_star.config.read_omlx_loaded_model", loaded)
+
+    probes = await probe_runtimes()
+    assert probes[0].models == ("Dirk-Qwen3.8", "MiMo-V2.6")
+    assert probes[0].model == "Dirk-Qwen3.8"
 
 
 async def test_probe_runtimes_names_unlisted_port_local(monkeypatch):

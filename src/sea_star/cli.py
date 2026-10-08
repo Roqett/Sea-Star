@@ -33,8 +33,9 @@ from .config import (
     write_default_config,
 )
 from .connections import clear_client, live_clients, record_client
-from .harnesses import detect_latent_harnesses
+from .harnesses import detect_latent_harnesses, serving_harness_processes
 from .mcp_server import create_server
+from .providers import detect_configured_providers
 from .recon import (
     harness_behaviour,
     listening_services,
@@ -73,7 +74,24 @@ async def _build_report() -> dict:
     """Assemble the §6 bridge object the host app decodes."""
 
     vault_path, vault_source = resolve_vault(read_config_file())
-    probes = await probe_runtimes()
+    # Reconnaissance first, and once: the ports it observes *listening* are
+    # handed to the probe, so a harness's own model server is asked wherever it
+    # put it. Atomic Chat's Apple foundation server answers on 3355, which no
+    # fixed sweep list would ever look at — a live endpoint Sea-Star could see
+    # in its own socket table and never spoke to.
+    observed = listening_services()
+    probes = await probe_runtimes(
+        extra_ports=tuple(service.port for service in observed if service.is_loopback),
+        # The same table read the other way: port → the app holding it. Consulted
+        # only where a server named a place instead of a product, so it turns
+        # 1337's "remote" into the app that actually owns the socket, and leaves
+        # oMLX's and Apple's own names alone.
+        owners={
+            service.port: service.app_name
+            for service in observed
+            if service.is_loopback and service.app_name
+        },
+    )
     config = await load_config(probes=probes)
     # Trust the resolved probe's model list when there is one: it carries the
     # Osaurus fix-up (the configured model in place of ``foundation``), which a
@@ -86,7 +104,22 @@ async def _build_report() -> dict:
     clients = live_clients()
     active = {probe.name for probe in probes}
     active.update(client.name for client in clients)
-    latent = detect_latent_harnesses(active=active)
+    # A process serving a model on loopback is a harness whatever it is called, so
+    # a CLI agent nobody has heard of yet is recognised by what it *does*. Ports
+    # proven to answer with a model list come from `probes`; the owner of each is
+    # read from the machine. Without this, a headless CLI outside the six known
+    # command names has no family that can see it at all.
+    serving_ports = {urlsplit(probe.base_url).port or 0 for probe in probes}
+    serving_ports.discard(0)
+    port_owners = {
+        service.port: (service.app_name or service.process or "")
+        for service in listening_services()
+        if service.is_loopback
+    }
+    latent = detect_latent_harnesses(
+        active=active,
+        serving=serving_harness_processes(serving_ports, port_owners),
+    )
     # Which endpoints *proved* they serve models. Everything else that looks like
     # one is reported as a port, not as a server — the difference between a fact
     # and a hint, and the reason this set is threaded through by hand.
@@ -97,6 +130,7 @@ async def _build_report() -> dict:
     register = load_register()
     recognised = recognised_names(register)
     pending = discover(register=register, workspace=None, home=None, include_vocabulary=False)
+    claims = detect_configured_providers()
     return {
         "schema_version": BRIDGE_SCHEMA_VERSION,
         "ready": bool(models),
@@ -194,7 +228,7 @@ async def _build_report() -> dict:
                 "app_path": service.app_path,
                 "base_url": service.base_url if service.is_loopback else None,
             }
-            for service in listening_services()
+            for service in observed
         ],
         "model_like": [
             {
@@ -208,6 +242,21 @@ async def _build_report() -> dict:
             }
             for service in model_like_services(known_apps=recognised)
         ],
+        # What each harness *says* it gets its models from. A declaration, not a
+        # connection: it is the one link of the cascade no port probe can show,
+        # because a configured provider holds no socket at all. Foundation §2's
+        # rung 0 — drawn as a stated binding, never as liveness.
+        "providers": [
+            {
+                "harness": claim.harness,
+                "provider": claim.provider,
+                "base_url": claim.base_url,
+                "model": claim.model,
+                "evidence": claim.evidence,
+                "local": claim.is_local,
+            }
+            for claim in claims
+        ],
         "candidates": [
             {
                 "identity": candidate.identity,
@@ -218,6 +267,17 @@ async def _build_report() -> dict:
                 "suggested_name": candidate.suggested_name,
             }
             for candidate in pending
+        ],
+        # Workspace markers found in the current directory — the only evidence
+        # family that proves *use* rather than installation.
+        "workspace_markers": [
+            str(marker) 
+            for marker in (
+                Path.cwd() / name for name in (
+                    ".trae", ".cursor", ".opencode", ".claude", ".codex",
+                    "AGENTS.md", "CLAUDE.md", "GEMINI.md"
+                )
+            ) if marker.exists()
         ],
         "outbound": [
             {

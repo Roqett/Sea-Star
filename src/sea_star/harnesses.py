@@ -26,7 +26,7 @@ from __future__ import annotations
 import plistlib
 import re
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -76,6 +76,91 @@ def running_app_paths() -> frozenset[str]:
         app = app_bundle_in(line)
         if app is not None:
             found.add(str(app))
+    return frozenset(found)
+
+
+#: Command names that are harnesses *while they are running*. Some harnesses ship
+#: no ``.app`` at all — OpenCode, Goose and the DeepSeek Harness run as bare CLI
+#: binaries — so there is no bundle to find and no Info.plist to read, and a
+#: running one was previously invisible to Sea-Star while an *installed* desktop
+#: sibling showed up as latent. The command name is the only handle such a process
+#: offers. That makes this an **additive hint**, in the foundation's sense: a
+#: harness that renames its binary drops off this list and is still found by every
+#: other family, so a missing name never hides a running harness.
+KNOWN_HARNESS_COMMANDS: dict[str, str] = {
+    "opencode": "OpenCode",
+    "goose": "Goose",
+    "dsh": "DeepSeek Harness",
+    "claude": "Claude Code",
+    "codex": "Codex",
+    "aider": "Aider",
+}
+
+
+def serving_harness_processes(
+    serving_ports: Iterable[int] = (),
+    port_owners: Mapping[int, str] | None = None,
+) -> frozenset[str]:
+    """Display names of processes that *serve a model*, found without a name list.
+
+    The gap this closes: a bare CLI agent has no bundle to scan, no Info.plist to
+    read, and — unless it happens to sit on one of the six names above — no handle
+    at all. :func:`running_command_harnesses` matches on the process name, so any
+    CLI agent invented after that dict was written is invisible, permanently. For a
+    headless agent that claim is not a limitation but the whole mechanism: there is
+    no other family that can see it.
+
+    So this asks a behavioural question instead. A process that owns a loopback port
+    answering as a model server is *doing the thing a harness does*, whatever it is
+    called. That generalises to software nobody has written yet, which is the
+    foundation's "no name is ever a precondition" clause applied to a process table.
+
+    ``serving_ports`` are ports already proven to answer with a model list (only
+    :mod:`sea_star.config` speaks HTTP, so the proof arrives from there);
+    ``port_owners`` maps each such port to the name of the process holding it. Ports
+    with no known owner are skipped rather than guessed at — an unowned port is not
+    evidence of anything.
+    """
+    ports = {int(port) for port in serving_ports}
+    if not ports:
+        return frozenset()
+    owners = port_owners or {}
+    found: set[str] = set()
+    for port in ports:
+        owner = str(owners.get(port, "")).strip()
+        if not owner:
+            continue
+        found.add(Path(owner).name if "/" in owner else owner)
+    return frozenset(found)
+
+
+def running_command_harnesses() -> frozenset[str]:
+    """Display names of known CLI harnesses with a live process right now.
+
+    One ``ps`` read of the executable name of every process. A CLI agent has no
+    bundle, so only a *running* one can be reported at all — there is nothing on
+    disk to call "installed". Failures return an empty set: a machine whose
+    process table cannot be read degrades to the bundle scan rather than claiming
+    a harness is up.
+    """
+
+    try:
+        result = subprocess.run(
+            ["ps", "-ax", "-o", "comm="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return frozenset()
+    found: set[str] = set()
+    for line in result.stdout.splitlines():
+        # ``comm`` is the executable path on macOS, but a bare name on some
+        # systems, so the basename is taken either way.
+        known = KNOWN_HARNESS_COMMANDS.get(Path(line.strip()).name.casefold())
+        if known:
+            found.add(known)
     return frozenset(found)
 
 #: Bundle id -> display name, for the harness apps worth naming on the graph.
@@ -212,6 +297,8 @@ def detect_latent_harnesses(
     system_dir: Path | None = None,
     volumes_dir: Path | None = None,
     running: Iterable[str] | None = None,
+    commands: Iterable[str] | None = None,
+    serving: Iterable[str] | None = None,
 ) -> tuple[HarnessSpec, ...]:
     """Known harness apps installed but not attached, each with its rung.
 
@@ -223,10 +310,24 @@ def detect_latent_harnesses(
     ``running`` is the set of bundle paths currently owned by a process; ``None``
     reads the real process table. Injecting it keeps the caller honest: a harness
     is called running on evidence, never on assumption.
+
+    ``commands`` is the set of known CLI harness *names* currently running; a CLI
+    harness has nothing on disk to be "installed", so only a running one appears,
+    and it always appears as ``running``.
     """
 
-    running_names = {name.casefold() for name in active}
+    attached_names = {name.casefold() for name in active}
     live_paths = running_app_paths() if running is None else frozenset(running)
+    live_commands = (
+        running_command_harnesses() if commands is None else frozenset(commands)
+    )
+    if serving is not None:
+        live_commands = live_commands | frozenset(serving)
+    # A running CLI harness also stands for its installed desktop sibling: it is
+    # the same product, and one row is the honest reading. Without this, OpenCode
+    # appears twice — once running as a command and once latent as an app — which
+    # reads as two different things rather than one tool that is open.
+    running_names = attached_names | {name.casefold() for name in live_commands}
     found: dict[str, HarnessSpec] = {}
     for directory in _application_dirs(
         home=home, system_dir=system_dir, volumes_dir=volumes_dir
@@ -250,4 +351,21 @@ def detect_latent_harnesses(
                 bundle_id,
                 HarnessSpec(name=known, bundle_id=bundle_id, path=str(app), rung=rung),
             )
+
+    # CLI harnesses last, and only the running ones: there is no install to scan,
+    # so a stopped one is not a fact Sea-Star can have. The identity is synthetic
+    # because the process has no bundle id, and it is namespaced so it can never
+    # collide with a real one.
+    for name in sorted(live_commands):
+        if name.casefold() in attached_names:
+            continue
+        found.setdefault(
+            f"cli:{name.casefold()}",
+            HarnessSpec(
+                name=name,
+                bundle_id=f"cli:{name.casefold()}",
+                path=name,
+                rung=RUNG_RUNNING,
+            ),
+        )
     return tuple(found.values())
