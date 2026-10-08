@@ -818,6 +818,18 @@ Summary of Changes:
 
 Harness: OpenCode
 
+Date: 2026-10-08 22:35 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/EntityGraphModel.swift` — **the deep reading now means something.** The founder's verdict on the 3D room: *"being able to just rotate the thing around looks like a novelty that is trivial and that will only produce scorn in the tech community."* Diagnosis confirmed it in the code: depth was pure decoration, because the majors sat on a ring whose `z` was `sin(angle) × radius`, so turning the room showed the same arrangement from another side.
+- **The third dimension now carries the foundation's own ladder** (`rungHeight`): what is answering stands highest, what is merely installed sits low. Turning the room *reads* the machine — how much of it is working — instead of re-showing a picture. `nil` (vault, model, persona) stays at the neutral plane, because those are not rungs.
+- **Height, not depth along z, and the distinction is load-bearing.** The first attempt pushed nodes along z and broke `majorsRingThePool` — a test stating a real guarantee: the majors' horizontal distance from the centre is exactly the radius, *"which is what makes the shape learnable: the same roster always opens the same way round, and you learn where things are."* On a horizontal ring, z **is** a radial axis, so pushing along it would have made the pool unlearnable to pay for legibility. Height is perpendicular to the ring, so the guarantee survives untouched and the pool gains an axis it did not have. The failing test was treated as the specification, not the obstacle.
+- `macapp/SeaStar/Views/GraphScene.swift` — **the neon is gone**, which is what made the room *"wacky blob pop art from the 80s"*: HDR, bloom, pushed contrast and raised saturation were all on together. Depth now comes from height and fog instead. Fog is load-bearing too — without it every body sits at the same apparent distance and a tilted pool reads as a flat blob from every angle, and it pushes an installed-but-off harness visibly to the back, which is exactly what the height axis says and what additive glow was faking.
+- `macapp/SeaStar/Views/GraphScene.swift` — **D-020 applied to the deep reading**, closing a loose end open since the morning handover. The 2D pool gave a running-but-unattached harness a steady glow; the 3D room still gave it nothing, and it still carried the floating liveness bars the founder asked to remove **twice** — the two readings disagreeing about the same fact, which is the exact failure the shared arrangement exists to prevent. Up-but-not-attached is now a still unlit torus ring: lit, never pulsing, because the breath is reserved for work and being up is not the same as carrying it. Live nodes keep the breathing ribbon.
+- Verified: **102 Swift tests in 18 suites** pass, ruff clean, **197 Python tests** pass. Two build errors were caught by compiling rather than reading (a `Float`/`CGFloat` mismatch and a `SCNBillboardConstraint.freeAxes` call that does not exist in this SDK); the ring-radius failure was caught by the test suite. **Not yet judged by eye** — the founder has the app open on the deep reading and needs to say whether it looks like this product now.
+
+Harness: OpenCode
+
 Date: 2026-10-08 22:05 ACDT
 
 Summary of Changes:

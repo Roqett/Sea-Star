@@ -112,13 +112,23 @@ enum GraphSceneBuilder {
         camera.camera?.fieldOfView = 50
         camera.camera?.zNear = 1
         camera.camera?.zFar = 4000
-        camera.camera?.wantsHDR = true
-        camera.camera?.bloomIntensity = 0.15
-        camera.camera?.bloomThreshold = 0.85
-        camera.camera?.bloomBlurRadius = 8
-        camera.camera?.bloomIterationCount = 1
-        camera.camera?.contrast = 0.05
-        camera.camera?.saturation = 1.05
+        // HDR, bloom, pushed contrast and raised saturation together are the 1985
+        // recipe: they are what made the founder call this room "wacky blob pop
+        // art". Depth now comes from *height carrying the rung* and from the fog
+        // below, so nothing here needs to fake it with glow.
+        camera.camera?.wantsHDR = false
+        camera.camera?.bloomIntensity = 0
+        camera.camera?.contrast = 0
+        camera.camera?.saturation = 1.0
+        // Fog is the other half of making the room a room: without it every body
+        // sits at the same apparent distance and a tilted pool reads as a flat blob
+        // from every angle. It also does the honest work of pushing an
+        // installed-but-off harness visibly to the back, which is what the height
+        // axis says and what additive glow was faking.
+        scene.fogStartDistance = 90
+        scene.fogEndDistance = 620
+        scene.fogDensityExponent = 0.6
+        scene.fogColor = NSColor(Palette.pool)
         camera.position = homePosition
         camera.eulerAngles = homeAngles
         scene.rootNode.addChildNode(camera)
@@ -336,13 +346,15 @@ enum GraphSceneBuilder {
         star.constraints = [SCNBillboardConstraint()]
         holder.addChildNode(star)
 
-        // Liveness. The bar is the founder's own `NudiGreenOrange` ribbon,
-        // rasterised from the same view the 2D pool and the panel use, so
-        // "answering" looks identical in both readings.
+        // Liveness. The founder asked twice for the floating bars to come off the
+        // starfield, and this room still had them: the 2D pool lost them and the
+        // deep reading kept them, which is the two readings disagreeing about the
+        // same fact — the exact failure the whole arrangement is meant to prevent.
         //
-        // A node that did not answer gets *no bar at all* rather than a grey
-        // one. A still bar would be decoration, and this graph's job is to say
-        // what was proved — so absence of evidence is drawn as absence.
+        // What replaces them is not nothing. "Up but not attached" is now a *steady*
+        // glow rather than a breathing one — lit, but never pulsing, because the
+        // breath is reserved for work and being up is not the same as carrying it
+        // (D-020, which the 2D pool already did and this room did not).
         if node.isLive {
             let bar = makeLivenessBar(
                 node,
@@ -351,6 +363,12 @@ enum GraphSceneBuilder {
             )
             bar.position = SCNVector3(0, CGFloat(radius) * 1.5, 0)
             holder.addChildNode(bar)
+        } else if node.rung?.isUp == true {
+            // Steady, and dimmer than the breath: present without pretending to be
+            // busy. Drawn as a still, unlit-ribbon ring at the node's own radius so
+            // it reads as "this is up" from across the room and does not animate.
+            let ring = makeUpRing(radius: radius)
+            holder.addChildNode(ring)
         }
 
         // The name, small and mono, hung beneath. Readable when you fly close;
@@ -361,6 +379,28 @@ enum GraphSceneBuilder {
         }
 
         return holder
+    }
+
+    /// A still ring for a harness that is *up* but has answered nothing (D-020).
+    ///
+    /// Deliberately not the breathing ribbon: the breath means "carrying a request"
+    /// and spending it on a merely-running process is exactly the false signal the
+    /// founder objected to. A thin torus with constant lighting and no animation
+    /// reads as lit-but-idle at any distance, and costs one geometry node.
+    private static func makeUpRing(radius: Float) -> SCNNode {
+        let ring = SCNTorus(ringRadius: CGFloat(radius) * 1.25, pipeRadius: CGFloat(radius) * 0.06)
+        let material = SCNMaterial()
+        material.diffuse.contents = NSColor(Palette.harnessGlow).withAlphaComponent(0.55)
+        material.emission.contents = NSColor(Palette.harnessGlow).withAlphaComponent(0.34)
+        material.lightingModel = .constant
+        material.isDoubleSided = true
+        material.transparencyMode = .aOne
+        ring.firstMaterial = material
+
+        let node = SCNNode(geometry: ring)
+        node.name = "up-ring"
+        node.constraints = [SCNBillboardConstraint()]
+        return node
     }
 
     /// The nudibranch liveness bar: the founder's own green-and-orange strip,

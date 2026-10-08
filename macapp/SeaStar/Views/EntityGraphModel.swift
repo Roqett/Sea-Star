@@ -174,6 +174,38 @@ struct GraphSpace3D {
     /// The centre of the pool, where a focused node is drawn.
     var centre: Point3 { .origin }
 
+    /// How high each rung sits, as a fraction of the pool's radius. Positive is
+    /// *higher*.
+    ///
+    /// This is what makes the deep reading mean something. Before it, depth was
+    /// pure decoration: the majors sat on a ring whose z was `sin(angle) × radius`,
+    /// so turning the room showed the same arrangement from another side — the
+    /// founder's *"looks like a novelty that is trivial"*. Rotating a room is only
+    /// worth doing when the third dimension carries a fact.
+    ///
+    /// So the third dimension now carries the foundation's own ladder, in its own
+    /// words: what is answering stands highest, what is merely installed sits low.
+    /// Turning the room then *reads* the machine — you see how much of it is working
+    /// — rather than re-showing a picture. `nil` (the vault, a model, a persona)
+    /// stays at the neutral plane, because those are not rungs.
+    ///
+    /// **Height, not depth along z, and the distinction is load-bearing.** The
+    /// majors' *horizontal* distance from the centre is exactly the pool's radius,
+    /// and that is a learnability guarantee the test file states outright: the same
+    /// roster always opens the same way round, so you learn where things are.
+    /// Pushing nodes along z would have broken it, because on a horizontal ring z
+    /// *is* a radial axis. Height is perpendicular to that ring, so the guarantee
+    /// survives untouched and the pool gains an axis it did not have.
+    static func rungHeight(_ rung: HarnessRung?) -> Float {
+        switch rung {
+        case .connected: return 0.62
+        case .listening: return 0.30
+        case .running: return 0.00
+        case .present: return -0.62
+        case nil: return 0.00
+        }
+    }
+
     /// The position of every node, by id. Nodes with no place in the arrangement
     /// (there should be none) are simply absent rather than stacked at the
     /// origin, so a stray node can never hide behind another.
@@ -191,14 +223,18 @@ struct GraphSpace3D {
         // The majors ring the pool on the horizontal plane, evenly and
         // deterministically — the same "the count of majors is the count of
         // points" rule the 2D star uses, so the two readings agree on shape.
-        // A seeded lift in y and z gives the ring depth, so the pool is
-        // legibly three-dimensional from any angle rather than a flat disc.
+        // A seeded lift in y keeps the ring from being a flat disc, and the rung
+        // adds an axis that means something: what is answering stands high, what is
+        // installed sits low, so the pool is a landscape of how present each thing
+        // is rather than one circle of equals. Horizontal distance stays exactly
+        // the radius, so the ring is still learnable (see ``rungHeight``).
         for (index, node) in majors.enumerated() {
             let angle = -Double.pi / 2 + Double(index) / Double(count) * 2 * .pi
             let wobble = GraphSeed.phase(for: node.id)
             points[node.id] = Point3(
                 x: Float(cos(angle)) * radius,
-                y: Float(sin(angle * 2 + wobble)) * radius * 0.30,
+                y: Float(sin(angle * 2 + wobble)) * radius * 0.30
+                    + Self.rungHeight(node.rung) * radius,
                 z: Float(sin(angle)) * radius
             )
         }
