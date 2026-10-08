@@ -160,6 +160,13 @@ struct Point3: Equatable, Sendable {
 @MainActor
 struct GraphSpace3D {
     /// The radius the majors sit on — the pool's overall width.
+    ///
+    /// Widening this was tried and reverted: at 260 with the camera pulled back to
+    /// match, the room stopped being crowded but became a distant clump, and the
+    /// crowding had not actually gone away — only shrunk. The real cause is the
+    /// satellite pull below, which draws models and personas onto their anchor and
+    /// packs several bodies into the same space. That is a layout decision, not a
+    /// number, so it is left for a proper pass rather than tuned blind.
     var radius: Float = 120
     /// The distance a satellite orbits from whatever it orbits.
     var satelliteRadius: Float = 46

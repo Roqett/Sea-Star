@@ -22,6 +22,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureStatusItem()
         configurePopover()
+        // The popover genuinely starts closed at launch, so say so. `SeaStar.cockpitOpen`
+        // otherwise survives a relaunch from the previous session and reports "open"
+        // for a popover that does not exist — which is how `script/shot.sh` came to
+        // skip opening the cockpit and photograph the desktop instead. A flag that
+        // outlives the thing it describes is the same class of lie this app exists to
+        // avoid, so it is written honestly here rather than trusted.
+        UserDefaults.standard.set(false, forKey: "SeaStar.cockpitOpen")
         observeIcon()
         // The first-run window needs the launch sequence to finish before it can
         // order itself front: at this exact moment the app is not yet active,

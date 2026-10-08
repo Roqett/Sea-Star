@@ -215,21 +215,12 @@ struct CockpitPopoverView: View {
                 GraphSceneView(controller: controller, height: graphHeight)
             }
             // What belongs to the graph lives in a drawer at its foot rather than
-            // beside it: the roster (a graph being read should not be
-            // half-covered by its own legend) and the depth choice (which is only
-            // meaningful inside the graph, so it does not belong in a header both
-            // readings share).
+            // beside it: the roster only. The depth choice used to be here too, and
+            // that made the deep reading a dead end — the founder could not find his
+            // way back to the flat pool, and said so twice. It is now in the graph's
+            // own header, where it is visible, labelled, and only present where it
+            // means something.
             CockpitTray(isOpen: $isTrayOpen, title: Strings.Views.trayTitle) {
-                TrayChoiceRow(
-                    title: Strings.Views.depthTitle,
-                    options: Strings.Views.Depth.allCases.map {
-                        ($0.rawValue, $0.symbol, $0.label)
-                    },
-                    selected: depth.rawValue,
-                    choose: { raw in
-                        if let option = Strings.Views.Depth(rawValue: raw) { chooseDepth(option) }
-                    }
-                )
                 HarnessVisibilityList(controller: controller)
             }
         }
@@ -265,6 +256,8 @@ struct CockpitPopoverView: View {
 
             if mode == .list {
                 layoutToggle
+            } else {
+                depthToggle
             }
 
             if let onOpenSettings {
@@ -447,6 +440,42 @@ struct CockpitPopoverView: View {
                 try await Task.sleep(for: Self.watchInterval)
             } catch {
                 return  // cancelled — the cockpit closed mid-wait
+            }
+        }
+    }
+
+    /// Flat or deep, shown only in the graph reading — it is meaningless anywhere
+    /// else, so it lives in *this* header rather than a tray at the graph's foot.
+    ///
+    /// It was in the tray, and that was a trap the founder walked into twice in one
+    /// session: once for Facts/Path, once for this. *"I still can't alternate between
+    /// this 3D test and the original"* — because getting back out of the deep reading
+    /// meant finding a hidden drawer. A control you cannot find is not a control, and
+    /// a reading you cannot leave is a dead end. Icon **and** word, for the same
+    /// reason the layout toggle carries both.
+    private var depthToggle: some View {
+        HStack(spacing: 2) {
+            ForEach(Strings.Views.Depth.allCases) { option in
+                Button {
+                    chooseDepth(option)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: option.symbol)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(option.label)
+                            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    }
+                    .foregroundStyle(depth == option ? Palette.ink : Palette.inkMuted)
+                    .padding(.horizontal, 6)
+                    .frame(height: 20)
+                    .background(
+                        depth == option ? Palette.ink.opacity(0.12) : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 5)
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
+                .help(Strings.Views.depthTitle)
             }
         }
     }

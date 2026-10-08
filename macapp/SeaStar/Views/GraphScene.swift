@@ -246,8 +246,13 @@ enum GraphSceneBuilder {
         let length = from.distance(to: to)
         let isLive = plan.isLive(edge.from) || plan.isLive(edge.to)
         let tint = isLive ? Palette.neonGreen : Palette.electricBlue
+        // Hairline, to match the flat pool. At 1.6 the wires were three times the weight
+        // of the star's own arms and read as poster paint — the founder's "still
+        // nothing like the nice fine detail and clarity of our 2D version". The
+        // distinction between a core wire and an ordinary one is kept, because that
+        // *is* information, just far finer than it was.
         let cylinder = SCNCylinder(
-            radius: plan.touchesCore(edge) ? 1.6 : 0.9,
+            radius: plan.touchesCore(edge) ? 0.42 : 0.24,
             height: CGFloat(max(length, 0.1))
         )
         let material = SCNMaterial()
@@ -480,8 +485,12 @@ enum GraphSceneBuilder {
             0,
             0
         )
-        // Half the node's radius, expressed in the text's own world units.
-        let captionScale = max(radius * 0.5 / 11, 0.05)
+        // Sized against the node's own radius, in the text's own world units. The first
+        // attempt used half the radius, which was a swing too far: the names became
+        // invisible and the room became a set of unidentifiable stars. It was caught
+        // by capturing the reading and *looking* at it — not by any test, because
+        // nothing here can assert that a caption is legible to a person.
+        let captionScale = max(radius * 0.8 / 11, 0.4)
         label.scale = SCNVector3(captionScale, captionScale, captionScale)
         label.constraints = [SCNBillboardConstraint()]
         return label

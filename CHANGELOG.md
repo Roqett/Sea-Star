@@ -818,6 +818,19 @@ Summary of Changes:
 
 Harness: OpenCode
 
+Date: 2026-10-08 23:05 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — **you can get back out of the deep reading.** The founder: *"I still can't alternate between this 3D test and the original"*. Flat/Deep was buried in a tray at the foot of the graph, so the deep view was a dead end and getting back meant finding a hidden drawer — the second time in one session he could not find a control he was entitled to (the first was Facts/Path as bare symbols). It is now in the graph's own header, icon **and** word, visible only in the reading where it means something. The tray keeps the roster, which genuinely belongs out of the way.
+- `script/shot.sh` — **new.** Captures a reading as a PNG, opening the cockpit if closed. Exists because an agent could build a reading and never *see* it, which the founder hit exactly: *"I would take a screenshot of but I can't click back to that from this window either"*. Two ways of opening the cockpit were tried and **rejected on evidence**: a distributed-notification hook the app would listen for built and launched but never fired (`notifyutil -p` left `cockpitOpen` at 1 while an AppleScript click took it to 0), and a URL scheme, which is permanent public surface wanting a real design. The hook was **removed rather than shipped** — a door that silently does not open is the exact failure this project exists to avoid. This host now has assistive access granted, which earlier in the project it did not.
+- `macapp/SeaStar/App/AppDelegate.swift` — `SeaStar.cockpitOpen` is now written `false` at launch. It survived a relaunch from the previous session and reported "open" for a popover that did not exist, which is how `shot.sh` came to photograph the desktop instead of the app. A flag that outlives the thing it describes is the same class of lie this app exists to avoid.
+- `macapp/SeaStar/Views/GraphScene.swift` — **labels restored, and it was my own regression.** Scaling captions to half the node radius made every name invisible and the room a set of unidentifiable stars. Caught by capturing the reading and looking at it, not by any test — nothing here can assert that a caption is legible to a person. Now sized against the node's own radius with a floor.
+- `macapp/SeaStar/Views/GraphScene.swift` — **wires are hairlines**, down from 1.6/0.9 to 0.42/0.24. They were three times the weight of a star's own arms and read as poster paint; the founder's *"still nothing like the nice fine detail and clarity of our 2D version"*. The core/ordinary distinction is kept because that *is* information, just far finer.
+- **Reverted, unproven:** widening the pool to radius 260 and pulling the camera to 760 was tried to spread the crowd and made it *worse* — the room stopped being crowded and became a distant clump, because the crowding had not gone, only shrunk. The real cause is the satellite pull, which draws models and personas onto their anchor and packs several bodies into one space. That is a layout decision, not a number, so the experiment was backed out rather than tuned blind and the reason recorded at the declaration.
+- Verified: **102 Swift tests in 18 suites**, ruff clean, **197 Python tests**. **The deep reading is still not where the flat pool is** — the glyphs, the wires and the labels are right, and the third axis now carries the rung, but the arrangement needs a proper layout pass on the satellite pull before it can be called finished.
+
+Harness: OpenCode
+
 Date: 2026-10-08 22:55 ACDT
 
 Summary of Changes:
