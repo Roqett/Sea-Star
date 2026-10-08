@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import argparse
 import ipaddress
-import socket
 import subprocess
 import sys
 import tempfile
@@ -161,7 +160,7 @@ class Handler(BaseHTTPRequestHandler):
     #: whether a blank panel means a broken app or a closed one.
     last_note = "nothing captured yet"
 
-    def log_message(self, *_args) -> None:  # noqa: D102 - silence per-request noise
+    def log_message(self, *_args) -> None:
         return
 
     def _send(self, body: bytes, content_type: str) -> None:
@@ -172,7 +171,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler's name
+    def do_GET(self) -> None:
         if self.path.startswith("/shot.png"):
             try:
                 body, note = capture(self.target)
