@@ -2511,3 +2511,48 @@ founder raised in the same breath attacks it with none of these costs.
 The founder opens the rebuilt app and confirms the two things he asked for by eye:
 that a running harness now reads as lit in the graph, and that Facts/Path sit
 sensibly in the header.
+
+---
+
+## Session handoff — 2026-10-08, night
+
+**Full detail: `docs/HANDOVER-2026-10-08-NIGHT.md`. Read that one; this is the index.**
+
+### Completed this session
+
+- The build fix (`currentDirectoryURL` was not a real property) — the Swift build had
+  been broken and uncommitted.
+- The cockpit **watches** the machine every 2s while open and stops when closed (D-026).
+  Before this it read only on open/Refresh/after-a-setting, so working in a harness left
+  the panel describing a machine that had stopped existing.
+- The two-second **flicker** is fixed: a reading is adopted only when it differs. Found
+  by the founder — a rapid full-brightness flicker is a genuine photosensitivity hazard.
+- Facts and Path **carry their words**; as bare symbols they were unreadable.
+- **Headless CLIs** are recognised by the port they serve, not by six hardcoded names
+  (D-025). The comment justifying that list was an agent's rationalisation, never a
+  founder decision.
+- **Agents** are read by shape from any harness's `agents/` directory and unioned with
+  the existing store (D-023); agent **instances** are one root process with helpers
+  collapsed, and unnamed ones still count (D-024).
+- **D-022**: the Workspace row is removed. A workspace is where a harness is pointed.
+- `docs/WORKSPACE-IMPLEMENTATION.md` rewritten — it described a failed experiment as
+  shipped.
+- `script/phone_preview.py`: a live screen on the founder's phone over Tailscale.
+- **The tree is clean** for the first time since 6 October. 197 Python, 102 Swift.
+
+### Half-finished, and in what state
+
+- **The Inference row names the wrong model** (`Dirk` shown, `MiMo` is actually
+  loaded). Cause understood and written up: the chosen server cannot say which model
+  it serves, so `models[0]` is used as a guess. Fix written, **wording not approved**.
+- **Server priority** is still a fixed order, so Atomic Chat wins over oMLX. Same root
+  cause; not started.
+- `site/assets/` deliberately uncommitted — stale art on the landing page, branding
+  decision outstanding.
+- Two commits unpushed (`d9ff1fd`, `b818941`). Push needs his word.
+
+### The one thing to do first
+
+**Open `http://100.126.11.98:8766` on his phone.** Serve it with
+`python3 script/phone_preview.py`. He asked for a way to see a build and has never seen
+the app run; tell him whether it is usable or clumsy.
