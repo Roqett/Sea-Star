@@ -818,6 +818,18 @@ Summary of Changes:
 
 Harness: OpenCode
 
+Date: 2026-10-08 22:05 ACDT
+
+Summary of Changes:
+- `script/phone_preview.py` — **new. A screen on the phone, over the tailnet.** The founder asked for the one door this project lacked: a way to *see* a build rather than be told a build is fine, because he works away from this machine and needed it by 7:30am. Screen Sharing would do it, but needs a VNC client, a full desktop session and an interactive password prompt — the wrong shape for a glance between two jobs. This serves one picture of the cockpit over Tailscale, which is already installed and already carries this Mac and the founder's phone.
+- **Two decisions that are load-bearing, not incidental.** It binds to the **Tailscale address only**, never `0.0.0.0`: a screen is the most private thing this Mac owns, so the surface is reachable from the founder's own devices and nowhere else, and Tailscale's membership *is* the authorisation — no second lock to forget on a phone at 6am. Verified: the service is refused on loopback and answers only on the tailnet address. And it **prefers the cockpit's own window**, because a full-desktop capture works and would also hand over every other window, sticky note and notification on the machine; the whole-screen fallback is a deliberate last resort that the page *names*, so a blank panel is never ambiguous between a broken app and a closed one.
+- **Nothing is written to disk and nothing is logged.** Each request captures, serves and discards, so the history of what was on screen does not outlive the glance.
+- The page auto-refreshes every 4s, because the real question on a tractor is "is it still alive" and answering it should not need a second tap; it says which capture you are looking at and when it arrived. A failed capture returns the reason as plain text rather than a broken image.
+- Two bugs found and fixed while proving it, both caught by running it rather than reading it: an unescaped `{}` dict literal inside an f-string (SyntaxError on launch), and an em-dash in an HTTP header value, which is latin-1 and raised `UnicodeEncodeError` — so header values now carry no typographic punctuation.
+- **Note:** this reaches only devices on the tailnet. Remote Login and Screen Sharing are both still **off**, and enabling them needs sudo this agent does not have — a founder action in System Settings → General → Sharing.
+
+Harness: OpenCode
+
 Date: 2026-10-08 21:55 ACDT
 
 Summary of Changes:
