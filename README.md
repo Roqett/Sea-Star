@@ -26,6 +26,10 @@ Sea-Star does the same with your notes — and helps you find the right one.
 
 ## Documentation
 
+# 🚧 SeaStar (Work in Progress)
+
+> **Note:** SeaStar is currently under active pre-alpha development. It is not yet ready for production use, and code architecture is subject to rapid change.
+
 Four pages, one for wherever you're starting from. Start at the
 **[docs index](docs/README.md)** if you're unsure.
 
