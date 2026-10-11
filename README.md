@@ -15,9 +15,9 @@ One-click's ease. Nothing leaves your house.
 
 ***
 
-> *"Your own adventure to fair winds and following seas."*
-> — The Sea Star, 2289 3rd Street, Dogpatch, San Francisco
-> This cute snack also thanks Tom's dry dock around the corner. As it was.
+
+> — The Sea Star, 20th n 3rd, Dogpatch, SF, Ca,  USA
+> This cute snack also thanks Tom's drydock around the corner. As it was.
 
 A sea star holds on tight to its rock and doesn't let go.
 Sea-Star does the same with your notes — and helps you find the right one.
@@ -42,13 +42,13 @@ Four pages, one for wherever you're starting from. Start at the
 
 Right now you get to pick two of three:
 
-- **Powerful local agents** (Goose, Aider, custom stacks) — but configuring them is a weekend of YAML and silent failures.
+- **Powerful local Harnesses** (Opencode, Buzz, custom stacks) — but configuring them is a weekend of YAML and silent failures.
 
 - **One-click agents** (the frontier products) — but they're cloud, proprietary, and they read your notes.
 
 - **Your Obsidian vault as the brain** — but wiring Obsidian + a local model + an agent loop together is left as an exercise for the reader.
 
-**Sea-Star is the missing third option:** the zero-config, fully-local agent that treats your Obsidian vault as first-class memory, runs on whatever local model you already have, and plugs into whatever MCP host you already use.
+**Sea-Star is an AI Cockpit and the missing third option:** the zero-config, fully-local agent that treats your Obsidian vault as first-class memory, runs on whatever local model you already have, and plugs into whatever MCP host you already use.
 
 ## What it is
 
@@ -78,8 +78,8 @@ Sea-Star talks to any **OpenAI-compatible** local inference endpoint. That means
 Runtime-agnostic by contract. You never touch this layer again.
 
 ## The focused setup: Osaurus + Unsloth Studio
-
-Sea-Star is runtime-agnostic on purpose — but if you want the *specific* pairing that
+I built Sea-star after thinking it would be cool for an Osaurus (my fave harness that week ) agent.. just to hop over to Unsloth studio and do some fine tuning
+It is runtime-agnostic on purpose — but if you want the *specific* pairing that
 inspired it, this is the one: **Osaurus for the agent layer, Unsloth Studio for the
 model-and-skills layer, Sea-Star for the memory.**
 
@@ -115,11 +115,10 @@ is the third leg: it gives them a shared, private memory in your Obsidian vault.
 > Unsloth serves an OpenAI-compatible endpoint, Sea-Star consumes it, Osaurus calls Sea-Star.
 > If either app exposes a compatible endpoint, this works unchanged.
 
-And if you'd rather use a different harness tomorrow — LM Studio, Ollama, Claude
-Desktop — **nothing above changes.** That flexibility is the point.
+And if you'd rather use a different harness tomorrow — Buzz, Opencode
+Desktop, Deepseek Harness MacOS (omarchy soon .. ) — **nothing above changes.** That flexibility is the point.
 
-> **Zero-download shortcut (macOS 26+).** Osaurus ships an Apple on-device model called
-> `foundation`. Run `osaurus serve`, and you can skip Unsloth entirely: Sea-Star
+> **Zero-download shortcut (macOS 26+).** Osaurus ships AFM. Run `osaurus serve`, and you can skip Unsloth entirely: Sea-Star
 > autodetects Osaurus on `http://127.0.0.1:1337/v1` and uses `foundation` as the brain.
 > Two legs instead of three, and nothing to download.
 
@@ -239,7 +238,7 @@ This is the "Osaurus gets your memory" move. Register Sea-Star as an MCP server:
 - **Osaurus** — Settings › Tools › Connections › add the block above. Osaurus then
   exposes one tool, `ask_seastar`, to its agents.
 
-- **Claude Desktop / Cursor / TRAE** — the same block, in the app's `mcpServers` config.
+- **Opencode Desktop / Cursor / TRAE work** — the same block, in the app's `mcpServers` config.
 
 Now any agent in the host can ask *"what do I already know about X?"* and get your
 vault's answer, locally.
@@ -354,12 +353,12 @@ src/sea_star/
 
 ## The name
 
-There's a bar called **The Sea Star** at 2289 3rd Street, in the Dogpatch
-district of San Francisco. Its sign was an orange octopus.
-In its own words: *"House Octopus overseeing the antics? We've got one of those too!"*
+There's a bar called **The Sea Star** at 20th n 3rd, in the Dogpatch
+district of San Francisco. I stone's throw from the birthplace of GPT some 30 years later. The Builder spent some time there ( with a qwirky Grey timberwolf)..a long time ago.
+The Sea-stars in South Australia 's Spencer Gulf are just as colourful and EVERY single one : TOTALLY unique 
 
-That's the spirit. A sea star holds on tight to its rock and doesn't let go. Sea-Star
-does the same with your notes. The octopus is the house mascot.
+That's the spirit. A sea star holds on tight to its rock and doesn't let go. Those arms (or legs ) are independent, but connected :  Sea-Star
+does the same with your notes and lets you know the big picture.
 
 ## Contributing
 
@@ -372,8 +371,8 @@ MIT © Roqett / Up Periscope
 
 ***
 
-*Built by an Oz winemaker who bought an M4 Pro 64GB, got curious, and started a small
-software factory called* ***Up Periscope*** *to bump up diverse projects. Learned in public.*
+*Built by an Oz winemaker who as a lad bought a Sinclair Spectrum 16K (but only got as far as trying to copy "blue Monday ' in BASIC )..timewarp to pulling the pin after vintage 2025, upgraded to a M4pro Mini 64GB, and relearnt to build. an Indy-dev build is a lot like a mini vintage. 
+ Learnt in public.*
 
 *On the advice of the late Hunter S. Thompson — who said he hated recommending drugs, alcohol,
 or insanity to anyone... but admitted they'd always worked for him — we took the
