@@ -4,7 +4,7 @@
 
 # ⭐ Sea-Star
 
-**A private, local-first AI agent that lives in your Obsidian vault.**
+**A private, local-first AI agent  with a MacOS menubar cockpit that lives in your Obsidian vault.**
 One-click's ease. Nothing leaves your house.
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
