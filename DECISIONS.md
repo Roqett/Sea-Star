@@ -1737,3 +1737,65 @@ amendment to foundation §4 before implementation.
 
 A public, product-neutral sensor package would be independently valuable, or a real
 integration use case cannot be met by one-way borrowing and optional public contracts.
+
+
+---
+
+## D-029 — Instrument #5 uses hybrid context-truth preflight and honest unknowns
+
+**Date:** 2026-11-09 · **Status:** Accepted · **Tier:** 2 (architecture and inference UX)
+
+**Affects:** runtime discovery, inference, observability, future event vocabulary.
+
+**Founder input:** "Adopt the instrument #5 design direction."
+
+### The decision
+
+Sea-Star will assess declared-context overflow independently, without Redline or any
+private runtime dependency. `config.py` owns discovery of the effective context limit
+from the running server; documentation defaults are never substitutes for runtime facts.
+The runtime-configured limit and the model-advertised maximum remain separate values,
+each with its source and evidence basis. Unsupported or older runtimes yield `unknown`.
+Runtime-specific APIs, including Ollama `num_ctx`, must be verified locally before an
+adapter claims them; OpenAI-compatible context metadata is not assumed to be standard.
+
+`InferenceClient.chat()` owns preflight immediately before POST. Measurement covers the
+complete outgoing request structure: instructions, history, new user content, accumulated
+assistant and tool messages, tool schemas and choice configuration, model-specific framing
+where known, and an explicit `reserved_output_tokens` budget. Raw JSON size or the user
+prompt alone is not context truth. An absent reserve is unknown and prevents an exact
+`within` result, except where the input alone already proves overflow.
+
+Every assessment carries independent dimensions:
+
+- `status`: `within | over | unknown`.
+- `basis`: `exact | estimated | unknown`.
+
+Only `over / exact` blocks before POST, with a specific visible context-overflow error.
+Estimated overflow warns without claiming proof; unknown never masquerades as safe.
+Tokenizer mismatch and generic fallbacks cannot claim exactness. Post-response
+`finish_reason == "length"` is separate output-truncation evidence, not an input-preflight
+substitute.
+
+The transient event vocabulary may carry schema version, event identity and time, kind,
+endpoint and model, runtime and advertised limits, request and reserved-output tokens,
+status and basis, agent identity and evidence rung. It never carries prompts, outputs,
+tool arguments, tool results or serialized request bodies. This decision does not amend
+foundation §4 or authorise persistent JSONL; D-028's gate remains unchanged.
+
+### Consequences
+
+- No runtime limit is inferred from documentation, and no cloud tokenizer or request
+  content leaves the machine.
+- Tests must cover full-payload accounting, growing tool loops, exact boundaries,
+  estimated and unknown states, absent or older runtimes, missing output reserve,
+  no-content retention and separate output-length evidence.
+- KV-cache consumption, GPU and thermal physics, automatic intervention, silent history
+  trimming and persistent event storage are outside this instrument.
+- This adopts the design direction only; implementation remains separately commissioned
+  work.
+
+### Revisit when
+
+A runtime exposes a stronger standard context contract, or exact preflight cannot be
+implemented without changing the locked inference or configuration boundaries.

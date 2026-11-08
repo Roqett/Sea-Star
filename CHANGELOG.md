@@ -957,3 +957,13 @@ Summary of Changes:
 - `DECISIONS.md` — accepted D-028: Sea-Star and Redline share attribution patterns, never a private runtime dependency. Redline may borrow public sensor patterns one-way; intervention checks fail closed, and C-Star evidence never authorises an intervention.
 - `DECISIONS.md` — recorded the post-V1 direction for a generic, versioned JSONL runtime-event contract. Persistent events remain gated on a written foundation §4 amendment; no V1 scope was added.
 - `docs/PROGRESS.md` — recorded the decision, its safety clauses, and the standalone context-truth proposal as the next step.
+
+
+Harness: Kimi Work
+
+Date: 2026-11-09 08:30 ACDT
+
+Summary of Changes:
+- `DECISIONS.md` — accepted D-029: instrument #5 uses standalone hybrid context-truth preflight, full-request accounting, explicit output reserve, and independent status/evidence dimensions. Only proven overflow blocks; estimates warn and unknowns stay honest. No persistent events or private runtime dependency were added.
+- `docs/PROGRESS.md` — recorded D-028's push, D-029's adoption, and the successful cockpit verification after the founder repaired Xcode.
+- Verification: `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` succeeded; 107 Swift tests in 19 suites passed. The earlier Metal Toolchain blocker is resolved.

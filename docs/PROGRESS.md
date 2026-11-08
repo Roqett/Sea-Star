@@ -2704,3 +2704,26 @@ contains no content fields, and remains gated on the foundation §4 amendment.
 
 **Next step.** Prepare instrument #5 as a standalone context-truth proposal, with no
 Redline dependency and no persistent-event implementation before the §4 amendment.
+
+
+---
+
+## Session 2026-11-09 — instrument #5 adopted and cockpit verified (Kimi Work)
+
+**Published.** D-028, commit `88df8aa`, was pushed to
+`origin/feat/macapp-cockpit`. Only the GitHub `origin` remote was updated.
+
+**Decision recorded.** D-029 accepts the standalone instrument #5 design. Runtime context
+discovery belongs to `config.py`; full-request preflight belongs to
+`InferenceClient.chat()`. It uses an explicit output reserve and independent
+`within | over | unknown` / `exact | estimated | unknown` results. Only proven overflow
+blocks; estimates warn and unknowns never claim safety. No Redline dependency or
+persistent event stream is authorised, and implementation remains separate work.
+
+**Verified.** After the founder repaired Xcode, ran
+`xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test`.
+The app and test targets built, and **107 Swift tests in 19 suites passed**. This
+supersedes the earlier Metal Toolchain test blocker. No visual verification was performed
+in this session.
+
+**Next step.** Implement instrument #5 against D-029 when that work is commissioned.
