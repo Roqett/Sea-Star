@@ -2736,3 +2736,43 @@ D-029 (`df2aa67`) was pushed to `origin/feat/macapp-cockpit`. Existing draft pul
 D-029; no duplicate pull request was created. The pull request remains a draft awaiting
 founder review and merge. No code changed in this publication update, so the successful
 107-test verification recorded above remains the relevant result.
+
+
+---
+
+## Session 2026-11-09 — observability design reconciliation (Kimi Work)
+
+**Writing and evidence only.** Read `INBOX/sea-star-harness-observability-deep-analysis-macos (4).md`
+in full, reconciled all seven instruments, and left code, README and draft PR #2 untouched.
+Instruments 1–4 and 7 are partial; instruments 5 and 6 are missing. D-029 remains design
+only, with none of its ten implementation tests present.
+
+**Conflicts kept explicit.** The design says “five instruments” but lists seven; its
+same-user-only assumption is false on this machine; instrument #5 retains older
+memory-pressure and uncertain-tokenisation wording beside D-029's narrower approved
+scope; and `providers.py` parses whole JSON config files before deriving safe fields,
+which needs reconciliation with the design's stricter “secret-bearing files are never
+read” rule. The candidate UI deliberately lives in onboarding (D-012), although the
+founder's reconciliation note called it the cockpit feed.
+
+**Live port evidence.** On 2026-11-09, `lsof` proved Nick's `omlx-server` (PID 14859,
+parent `/Applications/oMLX.app` PID 14848) listens on 1337; `/v1/models` on both 1337
+and 8000 answers `owned_by: omlx`. Port 8009 refused connection. A second oMLX process
+pair runs as `ottoparts`; same-user `lsof` cannot bind the 8000 listener directly, so its
+socket owner remains inferential rather than proven. The bridge correctly reports oMLX on
+1337. README's fixed Osaurus/1337 shortcut does not survive as a blanket claim; oMLX/8000
+survives only as a configurable default hint.
+
+**Gate evidence.** Per-agent/per-request attribution is unbuilt; `Vault.scan()` still
+reads every note and `cli.py` calls it for `note_count`; `detect_agent_instances()` has no
+caller and the live bridge returned an empty roster; instrument #5 and its ten tests are
+absent; the three-state Live/Running/Idle UI run was not performed. Current `doctor --json`
+completed against the four-note local vault and supplied Live-state evidence only.
+
+**Verification.** `uv run pytest`: **197 passed, 1 failed** —
+`test_doctor_json_fails_loud_with_one_object` expected no vault but resolved the global
+TOML vault and exited 0. No retry or fix attempted. `uv run ruff check .`: clean. The
+previously verified 107 Swift tests remain the latest macOS result.
+
+**Next step.** Founder reviews the gate evidence and commissions implementation separately.
+Draft PR #2 remains on hold and must be remembered at the next publishing decision.
