@@ -2727,3 +2727,12 @@ supersedes the earlier Metal Toolchain test blocker. No visual verification was 
 in this session.
 
 **Next step.** Implement instrument #5 against D-029 when that work is commissioned.
+
+
+### Publication update — 2026-11-09
+
+D-029 (`df2aa67`) was pushed to `origin/feat/macapp-cockpit`. Existing draft pull request
+[#2](https://github.com/Roqett/Sea-Star/pull/2), targeting `main`, now includes D-028 and
+D-029; no duplicate pull request was created. The pull request remains a draft awaiting
+founder review and merge. No code changed in this publication update, so the successful
+107-test verification recorded above remains the relevant result.
