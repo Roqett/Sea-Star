@@ -805,7 +805,24 @@ final class ServerController {
             rollIcon()
         } else if startServer(command) {
             rollIcon()
+            // Starting the engine is the moment the founder described as "when
+            // you click Start": worth showing everything the machine offers
+            // before it settles into what is in play.
+            handReads += 1
         }
+    }
+
+    /// Bumped when a reading is asked for by hand — Start or Refresh. The pool
+    /// watches this to replay its intro swarm. The background poll deliberately
+    /// does not bump it, so the pool never twitches on its own.
+    private(set) var handReads = 0
+
+    /// Ask the engine for a reading because a person asked, not because a timer
+    /// did. Separate from `refresh()` so the difference is visible where it is
+    /// made rather than inferred from a caller.
+    func reread() async {
+        handReads += 1
+        await refresh()
     }
 
     /// Move to a face that isn't the current one — the "open and shut" reroll.

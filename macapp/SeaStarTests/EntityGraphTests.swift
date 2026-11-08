@@ -739,11 +739,14 @@ enum Fixture {
     static func report(
         ready: Bool = true,
         model: String = "qwen3",
+        models: [String]? = nil,
         agents: Bool = true,
         latent: Bool = true,
         attached: Bool = true,
         extraJSON: String = ""
     ) throws -> DoctorReport {
+        let catalogue = models ?? ["qwen3", "qwen3-tiny"]
+        let catalogueJSON = "[" + catalogue.map { "\"\($0)\"" }.joined(separator: ", ") + "]"
         let json = """
         {
           "schema_version": 1,
@@ -758,13 +761,13 @@ enum Fixture {
           "runtime": "osaurus",
           "base_url": "http://127.0.0.1:1337/v1",
           "model": "\(model)",
-          "models": ["qwen3", "qwen3-tiny"],
+          "models": \(catalogueJSON),
           "runtimes": [
             {
               "name": "osaurus",
               "base_url": "http://127.0.0.1:1337/v1",
               "model": "\(model)",
-              "models": ["qwen3", "qwen3-tiny"]
+              "models": \(catalogueJSON)
             },
             {
               "name": "omlx",
@@ -861,6 +864,7 @@ enum Fixture {
     static func controller(
         ready: Bool = true,
         model: String = "qwen3",
+        models: [String]? = nil,
         agents: Bool = true,
         latent: Bool = true,
         attached: Bool = true,
@@ -871,6 +875,7 @@ enum Fixture {
             try! report(
                 ready: ready,
                 model: model,
+                models: models,
                 agents: agents,
                 latent: latent,
                 attached: attached,
@@ -1218,5 +1223,55 @@ struct ConfiguredProviderTests {
         let subject = Fixture.controller()
         #expect(subject.declaredProvider(forHarnessNamed: "OpenCode") == nil)
         #expect(subject.report?.declaredProviders.isEmpty == true)
+    }
+}
+
+/// The intro swarm (D-014). The founder's brief, 2026-10-23: *"it looked so cool
+/// when I first saw it … keep the visualisation but just have it fade down like
+/// compact, like within a few seconds … the actual graphical effect of that ring
+/// was pretty amazing, like a Dyson swarm."*
+///
+/// So the ring of every offered model is kept as the opening beat, and the
+/// standing reading is what is in play. These tests pin the boundary: the swarm
+/// is drawn, it is never a thing you can land on, and it is never part of what a
+/// focused node calls its neighbourhood.
+@Suite("The catalogue opens as a swarm, then settles to what is in play")
+@MainActor
+struct GraphSwarmTests {
+    private func catalogue(_ count: Int) -> [String] {
+        (0..<count).map { "catalogue-\($0)" } + ["qwen3"]
+    }
+
+    @Test("a catalogue small enough to read never blooms")
+    func smallCatalogueDoesNotBloom() {
+        // Three models is a ring, not a crowd: nothing is hidden from the
+        // standing reading, so there is no intro to play.
+        #expect(EntityGraphModel(controller: Fixture.controller()).bloomIDs.isEmpty)
+    }
+
+    @Test("a big catalogue blooms, and settles to six")
+    func bigCatalogueBlooms() {
+        let model = EntityGraphModel(controller: Fixture.controller(models: catalogue(40)))
+        #expect(model.nodes.filter { $0.kind == .model }.count == 41)
+        #expect(model.bloomIDs.count == 41 - EntityGraphModel.curatedModelCount)
+        // Every model is still drawn — the swarm is a matter of *when*, not of
+        // pretending the catalogue is smaller than it is.
+        #expect(model.bloomIDs.allSatisfy { $0.hasPrefix("model:") })
+    }
+
+    @Test("the model answering now survives the compaction")
+    func theAnsweringModelStays() {
+        let model = EntityGraphModel(controller: Fixture.controller(models: catalogue(40)))
+        #expect(!model.bloomIDs.contains("model:qwen3"))
+    }
+
+    @Test("the swarm is never part of a neighbourhood")
+    func swarmIsNeverANeighbour() {
+        // Focusing the endpoint must not drag forty ghost models into the focus
+        // reading — they are scenery, and scenery does not have edges.
+        let model = EntityGraphModel(controller: Fixture.controller(models: catalogue(40)))
+        let neighbours = model.neighbours(of: "inference:http://127.0.0.1:1337/v1")
+        #expect(neighbours.filter { $0.hasPrefix("model:") }.count <= 6)
+        #expect(neighbours.isDisjoint(with: model.bloomIDs))
     }
 }

@@ -408,6 +408,12 @@ struct EntityGraphView: View {
     /// Whether the tip note is open beside the active starfish. Tapping that
     /// starfish expands and contracts it (spec §8.7).
     @State private var tipExpanded = true
+    /// The intro swarm: every model the server offers is drawn for the first few
+    /// seconds and then compacts to the ones in play (D-014). `bloomFade` drives
+    /// the shrink-and-fade; `bloomOn` is the switch that stops the extras being
+    /// drawn at all once they are gone.
+    @State private var bloomOn = false
+    @State private var bloomFade: Double = 1
     /// The entity the person has zoomed into with a double click (spec §8.7).
     /// While focused, its neighbourhood rings it and every unrelated star fades
     /// back, so the pool reads as *one* thing and what it touches rather than the
@@ -455,11 +461,21 @@ struct EntityGraphView: View {
                 .simultaneously(with: rotateGesture)
         )
         .help(Strings.Views.panHint)
-        .onAppear { growConnection() }
+        .onAppear {
+            growConnection()
+            replayBloom()
+        }
         .onChange(of: activeInferenceID) { _, _ in
             growConnection()
             tipExpanded = true
         }
+        // The swarm replays when the person asks for a fresh reading by hand, and
+        // when the catalogue itself changes — a harness booting is exactly the
+        // moment worth seeing everything at once. It deliberately does *not*
+        // replay on the background poll, which would make the pool twitch while
+        // nobody asked it anything.
+        .onChange(of: controller.handReads) { _, _ in replayBloom() }
+        .onChange(of: nodes.count) { _, _ in replayBloom() }
     }
 
     /// The pool at one instant: the faint star outline, the connection ribbon,
@@ -483,8 +499,14 @@ struct EntityGraphView: View {
                     focusEdgeLayer(points, liveNodes: liveNodes)
                 }
                 ForEach(drawOrder) { node in
-                    if let point = points[node.id] {
-                        nodeView(node, at: point, time: time, animated: animated)
+                    if let point = points[node.id], bloomOn || !model.bloomIDs.contains(node.id) {
+                        nodeView(
+                            node,
+                            at: point,
+                            time: time,
+                            animated: animated,
+                            bloomFade: model.bloomIDs.contains(node.id) ? bloomFade : 1
+                        )
                     }
                 }
                 if focused == nil {
@@ -494,7 +516,11 @@ struct EntityGraphView: View {
             .onContinuousHover { phase in
                 switch phase {
                 case .active(let location):
-                    hovered = Self.hitNode(at: location, nodes: drawOrder, positions: points)?.id
+                    // The intro swarm is scenery, not handles: a star that is
+                    // about to vanish must never become the thing the card is
+                    // describing.
+                    let landable = drawOrder.filter { !model.bloomIDs.contains($0.id) }
+                    hovered = Self.hitNode(at: location, nodes: landable, positions: points)?.id
                 case .ended:
                     hovered = nil
                 }
@@ -578,6 +604,27 @@ struct EntityGraphView: View {
         } else {
             connectProgress = 0
             withAnimation(.easeOut(duration: 0.5)) { connectProgress = 1 }
+        }
+    }
+
+    /// Play the intro swarm: everything the server offers, held long enough to be
+    /// seen, then compacted to the models in play. Off entirely under Reduce
+    /// Motion — this is decoration with a message, and the message survives
+    /// without the movement.
+    private func replayBloom() {
+        guard !model.bloomIDs.isEmpty, !reduceMotion else {
+            bloomOn = false
+            bloomFade = 1
+            return
+        }
+        bloomOn = true
+        bloomFade = 1
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_400_000_000)
+            withAnimation(.easeInOut(duration: 2.6)) { bloomFade = 0 }
+            try? await Task.sleep(nanoseconds: 2_800_000_000)
+            bloomOn = false
+            bloomFade = 1
         }
     }
 
@@ -950,7 +997,8 @@ struct EntityGraphView: View {
         _ node: GraphNode,
         at point: CGPoint,
         time: Double,
-        animated: Bool
+        animated: Bool,
+        bloomFade: Double
     ) -> some View {
         let isActive = hovered == node.id || selected == node.id
         // In a focus reading, the focused star and its neighbours stay lit while
@@ -972,7 +1020,8 @@ struct EntityGraphView: View {
         // drawing. Steady, never pulsing: the breath is reserved for work, and
         // being up is not the same as carrying it.
         let isUpNotLive = !node.isLive && node.rung?.isUp == true
-        let presence: Double = (unproven ? (isUpNotLive ? 0.72 : 0.5) : 1) * (faded ? 0.12 : 1)
+        let presence: Double =
+            (unproven ? (isUpNotLive ? 0.72 : 0.5) : 1) * (faded ? 0.12 : 1) * bloomFade
         // A slow breath in the glow, each orb on its own phase. Only a node that
         // actually answered breathes — a still one is telling you nothing is on
         // its port, which is a fact, not a lack of decoration.
@@ -1007,7 +1056,12 @@ struct EntityGraphView: View {
             }
         }
         .opacity(presence)
-        .scaleEffect(isFocused ? 1.7 : (isActive ? 1.25 : 1))
+        // The swarm compacts rather than merely switching off: each extra model
+        // shrinks into its own centre as it goes. Held apart from the focus and
+        // hover scales so a passing hover can never resurrect one.
+        .scaleEffect(
+            (isFocused ? 1.7 : (isActive ? 1.25 : 1)) * (0.3 + 0.7 * bloomFade)
+        )
         .overlay(alignment: .bottom) {
             if isActive || inFocus {
                 Text(node.title)

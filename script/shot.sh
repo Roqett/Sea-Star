@@ -59,8 +59,35 @@ mkdir -p "$OUT"
 
 # Open it if closed. `SeaStar.cockpitOpen` is written by the popover's own
 # show/close delegate, so it is the honest signal rather than a guess.
+#
+# Two ways to open, tried in order:
+#   1. A distributed notification the app listens for (debug builds only).
+#      Works without assistive access.
+#   2. AppleScript clicking the status item. Needs assistive access granted
+#      to the terminal; silently does nothing without it.
 open_cockpit() {
-  osascript -e 'tell application "System Events" to tell process "Sea-Star" to click menu bar item 1 of menu bar 1' >/dev/null 2>&1 || true
+  # A tiny Swift helper posts the distributed notification the app listens for.
+  # Compiled on first use and cached in the output directory.
+  local helper="$OUT/.toggle-notif"
+  if [ ! -x "$helper" ]; then
+    cat > "$helper.swift" <<'SWIFT'
+import Cocoa
+DistributedNotificationCenter.default().post(
+    name: NSNotification.Name("UpPeriscope.Sea-Star.toggle"),
+    object: "shot.sh"
+)
+SWIFT
+    swiftc -o "$helper" "$helper.swift" 2>/dev/null || true
+    rm -f "$helper.swift"
+  fi
+  if [ -x "$helper" ]; then
+    "$helper" >/dev/null 2>&1 || true
+  fi
+  # If the notification didn't open it (release build, or app not listening),
+  # fall back to the AppleScript click.
+  if [ "$(defaults read "$DOMAIN" SeaStar.cockpitOpen 2>/dev/null || echo 0)" != "1" ]; then
+    osascript -e 'tell application "System Events" to tell process "Sea-Star" to click menu bar item 1 of menu bar 1' >/dev/null 2>&1 || true
+  fi
 }
 
 if [ "$(defaults read "$DOMAIN" SeaStar.cockpitOpen 2>/dev/null || echo 0)" != "1" ]; then

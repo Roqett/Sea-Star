@@ -240,7 +240,7 @@ async def _build_report() -> dict:
                 # like one. Both are reported; only one may be stated as fact.
                 "answering": service.port in answered_ports,
             }
-            for service in model_like_services(known_apps=recognised)
+            for service in model_like_services(known_apps=recognised, answered_ports=answered_ports)
         ],
         # What each harness *says* it gets its models from. A declaration, not a
         # connection: it is the one link of the cascade no port probe can show,

@@ -278,10 +278,11 @@ def outbound_connections() -> tuple[OutboundConnection, ...]:
 
 def model_like_services(
     known_apps: Iterable[str] = (),
+    answered_ports: Iterable[int] = (),
 ) -> tuple[ListeningService, ...]:
     """Loopback services that are inference, judged without a list of app names.
 
-    A service qualifies on either of two honest grounds:
+    A service qualifies on any of three honest grounds:
 
     1. **Its process tree speaks runtime vocabulary.** ``llama``, ``mlx``,
        ``ollama``, ``vllm`` — words that appear in the command line of something
@@ -291,19 +292,27 @@ def model_like_services(
     2. **Its owning app is one this machine has already agreed is a harness.**
        That set comes from the caller (the register the person built by naming
        things), so Sea-Star never has to guess a name to recognise a friend.
-
-    Whether a port actually *answers* with a model list is a separate question
-    and belongs to :mod:`sea_star.config`, which is the only place allowed to
-    speak HTTP. This function is a read of the machine, so it stays offline.
+    3. **Its port answered with a model list.** This is the load-bearing case:
+       the whole point of listening to every port is to find things the
+       vocabulary and register do not yet know about. A port that proved it
+       serves models is model-like by definition, regardless of what its
+       process is called. ``answered_ports`` comes from the caller that
+       actually spoke HTTP (:mod:`sea_star.config`), because this module's
+       job is to read the machine, not to make network requests.
     """
 
     agreed = {name.casefold() for name in known_apps}
+    answered = {int(port) for port in answered_ports}
     return tuple(
         service
         for service in listening_services()
         if service.is_loopback
         and not _excluded(service.app_path)
-        and (_speaks_runtime_vocabulary(service) or _in_register(service, agreed))
+        and (
+            _speaks_runtime_vocabulary(service)
+            or _in_register(service, agreed)
+            or service.port in answered
+        )
     )
 
 
@@ -346,7 +355,7 @@ def _in_register(service: ListeningService, agreed: set[str]) -> bool:
 #: Words that appear in the process tree of something serving a model, and
 #: almost nowhere else. Runtime families only — never a product list. A model
 #: server that names no runtime still gets found by its app, via the register
-#: the person keeps.
+#: the person keeps, or by having answered ``/v1/models`` on its port.
 MODEL_VOCABULARY: tuple[str, ...] = (
     "llama",
     "ggml",
@@ -359,6 +368,34 @@ MODEL_VOCABULARY: tuple[str, ...] = (
     "text-generation",
     "inference-server",
     "model-server",
+    # Common server process names — added so the vocabulary covers the
+    # products people actually run, not just the families. See
+    # ``docs/known-harnesses.md`` for the full reference.
+    "unsloth",
+    "kobold",
+    "tabby",
+    "jan",
+    "gpt4all",
+    "localai",
+    "llamafile",
+    "deepseek",
+    "qwen",
+    "mistral",
+    "phi",
+    "gemma",
+    "starcoder",
+    "codestral",
+    "magicoder",
+    "nomic",
+    "bge",
+    "minilm",
+    "llava",
+    "internvl",
+    "molmo",
+    "granite",
+    "jamba",
+    "solar",
+    "yi-",
 )
 
 
@@ -384,7 +421,7 @@ def machine_summary(
     """
 
     names = tuple(known_apps)
-    model_ports = {service.port for service in model_like_services(known_apps=names)}
+    model_ports = {service.port for service in model_like_services(known_apps=names, answered_ports=answering)}
     lines: list[str] = []
 
     servers = [
@@ -500,7 +537,7 @@ def harness_ledger(
 
     proved = frozenset(answering)
     names = tuple(known_apps)
-    model_ports = {service.port for service in model_like_services(known_apps=names)}
+    model_ports = {service.port for service in model_like_services(known_apps=names, answered_ports=answering)}
     table = process_table()
 
     my_servers: dict[str, set[int]] = {}

@@ -915,3 +915,19 @@ Summary of Changes:
 - `docs/HANDOVER-2026-10-08.md` — **new.** The cold-start handover for the session the founder asked for, superseding the 2026-10-02 snapshot in `NEXT-SESSION.md` (which is kept and relabelled as history). Nine sections: the state in one screen; how the session started and what the review found; the founder's decisions; what was built, with the three findings from the provider reader that matter more than the feature; **what is uncommitted and the four suggested commits**; what needs his eyes versus what is verifiable from code; loose ends; the traps; and the single next step. Records that the app was **not running** at handover and must be started before any visual check, and that `docs/WORKSPACE-IMPLEMENTATION.md` contradicts his decision not to display the Workspace row.
 - `docs/README.md` — the "start here" door now points at the 2026-10-08 handover, with `NEXT-SESSION.md` explicitly relabelled as the superseded 2026-10-02 snapshot kept for history.
 - No code changed. **179 Python tests, 102 Swift tests in 18 suites, ruff clean.**
+
+Harness: DeepSeek Harness
+
+Date: 2026-10-23 14:20 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/EntityGraphModel.swift` — added `bloomIDs` and `curatedModelCount`:
+  the models that wait their turn, and the six the standing reading keeps (D-027).
+- `macapp/SeaStar/Views/EntityGraphView.swift` — the intro swarm: every visible model is
+  drawn, then all but six fade over ~5 s; replays when the machine's contents change, and
+  from Refresh only. Bloomed nodes are excluded from placement, hit-testing and focus.
+- `macapp/SeaStar/Services/ServerController.swift` — `handReads` so a human Refresh can
+  replay the beat while the 2-second poll cannot.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — the fixture takes a catalogue; four tests
+  pin the swarm's boundary (no bloom when small, six kept, the answering model always kept,
+  the swarm never a neighbour).

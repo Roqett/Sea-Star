@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureStatusItem()
         configurePopover()
+        installDebugToggle()
         // The popover genuinely starts closed at launch, so say so. `SeaStar.cockpitOpen`
         // otherwise survives a relaunch from the previous session and reports "open"
         // for a popover that does not exist — which is how `script/shot.sh` came to
@@ -106,6 +107,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             popover.contentViewController?.view.window?.makeKey()
             NSApp.activate()
         }
+    }
+
+    /// A development-only hook so a script can open and close the cockpit
+    /// without assistive access. Listens for a distributed notification named
+    /// `UpPeriscope.Sea-Star.toggle`; sending it flips the popover. This is not
+    /// shipped surface — it exists so `script/shot.sh` works on machines where
+    /// the terminal lacks assistive-access permission, and it is removed before
+    /// any release build.
+    private func installDebugToggle() {
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleDebugToggle(_:)),
+            name: NSNotification.Name("UpPeriscope.Sea-Star.toggle"),
+            object: nil
+        )
+    }
+
+    @objc private func handleDebugToggle(_ notification: Notification) {
+        togglePopover()
     }
 
     // The SDK's NSPopoverDelegate takes a Notification (macOS 14+). The old

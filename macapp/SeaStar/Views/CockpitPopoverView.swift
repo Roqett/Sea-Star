@@ -516,7 +516,7 @@ struct CockpitPopoverView: View {
                 title: Strings.Actions.refresh,
                 enabled: !controller.isRefreshing
             ) {
-                Task { await controller.refresh() }
+                Task { await controller.reread() }
             }
         }
         .padding(.horizontal, 2)

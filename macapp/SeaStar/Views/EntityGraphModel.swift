@@ -629,8 +629,47 @@ struct EntityGraphModel {
             }
         }
         let known = Set(nodes.map(\.id))
-        return related.intersection(known).subtracting([id])
+        // The intro swarm is not part of the standing reading: it exists for the
+        // first seconds of a session and then compacts away. If it leaked into
+        // this set, focusing an endpoint would drag hundreds of ghost models into
+        // the neighbourhood with it.
+        return related.intersection(known).subtracting(bloomIDs).subtracting([id])
     }
+
+    /// The models drawn only during the intro swarm.
+    ///
+    /// The founder's brief (2026-10-23): a server with a big catalogue should
+    /// open as everything it offers — his words, "like a Dyson swarm" — and then
+    /// compact, within a few seconds, to what is actually in play. Drawing all of
+    /// them for ever was the defect: a server advertising 788 models turned the
+    /// model ring into a wreath of identical marks that named nothing, which is
+    /// the bare-count failure he has been asking this cockpit not to make.
+    var bloomIDs: Set<String> {
+        let curated = Set(curatedModels)
+        return Set(controller.modelOptions.filter { !curated.contains($0) }.map { "model:\($0)" })
+    }
+
+    /// What is *in play*: the model answering now, the models a persona rides,
+    /// and a few more besides — because a catalogue of three should still read as
+    /// a ring, and a catalogue of eight hundred should not read as a necklace.
+    private var curatedModels: [String] {
+        let options = controller.modelOptions
+        let current = controller.report?.model
+        let ridden = Set(controller.agentOptions.compactMap(\.model))
+        var keep: [String] = []
+        if let current, options.contains(current) { keep.append(current) }
+        for name in options where ridden.contains(name) && !keep.contains(name) {
+            keep.append(name)
+        }
+        for name in options where keep.count < Self.curatedModelCount && !keep.contains(name) {
+            keep.append(name)
+        }
+        return keep
+    }
+
+    /// How many models stay on the ring once the swarm has settled. Six is a
+    /// ring you can read at pool size; more turns back into a crowd.
+    static let curatedModelCount = 6
 
     /// What a harness declares it gets models from, matched onto the graph by
     /// identity. `nil` when the harness declares nothing — which is a real answer

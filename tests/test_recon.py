@@ -172,14 +172,16 @@ def test_the_register_matches_by_identity_not_by_label(tmp_path, monkeypatch):
     have to be enough.
     """
 
-    app = tmp_path / "Unsloth Studio.app"
+    app = tmp_path / "Some Studio.app"
     contents = app / "Contents"
     contents.mkdir(parents=True)
     with (contents / "Info.plist").open("wb") as handle:
         plistlib.dump(
-            {"CFBundleIdentifier": "ai.unsloth.studio", "CFBundleName": "Unsloth"}, handle
+            {"CFBundleIdentifier": "ai.some.studio", "CFBundleName": "SomeApp"}, handle
         )
-    ps = f"  300     1 {app}/Contents/MacOS/unsloth-studio\n"
+    # Process and app names deliberately avoid vocabulary words so the register
+    # is the only path to recognition.
+    ps = f"  300     1 {app}/Contents/MacOS/studio-runner\n"
     listen = "p300\ncpython3.13\nn127.0.0.1:8888\n"
 
     def fake_run(command, timeout=10):
@@ -191,7 +193,7 @@ def test_the_register_matches_by_identity_not_by_label(tmp_path, monkeypatch):
 
     # Found by the app's own display name, by the folder name, and by the path —
     # the folder is what both sides agree on when the labels differ.
-    for entry in ("Unsloth", "Unsloth Studio", str(app)):
+    for entry in ("SomeApp", "Some Studio", str(app)):
         assert {s.port for s in model_like_services(known_apps=[entry])} == {8888}, entry
 
     # A name that matches nothing still matches nothing: the register widens
@@ -202,6 +204,22 @@ def test_the_register_matches_by_identity_not_by_label(tmp_path, monkeypatch):
 def test_a_network_port_is_never_called_local_inference(machine):
     found = {service.port for service in model_like_services(known_apps=["other"])}
     assert found == set()
+
+
+def test_answered_port_is_inference_regardless_of_name(machine):
+    """A port that proved it serves models is model-like by definition.
+
+    This is the load-bearing case: the whole point of listening to every port
+    is to find things the vocabulary and register do not yet know about. A
+    process called ``python3`` on port 8123 with no register entry and no
+    runtime vocabulary is still inference when it answered ``/v1/models``.
+    """
+
+    # Without answered_ports, the silent python3 on 8123 is invisible.
+    assert {s.port for s in model_like_services()} == set()
+    # With it answered, it is recognised.
+    found = {s.port for s in model_like_services(answered_ports=[8123])}
+    assert found == {8123}
 
 
 # --- outbound --------------------------------------------------------------

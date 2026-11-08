@@ -2598,3 +2598,31 @@ packs models and personas onto their anchors. That is a judgement call, not a nu
 The wrong model name (Inference says Dirk, truth is MiMo) — needs only his nod on the
 wording. Server priority, same root cause. Panel wording. `site/assets/` uncommitted.
 Spec `D3`, founder-only. **6 commits unpushed** — his word.
+
+---
+
+## Session 2026-10-23 — the intro swarm (DeepSeek Harness)
+
+**What this session did.** Answering the founder's own note about the ring in his
+screenshot: it was 788 model nodes from one local server, all drawn at once. That is why it
+looked like a Dyson swarm and why it was unusable. His instruction was to keep it and let it
+settle, so the graph now opens with every model drawn, then fades to the six that are in
+play (D-027). Faded models are scenery only: no hit-test, no placement, no focus edges.
+
+**Verified.** 106 Swift tests in 19 suites pass. Seen on screen at small scale: the pool
+opens with ten model stars and settles to six, because oMLX carries ten today. At the 788
+scale that produced the original ring, the same code draws the full swarm.
+
+**Not verified by eye.** The 788-scale beat, because no server on this machine carries that
+many models right now. A throwaway stand-in answering `/v1/models` with 120 names was tried
+and is a bad idea — the recon correctly filed it as a real endpoint and it polluted the
+pool. Removed.
+
+**Half-finished.** Nothing in this change. The founder's open questions from before it
+stand: graph renderer (SceneKit room vs bundled offline web canvas), Stack vs Chain, and
+the harness→agent roster engine work.
+
+**Next step.** Get it in front of him. The 2026-10-02 handover's one next step was never
+done — "Start a local model, open the cockpit with the founder, and read the three surfaces
+together" — because everything had only been checked by tests and by measuring the screen.
+That is still the next step.

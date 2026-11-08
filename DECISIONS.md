@@ -1629,3 +1629,59 @@ photosensitive users, not an irritation** — and it would have shipped unflagge
 ### Revisit when
 
 The 2-second interval proves too eager on battery, or too slow to feel live.
+
+---
+
+## D-027 — The catalogue opens as a swarm, and settles to what is in play
+
+**Date:** 2026-10-23 · **Founder:** in session · **Tier:** 3 (what the graph says)
+
+### The decision
+
+When the cockpit opens — and again whenever the machine's contents change — **every model
+the pool can see is drawn for about 2.4 seconds, then all but six fade out** over roughly
+2.6 seconds. The six kept are: the model answering now, any model an agent is riding, then
+announced names until six. The rest are not gone from the reading: the pool draws them
+again if the catalogue changes, and the endpoint's text card still states the true count.
+
+A faded model is **not hit-testable, not placed in the pool, and never part of a
+neighbourhood**. It is scenery for five seconds, not a thing you can land on.
+
+### Context
+
+The founder's brief, verbatim:
+
+> "The thing is though, it looked so cool when I 1st saw it, so maybe keep the visualisation
+> but just have it fade down like compact, like within a few seconds, you know what I mean,
+> to where it's at with what you're suggesting. The actual graphical effect of that ring was
+> pretty amazing, like a Dyson swarm. So I guess, you know, when that harness boots up, even
+> if it's not currently active, if it's been opened, when you click on C start, you just get
+> that intro snapshot of sort of what's around, even if it's not highly active and as you
+> said, it's much more useful to have that going on."
+
+Before this, one local server offering 788 models put all 788 on the pool at once as a dense
+pale ring — the large "circle" in his screenshot. It read as beauty and as scale, and it was
+also unusable: the pool it sat in had no room to say anything else.
+
+So the ring is not wrong, it is **misplaced in time**. As an opening beat it is the only
+honest way to show how much a server actually carries; as a standing state it buries the
+reading. D-014's rule — the standing reading is what is in play — survives intact, and the
+founder's affection for the effect is served rather than overruled.
+
+### Consequences
+
+- `EntityGraphModel.bloomIDs` is the set that awaits its turn; `curatedModelCount = 6`.
+- `EntityGraphView` owns the sequence (`hold` / `fade` constants) and replays it when
+  `nodes.count` changes, so a harness sitting down or a new endpoint answering gets the
+  same opening beat.
+- Bloomed nodes are excluded from placement, hit-testing and `neighbours(of:)`; a focus
+  reading can never drag forty ghosts into the panel.
+- `ServerController.handReads` lets Refresh replay the beat on a human request only — the
+  2-second poll never restarts it (D-026's no-flicker rule).
+- 106 Swift tests in 19 suites pass, including four that pin the boundary.
+
+### Revisit when
+
+A catalogue of ten (what oMLX carries today) shows only four extra stars, so the effect is
+barely visible at small scale. If the founder wants it to linger, the numbers to move are
+`hold` and `fade` in `EntityGraphView`.
