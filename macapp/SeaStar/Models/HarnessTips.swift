@@ -20,7 +20,10 @@ struct HarnessTip: Equatable, Sendable {
 ///
 /// It decides *one* thing to say, in priority order: a never-seen harness comes
 /// first (it needs configuring), then a wrong-vault nudge, then the plain
-/// "connected" note for a harness the person already knows.
+/// "connected" note for a harness the person already knows. The wrong-vault
+/// nudge yields once it has been acknowledged for the vault in question —
+/// before that it outranked everything and sat on the pool permanently, which
+/// the founder read as a hazy box that never leaves.
 enum HarnessTips {
     static func tip(
         inferenceName: String,
@@ -28,12 +31,13 @@ enum HarnessTips {
         isReady: Bool,
         model: String,
         vaultName: String,
-        otherVaults: Int
+        otherVaults: Int,
+        wrongVaultAcknowledged: Bool = false
     ) -> HarnessTip? {
         if isNew {
             return HarnessTip(kind: .fresh, body: Strings.Tips.newHarness(inferenceName))
         }
-        if otherVaults > 0 {
+        if otherVaults > 0 && !wrongVaultAcknowledged {
             return HarnessTip(
                 kind: .wrongVault,
                 body: Strings.Tips.wrongVault(vaultName, otherVaults)

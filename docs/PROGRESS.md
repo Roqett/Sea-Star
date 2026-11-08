@@ -2664,3 +2664,24 @@ cockpit with the founder, and read the three surfaces together.
 
 **Next step.** Await the brief; then consolidate → residual defects →
 Receptacle → semantic recall, per the vision document.
+
+
+---
+
+## Session 2026-11-08 — cockpit window and persistent-notice cleanup (Kimi Work)
+
+**What was pending and is now being published.** Eight existing macOS files form one
+coherent cockpit change: the reading can detach into a movable, resizable window whose
+frame is remembered; the popover and graph notice use opaque backgrounds instead of
+hazy translucency; and the wrong-vault notice can be acknowledged for the current vault,
+allowing the ordinary connected note through. Switching vaults may raise the question
+again. One Swift test was added for the acknowledgement fall-through.
+
+**Verification limit.** Ran `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar
+-destination 'platform=macOS' test`. The build failed before any test ran because the
+Metal Toolchain is not installed (`xcodebuild -downloadComponent MetalToolchain` is the
+documented remedy, not attempted). Xcode also warned that CoreSimulator is out of date.
+The changes have not been visually verified in this session.
+
+**Next step.** Commit and push this pending cockpit work first; then record the accepted
+D-028 separation boundary and prepare the standalone context-truth proposal.

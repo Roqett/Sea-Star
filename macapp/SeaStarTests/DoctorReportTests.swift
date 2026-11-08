@@ -583,6 +583,16 @@ struct HarnessTipsTests {
         #expect(tip?.body.contains("Second") == true)
     }
 
+    @Test("an acknowledged vault stops the nudge and lets the connected note through")
+    func acknowledgedVaultFallsThrough() {
+        let tip = HarnessTips.tip(
+            inferenceName: "oMLX", isNew: false, isReady: true,
+            model: "qwen3", vaultName: "Second", otherVaults: 1,
+            wrongVaultAcknowledged: true
+        )
+        #expect(tip?.kind == .reconnected)
+    }
+
     @Test("a known harness that is not ready says nothing")
     func silentWhenNotReady() {
         let tip = HarnessTips.tip(

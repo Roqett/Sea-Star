@@ -931,3 +931,19 @@ Summary of Changes:
 - `macapp/SeaStarTests/EntityGraphTests.swift` — the fixture takes a catalogue; four tests
   pin the swarm's boundary (no bloom when small, six kept, the answering model always kept,
   the swarm never a neighbour).
+
+
+Harness: Kimi Work
+
+Date: 2026-11-08 22:36 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/App/AppDelegate.swift` — added a detachable, resizable cockpit window with a remembered frame, and made the popover's AppKit background opaque.
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — added the detach control; it is absent when the cockpit already occupies its own window.
+- `macapp/SeaStar/Support/Palette.swift` — added the AppKit canvas colour used by the opaque popover and detached window.
+- `macapp/SeaStar/Support/Strings.swift` — added the detach control's explanation.
+- `macapp/SeaStar/Models/HarnessTips.swift` — let an acknowledged wrong-vault notice yield to the ordinary connected note.
+- `macapp/SeaStar/Services/ServerController.swift` — remember the acknowledged vault by path, so switching vaults can raise the question again without muting it everywhere.
+- `macapp/SeaStar/Views/EntityGraphView.swift` — made the vault notice dismissible and its card fully opaque.
+- `macapp/SeaStarTests/DoctorReportTests.swift` — added coverage for the acknowledged-vault fall-through.
+- Verification attempted: `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` could not build because the Metal Toolchain is not installed; no tests ran. A CoreSimulator version mismatch was also reported.

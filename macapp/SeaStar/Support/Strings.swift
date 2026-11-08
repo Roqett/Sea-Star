@@ -31,6 +31,9 @@ enum Strings {
     enum Header {
         static let title = "Sea-Star"
         static let subtitle = "Your vault, on device."
+        /// Tooltip for the header button that tears the cockpit off into a
+        /// window of its own.
+        static let detachHelp = "Open in a window — move it and resize it"
     }
 
     enum Rows {

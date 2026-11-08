@@ -184,6 +184,14 @@ final class ServerController {
 
     private static let seenHarnessesKey = "SeaStar.seenHarnesses"
 
+    /// The vault the wrong-vault nudge was acknowledged for. While the report
+    /// describes this vault the nudge stays down; point the engine at a
+    /// different vault and it is entitled to ask again — the acknowledgement
+    /// is about *this* choice, not a blanket mute.
+    private(set) var acknowledgedVault: String?
+
+    private static let acknowledgedVaultKey = "SeaStar.acknowledgedVault"
+
     /// Bundle ids of latent harnesses the person has switched *off*. Detected
     /// harnesses float by default, so the starfield shows at a glance where this
     /// machine could work rather than hiding every idle app until it is asked
@@ -212,6 +220,9 @@ final class ServerController {
         self.command = command
         self.seenHarnesses = Set(
             UserDefaults.standard.stringArray(forKey: Self.seenHarnessesKey) ?? []
+        )
+        self.acknowledgedVault = UserDefaults.standard.string(
+            forKey: Self.acknowledgedVaultKey
         )
         self.hiddenLatentHarnesses = Set(
             UserDefaults.standard.stringArray(forKey: Self.hiddenLatentHarnessesKey) ?? []
@@ -294,7 +305,8 @@ final class ServerController {
             isReady: report.ready,
             model: report.model,
             vaultName: (report.vault.path as NSString).lastPathComponent,
-            otherVaults: max(vaultOptions.count - 1, 0)
+            otherVaults: max(vaultOptions.count - 1, 0),
+            wrongVaultAcknowledged: acknowledgedVault == report.vault.path
         )
     }
 
@@ -314,6 +326,18 @@ final class ServerController {
         guard updated != seenHarnesses else { return }
         seenHarnesses = updated
         UserDefaults.standard.set(Array(updated), forKey: Self.seenHarnessesKey)
+    }
+
+    /// Acknowledge the wrong-vault nudge for the vault the report currently
+    /// describes. The nudge is a question ("is this the right vault?"); once
+    /// answered for this vault it must not keep asking — before this existed
+    /// it outranked every other note and sat on the pool permanently.
+    func acknowledgeVaultNote() {
+        guard let report else { return }
+        let path = report.vault.path
+        guard acknowledgedVault != path else { return }
+        acknowledgedVault = path
+        UserDefaults.standard.set(path, forKey: Self.acknowledgedVaultKey)
     }
 
     /// Vaults the popover offers: the Obsidian-known candidates, with the current

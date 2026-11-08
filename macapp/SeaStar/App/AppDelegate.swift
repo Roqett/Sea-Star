@@ -18,6 +18,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var popover: NSPopover?
     private var settingsWindow: NSWindow?
     private var onboardingWindow: NSWindow?
+    /// The cockpit torn off into a window of its own — movable, resizable,
+    /// and its frame autosaved, so it stays where the founder left it.
+    private var cockpitPanel: NSPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureStatusItem()
@@ -91,6 +94,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let hosting = NSHostingController(
             rootView: CockpitPopoverView(controller: controller, onOpenSettings: { [weak self] in
                 self?.openSettings()
+            }, onDetach: { [weak self] in
+                self?.openCockpitWindow()
             })
         )
         hosting.sizingOptions = [.preferredContentSize]
@@ -107,6 +112,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             popover.contentViewController?.view.window?.makeKey()
             NSApp.activate()
         }
+    }
+
+    /// The cockpit as a window. The popover is anchored to the star by
+    /// definition — it cannot move, and the founder wants to park the reading
+    /// beside his work and size it to his taste. A titled panel is the
+    /// smallest host that does all three: move, resize, and remember (the
+    /// autosave name persists frame across launches). The popover from the
+    /// star keeps working exactly as before.
+    private func openCockpitWindow() {
+        if let cockpitPanel {
+            cockpitPanel.makeKeyAndOrderFront(nil)
+            return
+        }
+        let panel = NSPanel(
+            contentRect: NSRect(x: 140, y: 140, width: 660, height: 840),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = Strings.MenuBar.label
+        panel.isReleasedWhenClosed = false
+        panel.minSize = NSSize(width: 380, height: 480)
+        // The reading draws its own chrome; paint any unpainted window area
+        // to match, as the popover does.
+        panel.backgroundColor = Palette.canvasNS
+        panel.contentViewController = NSHostingController(
+            rootView: CockpitPopoverView(
+                controller: controller,
+                onOpenSettings: { [weak self] in
+                    self?.openSettings()
+                },
+                // A window does not offer to become itself.
+                onDetach: nil
+            )
+        )
+        panel.setFrameAutosaveName("SeaStarCockpitWindow")
+        cockpitPanel = panel
+        panel.makeKeyAndOrderFront(nil)
     }
 
     /// A development-only hook so a script can open and close the cockpit
@@ -136,6 +179,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     // signature here fails without a single warning.
     func popoverDidShow(_ notification: Notification) {
         UserDefaults.standard.set(true, forKey: "SeaStar.cockpitOpen")
+        // macOS 26+ hosts NSPopover content over a vibrancy backdrop: the
+        // desktop blurs through the whole panel, and the founder reads that as
+        // broken ("we don't want shit looking hazy"). The SwiftUI side already
+        // paints an opaque Palette.canvas; this pins the window behind it to
+        // the same solid chrome so no translucent surface remains to bleed.
+        guard let popover = notification.object as? NSPopover,
+              let window = popover.contentViewController?.view.window else { return }
+        window.isOpaque = true
+        window.backgroundColor = Palette.canvasNS
     }
 
     func popoverDidClose(_ notification: Notification) {

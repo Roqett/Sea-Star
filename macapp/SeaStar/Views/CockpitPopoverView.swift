@@ -59,6 +59,10 @@ struct CockpitPopoverView: View {
     /// Opens the Settings window. Supplied by the AppKit host, which owns that
     /// window; `nil` when the popover is used without one.
     var onOpenSettings: (() -> Void)?
+    /// Tears the cockpit off into a window of its own — movable, resizable,
+    /// its place remembered. `nil` where the affordance makes no sense (the
+    /// cockpit is already a window) and in tests.
+    var onDetach: (() -> Void)?
 
     /// The header mark's side in points; also the caustic shimmer's scale, so the
     /// two can never drift apart.
@@ -258,6 +262,16 @@ struct CockpitPopoverView: View {
                 layoutToggle
             } else {
                 depthToggle
+            }
+
+            if let onDetach {
+                Button(action: onDetach) {
+                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Palette.inkMuted)
+                }
+                .buttonStyle(.plain)
+                .help(Strings.Header.detachHelp)
             }
 
             if let onOpenSettings {

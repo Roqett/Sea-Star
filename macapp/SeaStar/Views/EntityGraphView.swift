@@ -966,10 +966,23 @@ struct EntityGraphView: View {
                                 .font(.system(size: 9, weight: .semibold, design: .monospaced))
                                 .foregroundStyle(Palette.harnessGlow)
                         }
+                        if tip.kind == .wrongVault {
+                            // The vault question is answered once and stays
+                            // answered for this vault (controller); without a
+                            // way out the nudge outranked every other note and
+                            // sat on the pool permanently.
+                            Button(Strings.Tips.dismiss) { controller.acknowledgeVaultNote() }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(Palette.harnessGlow)
+                        }
                     }
                     .padding(9)
                     .frame(width: 152, alignment: .leading)
-                    .background(Palette.pool.opacity(0.94), in: RoundedRectangle(cornerRadius: 8))
+                    // Solid, not 94% opacity: a translucent card over the pool
+                    // read as "hazy" — the canvas stays flat (spec §7) and the
+                    // stroke alone carries the card.
+                    .background(Palette.pool, in: RoundedRectangle(cornerRadius: 8))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Palette.harnessGlow.opacity(0.45), lineWidth: 1)

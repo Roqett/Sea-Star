@@ -70,6 +70,15 @@ enum Palette {
     static let logInk = adaptive(dark: 0x9FC6FF, light: 0x1F5FB0)
     static let logSurface = adaptive(dark: 0x0A0C12, light: 0xF2F6FF)
 
+    /// The AppKit twin of `canvas`. SwiftUI paints its own background, but a
+    /// window frame is AppKit territory: making the popover window itself
+    /// opaque (so macOS 26+ vibrancy cannot blur the desktop through the
+    /// panel) needs an `NSColor`, not a SwiftUI `Color`.
+    static let canvasNS = NSColor(name: nil) { appearance in
+        let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return NSColor(hex: isDark ? 0x10131A : 0xF7F3EC)
+    }
+
     /// Build a colour that resolves differently in light and dark appearances.
     static func adaptive(dark: UInt32, light: UInt32) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
