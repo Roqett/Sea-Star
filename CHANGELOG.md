@@ -947,3 +947,13 @@ Summary of Changes:
 - `macapp/SeaStar/Views/EntityGraphView.swift` — made the vault notice dismissible and its card fully opaque.
 - `macapp/SeaStarTests/DoctorReportTests.swift` — added coverage for the acknowledged-vault fall-through.
 - Verification attempted: `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` could not build because the Metal Toolchain is not installed; no tests ran. A CoreSimulator version mismatch was also reported.
+
+
+Harness: Kimi Work
+
+Date: 2026-11-08 22:45 ACDT
+
+Summary of Changes:
+- `DECISIONS.md` — accepted D-028: Sea-Star and Redline share attribution patterns, never a private runtime dependency. Redline may borrow public sensor patterns one-way; intervention checks fail closed, and C-Star evidence never authorises an intervention.
+- `DECISIONS.md` — recorded the post-V1 direction for a generic, versioned JSONL runtime-event contract. Persistent events remain gated on a written foundation §4 amendment; no V1 scope was added.
+- `docs/PROGRESS.md` — recorded the decision, its safety clauses, and the standalone context-truth proposal as the next step.

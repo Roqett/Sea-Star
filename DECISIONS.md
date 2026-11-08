@@ -1685,3 +1685,55 @@ founder's affection for the effect is served rather than overruled.
 A catalogue of ten (what oMLX carries today) shows only four extra stars, so the effect is
 barely visible at small scale. If the founder wants it to linger, the numbers to move are
 `hold` and `fade` in `EntityGraphView`.
+
+
+---
+
+## D-028 — Sea-Star and Redline share attribution patterns, never a private runtime dependency
+
+**Date:** 2026-11-08 · **Status:** Accepted · **Tier:** 2 (cross-app architecture)
+
+**Affects:** architecture, product values, post-V1 integration.
+
+**Founder input:** the founder accepted the crossover memo's separation boundary and its
+two safety clauses: Sea-Star may degrade tolerantly because it observes, while Redline
+must fail closed because it intervenes; C-Star evidence may explain and cite, but may
+never authorise an intervention.
+
+### The decision
+
+Sea-Star and Redline remain fully functional, standalone products. Redline may privately
+reimplement Sea-Star's public, deterministic sensor patterns. Sea-Star must not import,
+link, launch, require, or ship integration hooks for Redline or any private shared sensor
+library.
+
+Optional post-V1 integration flows only from Redline, the private consumer, to Sea-Star's
+public, product-neutral contracts. Machine physics and intervention remain Redline's
+responsibility; agent identity, declarations, evidence rungs and request-context truth
+remain Sea-Star's. Neither product may interpret an absent, stale or unsupported
+counterpart as a negative observation or a healthy state.
+
+The future keystone input is a generic, versioned, append-only JSONL runtime-event stream,
+not an MCP pull and not `machine_report` prose. The event vocabulary carries observations
+and evidence only — never prompts, outputs, tool arguments or results. This records the
+contract direction only: any persistent stream remains gated on a separate written
+amendment to foundation §4 before implementation.
+
+### Consequences
+
+- There is no shared private sensor library and no Sea-Star → Redline runtime path.
+- Borrow patterns, never tolerance: Redline's intervention identity checks must fail
+  closed even where Sea-Star's observability reads degrade tolerantly.
+- Redline's rev-limiter, identity revalidation, holds ledger and Memory Guard never depend
+  on Sea-Star evidence; C-Star attribution never supplies kill authority.
+- Sea-Star's context-truth instrument proceeds independently of Redline. Its preflight
+  belongs at `InferenceClient.chat()` and measures the full serialized request; unknown
+  limits or uncertain tokenisation produce `unknown`, never a reassuring estimate.
+- Cross-product schemas are additive and versioned. `machine_report` remains a readable
+  report, not a machine-integration contract.
+- Nothing in this decision adds work to either V1.
+
+### Revisit when
+
+A public, product-neutral sensor package would be independently valuable, or a real
+integration use case cannot be met by one-way borrowing and optional public contracts.

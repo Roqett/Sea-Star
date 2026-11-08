@@ -2685,3 +2685,22 @@ The changes have not been visually verified in this session.
 
 **Next step.** Commit and push this pending cockpit work first; then record the accepted
 D-028 separation boundary and prepare the standalone context-truth proposal.
+
+
+---
+
+## Session 2026-11-08 — D-028 accepted (Kimi Work)
+
+**Published first.** The pending cockpit work was committed as `23b15fd` and pushed to
+`origin/feat/macapp-cockpit`. Its verification limit stands: no Swift tests ran because
+the Metal Toolchain is missing.
+
+**Decision recorded.** D-028 is accepted. Sea-Star and Redline share attribution patterns,
+not a private runtime or sensor library. Redline may reimplement public Sea-Star sensor
+patterns one-way; Sea-Star never depends on Redline. Observability may degrade tolerantly,
+but intervention identity checks must fail closed. C-Star evidence may explain and cite,
+never authorise an intervention. The future event contract is generic, versioned JSONL,
+contains no content fields, and remains gated on the foundation §4 amendment.
+
+**Next step.** Prepare instrument #5 as a standalone context-truth proposal, with no
+Redline dependency and no persistent-event implementation before the §4 amendment.
