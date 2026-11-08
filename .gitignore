@@ -43,3 +43,6 @@ macapp/SeaStar/Support/Info.plist
 # editor's "Run" action to script/build_and_run.sh. Per-machine scaffolding,
 # the same class as .trae/, so it stays local; the script it points at ships.
 .codex/
+# Personal recovery runbook — contains live credentials in plaintext.
+# Never commit: a filename pattern that ends up in public git history.
+macapp/ROQSTOR-RECOVERY-RUNBOOK.md
