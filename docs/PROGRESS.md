@@ -2626,3 +2626,41 @@ the harness→agent roster engine work.
 done — "Start a local model, open the cockpit with the founder, and read the three surfaces
 together" — because everything had only been checked by tests and by measuring the screen.
 That is still the next step.
+
+---
+
+## Session 2026-11-08 — catch-up, consolidation, and the founder's go (Kimi)
+
+**What this session did.** The founder asked for the state of the build and
+gave the word to commit. The 2026-10-23 intro-swarm session had finished its
+work and its write-ups but never committed: it is now committed (D-027 code,
+tests, changelog, decisions, progress) along with the known-harnesses
+reference and a .gitignore rule that keeps the SanDisk recovery runbook — it
+holds a live password — permanently out of git history. The runbook stays on
+disk; the password still needs rotating.
+
+**Verified.** 198 Python tests pass, ruff clean, on the committed tree.
+`sea-star doctor` runs in 2.2 s against the local vault and correctly reads
+this machine (oMLX with nine models, DeepSeek Harness on two ports, Xcode
+serving, OpenCode/Trae/Unsloth latent). Not verified: the Swift tests —
+this machine's Xcode is missing the Metal toolchain component, so the app
+target cannot build here until that component is installed (Xcode → Settings
+→ Components, founder's approval needed; it is a download).
+
+**Found, not fixed.** Vault autodetect resolves the founder's most recently
+used vault, which today is on the freshly mounted RoqstorMain external drive;
+`vault.scan()` then reads the full text of every note just to count them and
+never finishes on a large external vault. Interim measure: the global config
+at `~/.config/seastar/config.toml` points the engine at the local
+`~/Documents/Obsidian Vault`. The real fix — bounded/lazy vault IO — is
+brief-scale work, recorded against the foundation's known-debt list.
+
+**Pending the founder.** (1) Rotate the recovery-runbook password.
+(2) The runtime-state ledger (vision doc §7) needs his written amendment to
+foundation §4 before any code. (3) The operative *Catch-Up, Consolidate &
+Receptacle* brief has not reached this agent — it is needed to start work.
+(4) The 2026-10-02 next step is still undone: start a local model, open the
+cockpit with the founder, and read the three surfaces together.
+
+**Next step.** Await the brief; then consolidate → residual defects →
+Receptacle → semantic recall, per the vision document.
