@@ -509,6 +509,90 @@ struct EntityGraphModel {
         nodes.first { $0.id == id }
     }
 
+    // MARK: - Opening
+
+    /// Where a click on a node should take the person: the platform the node
+    /// *is* or is *served by*, proved from the report and never guessed. The
+    /// founder's ask (2026-11-09): the cockpit names things that may be
+    /// headless, parked in the background or buried behind other windows, so
+    /// clicking one should bring its platform up — even when the app then
+    /// does nothing in response. Anything the report cannot name resolves to
+    /// `nil`, and clicking such a node inspects it and nothing more.
+    enum OpenTarget: Equatable, Sendable {
+        /// An .app bundle the report named outright — a harness path, or the
+        /// app the engine attributed a model-server port to.
+        case application(path: String)
+        /// A bundle id the report recorded; resolved to an app at open time.
+        case bundleID(String)
+        /// A folder, revealed in Finder — the vault's platform.
+        case folder(path: String)
+    }
+
+    /// The platform click-to-open resolves to for this node, or nil when the
+    /// report names nothing launchable. Pure — the launching itself lives in
+    /// `PlatformOpener`, so this stays a testable fact about the roster.
+    func openTarget(for id: String) -> OpenTarget? {
+        guard let node = node(id) else { return nil }
+        switch node.kind {
+        case .core:
+            // Sea-Star's own surface is the cockpit the person is already
+            // reading; there is nothing to bring up.
+            return nil
+        case .vault:
+            return controller.report.map { .folder(path: $0.vault.path) }
+        case .harness:
+            return harnessOpenTarget(for: id)
+        case .inference:
+            return endpointOpenTarget(for: id)
+        case .model:
+            // The platform involved in a model is the one serving it.
+            guard let endpoint = neighbours(of: id).first(where: { $0.hasPrefix("inference:") })
+            else { return nil }
+            return endpointOpenTarget(for: endpoint)
+        case .agent:
+            // A persona rides a model, which is served by an endpoint: the
+            // platform involved is at the far end of that chain. An agent whose
+            // model is not in the pool names no platform — the honest answer
+            // is that there is nothing provable to open.
+            guard let modelID = neighbours(of: id).first(where: { $0.hasPrefix("model:") }),
+                  let endpoint = neighbours(of: modelID).first(where: { $0.hasPrefix("inference:") })
+            else { return nil }
+            return endpointOpenTarget(for: endpoint)
+        }
+    }
+
+    /// An attached harness opens by the bundle id the engine recorded from its
+    /// live connection; a latent one by the app path the disk scan found, or
+    /// its bundle id when the path is not an .app. CLI harnesses (`cli:`
+    /// bundles, bare command paths) resolve to nothing — there is no app to
+    /// bring up, and inventing one would be the exact guess the foundation
+    /// forbids.
+    private func harnessOpenTarget(for id: String) -> OpenTarget? {
+        if let attached = controller.attachedHarnesses
+            .first(where: { "harness:\($0.id)" == id }) {
+            return attached.bundleID.map { .bundleID($0) }
+        }
+        guard let app = controller.visibleLatentHarnesses
+            .first(where: { "harness:app:\($0.bundleID)" == id })
+        else { return nil }
+        if app.path.hasSuffix(".app") { return .application(path: app.path) }
+        if !app.bundleID.hasPrefix("cli:") { return .bundleID(app.bundleID) }
+        return nil
+    }
+
+    /// A model-server endpoint opens through the app the engine attributed
+    /// its port to (`model_like.app_path`). An endpoint nothing was attributed
+    /// to — or one that is merely a remote URL — has no platform on this
+    /// machine to bring up.
+    private func endpointOpenTarget(for id: String) -> OpenTarget? {
+        guard id.hasPrefix("inference:") else { return nil }
+        let baseURL = String(id.dropFirst("inference:".count))
+        guard let like = controller.report?.modelLike?.first(where: { $0.baseURL == baseURL }),
+              let path = like.appPath, path.hasSuffix(".app")
+        else { return nil }
+        return .application(path: path)
+    }
+
     // MARK: - Relationship
 
     /// Every binding in the pool, each one drawn once. Built from `neighbours`

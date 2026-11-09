@@ -1003,3 +1003,17 @@ Summary of Changes:
 - `macapp/SeaStarTests/EntityGraphTests.swift` — seven new tests: ringmates sharing an endpoint stay spread, anchored satellites sit at exactly their orbit radius, an agent rides inside its model's orbit, the plan labels only selected/hovered/focused, hovering changes the plan, captions truncate long titles and keep short ones.
 - `docs/PROGRESS.md` — session record appended.
 - Verification: `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` succeeded; 114 Swift tests in 20 suites passed. Live visual verification against the rebuilt running app (screenshot in repo root, `deep-reading-verified.png`): sparse labels, spread satellites; drag-orbit exercised and confirmed via the Recentre button appearing. Synthesised clicks still do not reach popover buttons; Recentre/detach need a real click.
+
+Harness: Kimi Work
+
+Date: 2026-11-09 21:20 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/App/AppDelegate.swift` — new "Close Cockpit" item on the star's right-click menu: closes the popover only, leaving the detached window and the app alive (Quit still quits). Both `openCockpitWindow` paths now activate the app, matching every other window-opening path. `panel.isRestorable = false`: the frame autosave keeps the person's chosen geometry, but macOS no longer resurrects which *Space* the window was last on — a reopened panel could otherwise come back ordered-in yet parked on a desktop nobody is looking at. Dev scaffolding: a second distributed-notification hook `UpPeriscope.Sea-Star.cockpitWindow` opens/focuses the detached window from a script (same removed-before-release status as the existing toggle hook).
+- `macapp/SeaStar/Support/Strings.swift` — `Menu.closeCockpit` string.
+- `macapp/SeaStar/Views/EntityGraphModel.swift` — `enum OpenTarget { application(path:), bundleID(String), folder(path:) }` and a pure `openTarget(for:)`: the vault opens its folder; an app-path harness opens by path, an attached harness by recorded bundle id, a `cli:` harness by nothing; an inference endpoint or model opens the app its port is attributed to; an agent opens the platform behind its model. Nothing the report cannot prove opens nothing.
+- `macapp/SeaStar/Support/PlatformOpener.swift` — new: thin NSWorkspace launcher for `OpenTarget`; unresolvable bundle ids are a silent no-op.
+- `macapp/SeaStar/Views/EntityGraphView.swift` + `GraphSceneView.swift` — a fresh click (not a re-click on the already-inspected node) selects the node and opens its platform.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — seven new tests in "A click opens the platform the node is about".
+- `docs/PROGRESS.md` — session record appended.
+- Verification: `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` — 121 tests in 21 suites passed. Window independence exercised live against the rebuilt running app: popover toggled closed with the detached panel open, panel persisted (screenshot-verified). Synthesised clicks still do not reach popover buttons; the new menu item and click-to-open need the founder's real click.

@@ -18,6 +18,10 @@ enum Strings {
         static let checkForUpdates = "Check for Updates…"
         static let help = "Help & Comments"
         static let patchdog = "Patchdog"
+        /// Dismisses the star-anchored cockpit only. The detached cockpit window
+        /// is a separate window and stays — the founder asked for exactly that
+        /// separation (2026-11-09), and this is the explicit control for it.
+        static let closeCockpit = "Close Cockpit"
         static let quit = "Quit Sea-Star"
         static func version(_ value: String) -> String { "Version \(value)" }
     }

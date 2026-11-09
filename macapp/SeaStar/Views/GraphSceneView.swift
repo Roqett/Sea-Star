@@ -182,8 +182,15 @@ struct GraphSceneView: View {
         }
         lastTapID = id
         lastTapTime = now
+        // Same rule the flat pool keeps: a fresh click inspects *and* brings
+        // the node's platform up when the report can name one; a re-click on
+        // the inspected body only closes its card.
+        let wasSelected = selected == id
         withAnimation(.easeInOut(duration: 0.18)) {
             selected = selected == id ? nil : id
+        }
+        if !wasSelected, selected == id, let target = model.openTarget(for: id) {
+            PlatformOpener.open(target)
         }
     }
 

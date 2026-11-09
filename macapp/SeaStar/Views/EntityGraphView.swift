@@ -1340,7 +1340,15 @@ struct EntityGraphView: View {
     }
 
     private func select(_ node: GraphNode) {
+        // A fresh click (not a re-click on the inspected star) also brings the
+        // node's platform up — the harness, the serving app, the vault folder —
+        // when the report can name one. Clicking around the pool to compare
+        // stars must not re-activate the same app on every other tap.
+        let wasSelected = selected == node.id
         selected = node.id
+        if !wasSelected, let target = model.openTarget(for: node.id) {
+            PlatformOpener.open(target)
+        }
         switch node.kind {
         case .core:
             // Sea-Star is the one thing in the pool that is not a knob. There is

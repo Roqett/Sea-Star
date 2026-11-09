@@ -123,6 +123,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func openCockpitWindow() {
         if let cockpitPanel {
             cockpitPanel.makeKeyAndOrderFront(nil)
+            // Every other window-opening path in this file activates the app;
+            // without it an order sent while Sea-Star is in the background
+            // can leave the panel underneath the app that currently has the
+            // screen, looking for all the world like it never opened.
+            NSApp.activate()
             return
         }
         let panel = NSPanel(
@@ -133,6 +138,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         )
         panel.title = Strings.MenuBar.label
         panel.isReleasedWhenClosed = false
+        // Window restoration is off for the same reason the frame is on:
+        // the frame is what the person chose, and it is all that should be
+        // remembered. Restoration also resurrects which *Space* the window
+        // was last on, which is how a freshly torn-off panel could open
+        // ordered-in but invisible — parked on a desktop the person is not
+        // looking at (founder-visible as "the window never opened").
+        panel.isRestorable = false
         panel.minSize = NSSize(width: 380, height: 480)
         // The reading draws its own chrome; paint any unpainted window area
         // to match, as the popover does.
@@ -152,6 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         panel.setFrameAutosaveName("SeaStarCockpitWindow")
         cockpitPanel = panel
         panel.makeKeyAndOrderFront(nil)
+        NSApp.activate()
     }
 
     /// A development-only hook so a script can open and close the cockpit
@@ -167,10 +180,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             name: NSNotification.Name("UpPeriscope.Sea-Star.toggle"),
             object: nil
         )
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleDebugCockpitWindow(_:)),
+            name: NSNotification.Name("UpPeriscope.Sea-Star.cockpitWindow"),
+            object: nil
+        )
     }
 
     @objc private func handleDebugToggle(_ notification: Notification) {
         togglePopover()
+    }
+
+    /// Sibling of the debug toggle for the detached cockpit: opens (or focuses)
+    /// the cockpit window, so the detach flow can be exercised from a script
+    /// where synthesised clicks cannot reach the popover's buttons. Same
+    /// dev-only, removed-before-release status as the toggle hook.
+    @objc private func handleDebugCockpitWindow(_ notification: Notification) {
+        openCockpitWindow()
     }
 
     // The SDK's NSPopoverDelegate takes a Notification (macOS 14+). The old
@@ -224,6 +251,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         menu.addItem(item(Strings.Menu.patchdog, #selector(openPatchdog), symbol: "ladybug"))
         menu.addItem(.separator())
 
+        // Closing the cockpit and quitting are deliberately different items:
+        // closing dismisses the star-anchored popover only, while a torn-off
+        // cockpit window keeps running as the primary surface. Quit ends the
+        // process and necessarily takes both (founder, 2026-11-09).
+        menu.addItem(item(Strings.Menu.closeCockpit, #selector(closeCockpit), symbol: "xmark"))
+
         let version = NSMenuItem(
             title: Strings.Menu.version(AppInfo.versionLine),
             action: nil,
@@ -266,6 +299,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+
+    /// The menu-bar close that is not a quit: the popover goes away, anything
+    /// torn off into its own window is untouched.
+    @objc private func closeCockpit() {
+        popover?.performClose(nil)
     }
 
     /// The onboarding window: the machine's ledger, the register's questions,

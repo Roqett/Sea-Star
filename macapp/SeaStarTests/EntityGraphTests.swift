@@ -1425,3 +1425,87 @@ struct GraphSwarmTests {
         #expect(neighbours.isDisjoint(with: model.bloomIDs))
     }
 }
+
+/// Click-to-open (founder, 2026-11-09): a click on a node brings the
+/// platform it names — or is served by — to the front, when the report can
+/// prove what that is. The launch itself is a one-line `NSWorkspace` call
+/// that cannot be unit-tested; these tests pin the proof rules, and in
+/// particular the cases where honesty means opening nothing at all.
+@Suite("A click opens the platform the node is about")
+@MainActor
+struct GraphOpenTargetTests {
+    private func graph() -> EntityGraphModel {
+        EntityGraphModel(controller: Fixture.controller())
+    }
+
+    @Test("Sea-Star itself has nothing to bring up")
+    func coreHasNoTarget() {
+        #expect(graph().openTarget(for: EntityGraphModel.coreID) == nil)
+    }
+
+    @Test("the vault opens its folder")
+    func vaultOpensFolder() {
+        #expect(graph().openTarget(for: "vault") == .folder(path: "/Users/lono/Vaults/main"))
+    }
+
+    @Test("an app harness opens by path, a cli harness by nothing")
+    func harnessTargets() {
+        let graph = graph()
+        #expect(
+            graph.openTarget(for: "harness:app:ai.unsloth.studio")
+                == .application(path: "/Applications/Unsloth Studio.app")
+        )
+        #expect(
+            graph.openTarget(for: "harness:app:com.apple.dt.Xcode")
+                == .application(path: "/Applications/Xcode.app")
+        )
+        // A cli: bundle with a bare command path names no app to bring up —
+        // resolving it would be the guess the foundation forbids.
+        #expect(graph.openTarget(for: "harness:app:cli:opencode") == nil)
+    }
+
+    @Test("an attached harness opens by its recorded bundle id")
+    func attachedHarnessOpensByBundleID() {
+        #expect(
+            graph().openTarget(for: "harness:chat.atomic.app")
+                == .bundleID("chat.atomic.app")
+        )
+    }
+
+    @Test("an endpoint opens the app its port is attributed to")
+    func endpointTargets() {
+        let graph = graph()
+        #expect(
+            graph.openTarget(for: "inference:http://127.0.0.1:1337/v1")
+                == .application(path: "/Applications/Atomic Chat.app")
+        )
+        #expect(
+            graph.openTarget(for: "inference:http://127.0.0.1:8009/v1")
+                == .application(path: "/Applications/Unsloth Studio.app")
+        )
+        // Nothing answering on 8000 was attributed to an app — nothing provable.
+        #expect(graph.openTarget(for: "inference:http://127.0.0.1:8000/v1") == nil)
+    }
+
+    @Test("a model opens the platform serving it")
+    func modelOpensItsServer() {
+        #expect(
+            graph().openTarget(for: "model:qwen3")
+                == .application(path: "/Applications/Atomic Chat.app")
+        )
+    }
+
+    @Test("an agent opens the platform behind the model it rides")
+    func agentOpensItsModelsServer() {
+        let roster = graph()
+        // Mariner rides qwen3, served by the 1337 endpoint (Atomic Chat).
+        #expect(
+            roster.openTarget(for: "agent:Mariner")
+                == .application(path: "/Applications/Atomic Chat.app")
+        )
+        // Cartographer names a model no endpoint in the pool claims, and
+        // Drifter rides nothing — neither names a platform Sea-Star can prove.
+        #expect(graph().openTarget(for: "agent:Cartographer") == nil)
+        #expect(graph().openTarget(for: "agent:Drifter") == nil)
+    }
+}
