@@ -991,3 +991,15 @@ Summary of Changes:
 - `macapp/SeaStar/App/AppDelegate.swift` — the cockpit window host passes `fillsHost: true`.
 - `macapp/SeaStar/Views/SettingsView.swift` + `Strings.swift` — new Cockpit section with the reading picker (graph/list), writing the same `SeaStar.cockpitMode` preference as the panel header toggle.
 - Verification: `xcodebuild … test` — 107 tests in 19 suites passed. Visual verification against the rebuilt running app: full header in list mode; graph mode with Pool/Deep toggle after switching preference. Detached-window resize not visually exercised (synthesised clicks cannot reach popover buttons; an Input Monitoring prompt was left for the founder).
+
+Harness: Kimi Work
+
+Date: 2026-11-09 12:55 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/GraphScene.swift` — the 3D pool now captions only the selected, hovered and focused nodes (`hoveredID` added to `GraphScenePlan`, `labelledIDs` computed next to the existing plan facts); full-length node titles were the overlapping type across the founder's "modern art" screenshot. New `GraphSceneBuilder.caption(for:)` middle-truncates titles to 22 characters, ends preserved.
+- `macapp/SeaStar/Views/EntityGraphModel.swift` — the satellite pull (models 55%, agents 72% toward their anchor, packing a whole catalogue onto one endpoint) is replaced by per-anchor orbit rings: models at `satelliteRadius` around their serving endpoint, agents at a new `agentOrbitRadius` around the model they ride, even spread plus small seeded wobble, unanchored agents still parked on the hub ring.
+- `macapp/SeaStar/Views/GraphSceneView.swift` — the plan now carries the live hover so the caption under the cursor actually renders.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — seven new tests: ringmates sharing an endpoint stay spread, anchored satellites sit at exactly their orbit radius, an agent rides inside its model's orbit, the plan labels only selected/hovered/focused, hovering changes the plan, captions truncate long titles and keep short ones.
+- `docs/PROGRESS.md` — session record appended.
+- Verification: `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` succeeded; 114 Swift tests in 20 suites passed. Live visual verification against the rebuilt running app (screenshot in repo root, `deep-reading-verified.png`): sparse labels, spread satellites; drag-orbit exercised and confirmed via the Recentre button appearing. Synthesised clicks still do not reach popover buttons; Recentre/detach need a real click.

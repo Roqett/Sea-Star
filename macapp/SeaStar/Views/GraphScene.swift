@@ -18,12 +18,17 @@ struct GraphScenePlan: Equatable {
     /// The focused neighbourhood, or empty for the whole-pool reading.
     var focus: Set<String> = []
     var selectedID: String?
+    /// The entity under the cursor, if any. Hovering names it without
+    /// selecting it — but it does earn a caption, exactly as a hovered star
+    /// does in the flat pool.
+    var hoveredID: String?
 
     init(
         model: EntityGraphModel,
         space: GraphSpace3D,
         focus: Set<String>,
-        selectedID: String?
+        selectedID: String?,
+        hoveredID: String? = nil
     ) {
         self.nodes = model.nodes
         self.edges = model.edges
@@ -33,6 +38,7 @@ struct GraphScenePlan: Equatable {
         )
         self.focus = focus
         self.selectedID = selectedID
+        self.hoveredID = hoveredID
     }
 
     /// Whether something answered on this entity during the read this plan came
@@ -47,6 +53,20 @@ struct GraphScenePlan: Equatable {
     /// heavier, because they are the ones the hub exists to carry.
     func touchesCore(_ edge: GraphEdge) -> Bool {
         edge.from == EntityGraphModel.coreID || edge.to == EntityGraphModel.coreID
+    }
+
+    /// The ids that wear a name tag in the deep: the selected entity, the one
+    /// under the cursor, and — while a neighbourhood is held — everything in
+    /// it. The flat pool captions only those same nodes, so this is that rule
+    /// read from the same facts; the two readings cannot drift apart on who
+    /// gets named. Labelling every node was what turned the founder's deep
+    /// screenshot into overlapping type, and the readout card already names
+    /// whatever is hovered, so a sparse rule loses nothing.
+    var labelledIDs: Set<String> {
+        var ids = focus
+        if let selectedID { ids.insert(selectedID) }
+        if let hoveredID { ids.insert(hoveredID) }
+        return ids
     }
 }
 
@@ -221,6 +241,7 @@ enum GraphSceneBuilder {
                 radius: plan.radii[node.id] ?? 20,
                 isDimmed: isDimmed(node, plan: plan),
                 isSelected: plan.selectedID == node.id,
+                showLabel: plan.labelledIDs.contains(node.id),
                 animated: animated
             )
             body.position = SCNVector3(point.x, point.y, point.z)
@@ -282,13 +303,15 @@ enum GraphSceneBuilder {
         return wire
     }
 
-    /// One entity: the body, the sea-star worn on it, the name beneath, and the
-    /// liveness bar if — and only if — something actually answered.
+    /// One entity: the body, the sea-star worn on it, the name beneath when
+    /// the plan says this node is worth naming, and the liveness bar if —
+    /// and only if — something actually answered.
     private static func makeNode(
         _ node: GraphNode,
         radius: Float,
         isDimmed: Bool,
         isSelected: Bool,
+        showLabel: Bool,
         animated: Bool
     ) -> SCNNode {
         let holder = SCNNode()
@@ -379,9 +402,11 @@ enum GraphSceneBuilder {
             holder.addChildNode(ring)
         }
 
-        // The name, small and mono, hung beneath. Readable when you fly close;
-        // quiet enough not to shout across the pool.
-        if let label = makeLabel(for: node, isDimmed: isDimmed, radius: radius) {
+        // The name, small and mono, hung beneath — only when the reading is
+        // actually about this node. A caption on everything meant every model
+        // name crossing every other, which is most of what the founder's
+        // screenshot was.
+        if showLabel, let label = makeLabel(for: node, isDimmed: isDimmed, radius: radius) {
             label.position = SCNVector3(0, -CGFloat(radius) * 1.6, 0)
             holder.addChildNode(label)
         }
@@ -457,7 +482,7 @@ enum GraphSceneBuilder {
     /// The entity's own name as a flat, always-facing label. A billboard, so it
     /// turns to you as you orbit instead of turning edge-on and vanishing.
     private static func makeLabel(for node: GraphNode, isDimmed: Bool, radius: Float) -> SCNNode? {
-        let text = SCNText(string: node.title, extrusionDepth: 0.2)
+        let text = SCNText(string: caption(for: node.title), extrusionDepth: 0.2)
         text.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .semibold)
         text.flatness = 0.1
         let material = SCNMaterial()
@@ -494,6 +519,15 @@ enum GraphSceneBuilder {
         label.scale = SCNVector3(captionScale, captionScale, captionScale)
         label.constraints = [SCNBillboardConstraint()]
         return label
+    }
+
+    /// A title shortened to caption length, middle-truncated so the ends —
+    /// usually the part that tells models apart — survive. Pure and static
+    /// so the exact shape of a caption is unit-testable; nothing about it
+    /// needs AppKit or a scene.
+    static func caption(for title: String, limit: Int = 22) -> String {
+        guard title.count > limit else { return title }
+        return "\(title.prefix((limit - 1) / 2))…\(title.suffix(limit / 2))"
     }
 
     /// Whether this node has faded back behind a focus reading.

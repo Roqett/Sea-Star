@@ -77,7 +77,8 @@ struct GraphSceneView: View {
                 model: model,
                 space: space,
                 focus: focusSet,
-                selectedID: selected
+                selectedID: selected,
+                hoveredID: hovered
             ),
             animated: !reduceMotion,
             onHover: { hovered = $0 },

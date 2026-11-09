@@ -160,16 +160,13 @@ struct Point3: Equatable, Sendable {
 @MainActor
 struct GraphSpace3D {
     /// The radius the majors sit on — the pool's overall width.
-    ///
-    /// Widening this was tried and reverted: at 260 with the camera pulled back to
-    /// match, the room stopped being crowded but became a distant clump, and the
-    /// crowding had not actually gone away — only shrunk. The real cause is the
-    /// satellite pull below, which draws models and personas onto their anchor and
-    /// packs several bodies into the same space. That is a layout decision, not a
-    /// number, so it is left for a proper pass rather than tuned blind.
     var radius: Float = 120
-    /// The distance a satellite orbits from whatever it orbits.
+    /// The distance a model orbits from the endpoint serving it.
     var satelliteRadius: Float = 46
+    /// The distance an agent orbits from the model it rides. Smaller than the
+    /// model's own orbit on purpose, so a persona reads as riding *inside*
+    /// its model's circuit rather than beside it.
+    var agentOrbitRadius: Float = 20
 
     private let model: EntityGraphModel
 
@@ -246,48 +243,74 @@ struct GraphSpace3D {
             )
         }
 
-        // The satellites orbit whatever they belong to, so a model sits near the
-        // harness serving it and a persona near the model it rides. Anything
-        // with nothing to orbit (an agent whose model is not in the pool) is
-        // parked on a slow ring of its own rather than dropped.
-        let hub = model.activeInferenceID.flatMap { points[$0] } ?? centre
-        var parked: Int = 0
-        var parkedCount = 0
-        for node in model.nodes where points[node.id] == nil {
-            parkedCount += 1
+        // The satellites orbit whatever they belong to, so a model sits near
+        // the harness serving it and a persona near the model it rides. Each
+        // anchor gets its own ring: the satellites bound to one endpoint share
+        // that endpoint's ring, spread evenly around it. The earlier design
+        // pulled every satellite most of the way onto its anchor, and nine
+        // models served by one endpoint landed inside the same few units —
+        // the illegible cluster in the founder's screenshot. That was a
+        // layout decision, not a size, so it is fixed here rather than by
+        // widening the pool.
+        //
+        // Placement order matters: models first, because their anchors are
+        // the endpoints already on the ring; agents second, because their
+        // anchors are the models this pass just placed. Anything with no
+        // anchor to orbit (an agent whose model is not in the pool) falls
+        // through to the parked hub ring below rather than being dropped.
+        var parkedIDs: [String] = []
+        for kind in [GraphNode.Kind.model, .agent] {
+            let orbit = kind == .model ? satelliteRadius : agentOrbitRadius
+            var groups: [String: [GraphNode]] = [:]
+            for node in model.nodes where node.kind == kind && points[node.id] == nil {
+                if let anchor = anchorID(for: node), points[anchor] != nil {
+                    groups[anchor, default: []].append(node)
+                } else {
+                    parkedIDs.append(node.id)
+                }
+            }
+            for (anchorID, satellites) in groups {
+                guard let anchorPoint = points[anchorID] else { continue }
+                let ring = satellites.sorted { $0.id < $1.id }
+                for (index, node) in ring.enumerated() {
+                    // The even spread does the legibility work; a seeded
+                    // wobble only stops the ring looking machined. The
+                    // wobble stays a small fraction of one spacing, so two
+                    // neighbours sharing an anchor can never be pushed into
+                    // the same spot.
+                    let angle = Double(index) / Double(ring.count) * 2 * .pi
+                        + (GraphSeed.phase(for: node.id) - .pi) * 0.1
+                    let lift = Float(GraphSeed.phase(for: node.id)) * 0.5
+                    points[node.id] = Point3(
+                        x: anchorPoint.x + Float(cos(angle)) * orbit,
+                        y: anchorPoint.y + lift * orbit * 0.5,
+                        z: anchorPoint.z + Float(sin(angle)) * orbit
+                    )
+                }
+            }
         }
-        for node in model.nodes where points[node.id] == nil {
-            let angle = -Double.pi / 2 + Double(parked) / Double(max(parkedCount, 1)) * 2 * .pi
-            let lift = Float(GraphSeed.phase(for: node.id)) * 0.5
-            points[node.id] = Point3(
+
+        // Whatever is left has nothing to orbit: an agent whose model is not
+        // in the pool is parked on a slow ring of its own around the hub,
+        // rather than dropped or given a binding it does not have.
+        let hub = model.activeInferenceID.flatMap { points[$0] } ?? centre
+        let parkedCount = max(parkedIDs.count, 1)
+        for (index, id) in parkedIDs.sorted().enumerated() {
+            let angle = -Double.pi / 2 + Double(index) / Double(parkedCount) * 2 * .pi
+            let lift = Float(GraphSeed.phase(for: id)) * 0.5
+            points[id] = Point3(
                 x: hub.x + Float(cos(angle)) * satelliteRadius,
                 y: hub.y + lift * satelliteRadius * 0.5,
                 z: hub.z + Float(sin(angle)) * satelliteRadius
             )
-            parked += 1
-        }
-
-        // Pull each satellite toward its own anchor, so the orbit is legible
-        // rather than a uniform ring: a model hugs its harness, an agent hugs
-        // its model, and the depth between them is what you read when you turn.
-        for (kind, reach) in [(GraphNode.Kind.model, 0.55), (.agent, 0.72)] {
-            for node in model.nodes where node.kind == kind {
-                guard let anchor = anchorID(for: node), let target = points[anchor] else { continue }
-                guard let here = points[node.id] else { continue }
-                points[node.id] = Point3(
-                    x: here.x + (target.x - here.x) * Float(reach),
-                    y: here.y + (target.y - here.y) * Float(reach),
-                    z: here.z + (target.z - here.z) * Float(reach)
-                )
-            }
         }
 
         return points
     }
 
-    /// What a satellite should be pulled toward: a model orbits an endpoint
-    /// that serves it, an agent orbits the model it rides. A major is placed on
-    /// the ring and has nothing to orbit.
+    /// What a satellite orbits: a model orbits an endpoint that serves it,
+    /// an agent orbits the model it rides. A major is placed on the ring and
+    /// has nothing to orbit.
     private func anchorID(for node: GraphNode) -> String? {
         switch node.kind {
         case .model:

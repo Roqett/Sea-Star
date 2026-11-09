@@ -620,6 +620,91 @@ struct GraphSpace3DTests {
         }
     }
 
+    /// Several models served by one endpoint share that endpoint's ring,
+    /// spread around it — piled onto the anchor was the founder's "modern
+    /// art" screenshot. Sharing a serving endpoint is read from the shared
+    /// model's own `neighbours`, the same fact the wiring is drawn from.
+    @Test("models sharing an endpoint spread around it, not onto it")
+    func ringmatesAreSpread() {
+        let (model, space) = pool()
+        let positions = space.positions()
+
+        for node in model.nodes where node.kind == .model {
+            let servers = Set(model.neighbours(of: node.id).filter { $0.hasPrefix("inference:") })
+            guard !servers.isEmpty, let here = positions[node.id] else { continue }
+            let ringmates = model.nodes.filter { other in
+                other.kind == .model && other.id != node.id
+                    && !servers.isDisjoint(
+                        with: model.neighbours(of: other.id).filter { $0.hasPrefix("inference:") }
+                    )
+            }
+            for mate in ringmates {
+                guard let there = positions[mate.id] else { continue }
+                #expect(
+                    here.distance(to: there) > 15,
+                    "\(node.title) and \(mate.title) share an endpoint but sit on top of each other"
+                )
+            }
+        }
+    }
+
+    /// An anchored satellite sits on its orbit ring: the *horizontal* distance
+    /// to the anchor is exactly the orbit radius, whatever the vertical lift.
+    /// A model's anchor is its nearest endpoint; a bound agent's is its model.
+    @Test("anchored satellites sit at exactly their orbit radius")
+    func satellitesOrbitAtTheirRadius() {
+        let (model, space) = pool()
+        let positions = space.positions()
+
+        func horizontal(_ a: Point3, _ b: Point3) -> Float {
+            let dx = a.x - b.x, dz = a.z - b.z
+            return (dx * dx + dz * dz).squareRoot()
+        }
+
+        for node in model.nodes where node.kind == .model {
+            guard let here = positions[node.id] else { continue }
+            let anchor = model.nodes
+                .filter { $0.kind == .inference }
+                .min { here.distance(to: positions[$0.id] ?? .origin) < here.distance(to: positions[$1.id] ?? .origin) }
+            guard let anchorPoint = anchor.flatMap({ positions[$0.id] }) else { continue }
+            #expect(abs(horizontal(here, anchorPoint) - space.satelliteRadius) < 0.01)
+        }
+
+        for node in model.nodes where node.kind == .agent {
+            let bound = model.neighbours(of: node.id).filter { $0.hasPrefix("model:") }
+            guard let modelID = bound.first, let there = positions[modelID],
+                  let here = positions[node.id] else { continue }
+            #expect(abs(horizontal(here, there) - space.agentOrbitRadius) < 0.01)
+        }
+    }
+
+    /// A persona rides inside its model's circuit: closer to the model than
+    /// the model is to any endpoint. If the two orbits ever swapped sizes the
+    /// deep would read an agent as standing *beside* its model's world rather
+    /// than in it.
+    @Test("an agent rides closer to its model than the model rides to its endpoint")
+    func agentOrbitSitsInsideModelOrbit() {
+        let (model, space) = pool()
+        let positions = space.positions()
+
+        #expect(space.agentOrbitRadius < space.satelliteRadius)
+        for node in model.nodes where node.kind == .agent {
+            let bound = model.neighbours(of: node.id).filter { $0.hasPrefix("model:") }
+            guard let modelID = bound.first,
+                  let modelPoint = positions[modelID],
+                  let agentPoint = positions[node.id] else { continue }
+            let nearestEndpoint = model.nodes
+                .filter { $0.kind == .inference }
+                .compactMap { positions[$0.id] }
+                .map { modelPoint.distance(to: $0) }
+                .min() ?? .greatestFiniteMagnitude
+            #expect(
+                agentPoint.distance(to: modelPoint) < nearestEndpoint,
+                "\(node.title) does not ride inside its model's orbit"
+            )
+        }
+    }
+
     /// The camera opens at a fixed pose, so the pool has to actually fit inside
     /// what that pose can see. If the layout ever grew past the opening view,
     /// bodies would sit off-screen with no indication they existed — a silent
@@ -647,6 +732,7 @@ struct GraphScenePlanTests {
     private func plan(
         focus: Set<String> = [],
         selected: String? = nil,
+        hovered: String? = nil,
         controller: ServerController = Fixture.controller()
     ) -> GraphScenePlan {
         let model = EntityGraphModel(controller: controller)
@@ -654,7 +740,8 @@ struct GraphScenePlanTests {
             model: model,
             space: GraphSpace3D(model: model),
             focus: focus,
-            selectedID: selected
+            selectedID: selected,
+            hoveredID: hovered
         )
     }
 
@@ -695,6 +782,32 @@ struct GraphScenePlanTests {
         #expect(selected.focus.isEmpty)
     }
 
+    /// A hover has to reach the plan or the caption under the cursor would
+    /// never be drawn — and the rebuild that shows it would never fire either.
+    @Test("hovering something changes the plan")
+    func hoverChangesThePlan() {
+        #expect(plan() != plan(hovered: "vault"))
+    }
+
+    /// The deep captions only what the flat pool captions: the selected, the
+    /// hovered, and — while a focus is held — the whole company. Naming every
+    /// node was what turned the founder's screenshot into overlapping type,
+    /// and the readout card already names whatever is hovered, so the sparse
+    /// rule loses nothing. Pinned here so it cannot quietly become "all".
+    @Test("only the selected, hovered and focused wear captions")
+    func labelsAreSparse() {
+        #expect(plan().labelledIDs.isEmpty)
+
+        let selected = plan(selected: "model:qwen3")
+        #expect(selected.labelledIDs == ["model:qwen3"])
+
+        let hovered = plan(hovered: "vault")
+        #expect(hovered.labelledIDs == ["vault"])
+
+        let focused = plan(focus: ["vault", "inference:http://127.0.0.1:1337/v1"])
+        #expect(focused.labelledIDs == ["vault", "inference:http://127.0.0.1:1337/v1"])
+    }
+
     /// Liveness is drawn, so a probe answering has to reach the scene. If the
     /// plan ignored it, the nudibranch bars would lie until something else
     /// happened to force a rebuild.
@@ -728,6 +841,29 @@ struct GraphScenePlanTests {
         let scene = plan()
         #expect(scene.focus.isEmpty)
         #expect(scene.selectedID == nil)
+    }
+}
+
+/// Captions in the deep are real 3D text, sized in world units, so a long
+/// model name is not just untidy — it is enormous. Middle-truncation keeps
+/// the ends, which are usually the part that tells models apart, and these
+/// tests pin the exact shape so a caption can never silently become a
+/// paragraph again.
+@Suite("Captions stay captions")
+@MainActor
+struct GraphCaptionTests {
+    @Test("a long name is middle-truncated")
+    func longNamesAreTruncated() {
+        let caption = GraphSceneBuilder.caption(for: "KAT-Coder-V2.5-Dev-OptiQ-4bit")
+        #expect(caption.count == 22)
+        #expect(caption.contains("…"))
+        #expect(caption.hasPrefix("KAT-Coder"))
+        #expect(caption.hasSuffix("OptiQ-4bit"))
+    }
+
+    @Test("a short name is kept whole")
+    func shortNamesAreKept() {
+        #expect(GraphSceneBuilder.caption(for: "qwen3") == "qwen3")
     }
 }
 

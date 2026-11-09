@@ -2967,3 +2967,53 @@ open-file dialog (vault picker) from the pkilled previous instance was dismissed
 
 **Next step.** Founder opens the panel, confirms the header is back, detaches the
 window, and tries resizing; then review PR #2, which now carries this fix.
+
+---
+
+## Session 2026-11-09 (midday) — the deep reading made readable (Kimi Work)
+
+**Founder report.** After the cockpit fixes landed: *"wow, that's really good… but
+the 'deep' window issue still hasn't been resolved. It looks like very nice modern
+art, but it's not useful for anything… that was meant to be a 3D look at that
+element."* Commissioned: test as much as possible and get it working.
+
+**Diagnosis.** Two defects in the 3D pool, both reproduced live against the running
+app. (1) Every node wore a full-length `SCNText` caption scaled by its own radius —
+a 19-character model name rendered ~190 world units wide across a pool of radius
+120, so the labels were the picture. The flat pool it claims to mirror captions
+only selected/in-focus nodes. (2) The layout parked all satellites on one hub ring
+and then pulled models 55% and agents 72% toward their anchor, so every model a
+single endpoint served landed inside ~20 units of it — the illegible pile the
+founder rightly called modern art. The code comment admitted this was "left for a
+proper pass rather than tuned blind"; this was that pass.
+
+**Fix.** Captions are now sparse and truncated: the plan labels only the selected,
+the hovered, and the focused neighbourhood (a new `hoveredID` on `GraphScenePlan`,
+mirroring the flat pool's rule exactly), and titles are middle-truncated to 22
+characters by a pure, unit-tested `GraphSceneBuilder.caption(for:)`. The pull is
+gone: satellites now orbit their own anchor directly, each anchor getting its ring
+— models at `satelliteRadius` (46) around their serving endpoint, agents at a new
+`agentOrbitRadius` (20) around the model they ride, spread evenly by index with a
+small seeded wobble, unanchored agents still parked on the hub ring.
+
+**Verified.** `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination
+'platform=macOS' test`: **114 tests in 20 suites passed** (7 new: ringmate spread,
+orbit radii exact, agent-inside-model, plan label sparsity, hover changes the plan,
+caption truncation/short-name). Visually against the rebuilt running app in
+graph/deep: no floating captions at rest, satellites spread on their own rings
+around their endpoints, core with liveness centre-left, readout card naming the
+active endpoint. Camera control proven live: a synthesised drag orbited the pool,
+the Recentre button appeared (only renders when the per-frame camera check reports
+off-home), and the hover card updated to the node under the release point.
+Caveats, stated plainly: synthesised *clicks* still do not reach the popover's
+SwiftUI buttons (Recentre/detach untested by hand-off — needs the founder's real
+click; drag-orbit is the verified interaction), and blind drag-reversal cannot
+re-home the camera, so the app was relaunched to restore the opening view.
+
+**Housekeeping.** Founder preferences restored (`cockpitMode` back to `list`,
+`graphDepth` back to `flat`), popover left closed, app running the new build.
+Verification screenshot: `deep-reading-verified.png` in the repo root (untracked).
+
+**Next step.** Founder opens the panel, switches the reading to Graph → Deep, and
+tries dragging the pool; then reviews PR #2, which carries this on top of the
+cockpit fixes.
