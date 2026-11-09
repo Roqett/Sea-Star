@@ -447,6 +447,8 @@ enum Strings {
         static let links = "Links"
         static let version = "Version"
         static let status = "Status"
+        static let cockpit = "Cockpit"
+        static let reading = "Reading"
     }
 
     /// The update-check alerts (spec §8.5).

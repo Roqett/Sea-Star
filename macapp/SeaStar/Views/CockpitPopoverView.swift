@@ -63,6 +63,11 @@ struct CockpitPopoverView: View {
     /// its place remembered. `nil` where the affordance makes no sense (the
     /// cockpit is already a window) and in tests.
     var onDetach: (() -> Void)?
+    /// `true` when the cockpit is hosted in its own window rather than the
+    /// star-anchored popover. The window owns the frame (and the person sizes
+    /// it), so the reading fills whatever it is given; a fixed panel size in
+    /// that host pins the window's fitting size and fights every resize.
+    var fillsHost: Bool = false
 
     /// The header mark's side in points; also the caustic shimmer's scale, so the
     /// two can never drift apart.
@@ -154,19 +159,34 @@ struct CockpitPopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
+                // The ScrollView below is greedy: left to itself it takes the
+                // whole proposed height and the logs and controls overflow the
+                // panel's cap, which then centres the over-tall layout and
+                // clips the header — mode switch, detach and all — clean off
+                // (founder report, 2026-11-09). Claiming the space outside the
+                // scroll first keeps every control reachable and makes only
+                // the middle scroll.
+                .layoutPriority(1)
             ScrollView {
                 content
             }
             logs
+                .layoutPriority(1)
             controls
+                .layoutPriority(1)
         }
         .padding(18)
-        .frame(width: panelWidth, alignment: .topLeading)
+        .frame(width: fillsHost ? nil : panelWidth, alignment: .topLeading)
         // The whole panel may never exceed what the display allows. The header
         // and the controls sit *outside* the scroll region, so when the middle
         // outgrows its room it scrolls rather than pushing the mode switch off
         // the top of the screen — the failure this cap exists to make impossible.
-        .frame(maxHeight: maxPopoverHeight)
+        // In its own window the cap comes off entirely: the window is the frame.
+        .frame(
+            maxWidth: fillsHost ? .infinity : nil,
+            maxHeight: fillsHost ? .infinity : maxPopoverHeight,
+            alignment: .topLeading
+        )
         .background(Palette.canvas)
         .environment(\.seaStarCockpitOpen, isOpen)
         .task { await watchTheMachine() }
@@ -230,32 +250,66 @@ struct CockpitPopoverView: View {
         }
     }
 
+    /// One row of header controls when the room allows, two when it does not.
+    /// The popover and a narrow window are both narrower than everything the
+    /// header wants to say; without the fallback the trailing buttons drew
+    /// past the edge and the controls — including the mode switch — could land
+    /// outside what is clickable (founder report, 2026-11-09).
     private var header: some View {
-        HStack(spacing: 12) {
-            AppIconMark(icon: controller.currentIcon, size: Self.markSize)
-                .foregroundStyle(controller.currentIcon.accent)
-                .caustics(size: Self.markSize)
-                .shadow(color: controller.currentIcon.accent.opacity(0.55), radius: 8)
+        ViewThatFits(in: .horizontal) {
+            headerRows(compact: false)
+            headerRows(compact: true)
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(Strings.Header.title)
-                    .font(.headline)
-                    .foregroundStyle(Palette.ink)
-                    // The name is one word and must stay one line: in the narrow
-                    // text reading the header used to squeeze it into "Sea-" /
-                    // "Star", which reads as a broken title rather than a title.
-                    .lineLimit(1)
-                    .fixedSize()
-                Text(Strings.Header.subtitle)
-                    .font(.caption)
-                    .foregroundStyle(Palette.inkMuted)
-                    .lineLimit(1)
+    private func headerRows(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 8 : 0) {
+            HStack(spacing: 12) {
+                headerMark
+                headerTitle
+                Spacer(minLength: 8)
+                statePill
+                if !compact {
+                    headerSwitches
+                }
             }
+            if compact {
+                HStack(spacing: 12) {
+                    Spacer(minLength: 8)
+                    headerSwitches
+                }
+            }
+        }
+    }
 
-            Spacer()
+    private var headerMark: some View {
+        AppIconMark(icon: controller.currentIcon, size: Self.markSize)
+            .foregroundStyle(controller.currentIcon.accent)
+            .caustics(size: Self.markSize)
+            .shadow(color: controller.currentIcon.accent.opacity(0.55), radius: 8)
+    }
 
-            statePill
+    private var headerTitle: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(Strings.Header.title)
+                .font(.headline)
+                .foregroundStyle(Palette.ink)
+                // The name is one word and must stay one line: in the narrow
+                // text reading the header used to squeeze it into "Sea-" /
+                // "Star", which reads as a broken title rather than a title.
+                .lineLimit(1)
+                .fixedSize()
+            Text(Strings.Header.subtitle)
+                .font(.caption)
+                .foregroundStyle(Palette.inkMuted)
+                .lineLimit(1)
+        }
+    }
 
+    /// The controls that change what the cockpit is doing: the reading switch,
+    /// the reading's own layout/depth switch, and the window/settings buttons.
+    private var headerSwitches: some View {
+        HStack(spacing: 12) {
             modeToggle
 
             if mode == .list {

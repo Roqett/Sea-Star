@@ -144,7 +144,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                     self?.openSettings()
                 },
                 // A window does not offer to become itself.
-                onDetach: nil
+                onDetach: nil,
+                // The window owns the frame here; the reading fills it.
+                fillsHost: true
             )
         )
         panel.setFrameAutosaveName("SeaStarCockpitWindow")

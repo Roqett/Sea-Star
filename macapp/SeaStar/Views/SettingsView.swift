@@ -24,6 +24,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 engineSection
+                cockpitSection
                 vaultSection
                 inferenceSection
                 logsSection
@@ -77,6 +78,30 @@ struct SettingsView: View {
     }
 
     // MARK: - Sections
+
+    /// Which reading the cockpit opens (spec §8.7) — the same preference the
+    /// header toggle in the panel writes, so a choice made here lights the
+    /// toggle there. The panel was the only route to the graph until now;
+    /// when its header was clipped there was no route at all (founder
+    /// report, 2026-11-09).
+    @AppStorage("SeaStar.cockpitMode") private var modeRaw = ""
+
+    private var cockpitSection: some View {
+        section(Strings.Settings.cockpit) {
+            SettingsRow(label: Strings.Settings.reading, accent: Palette.harnessGlow) {
+                Picker("", selection: Binding(
+                    get: { CockpitMode.resolved(from: modeRaw).rawValue },
+                    set: { modeRaw = $0 }
+                )) {
+                    ForEach(CockpitMode.allCases) { option in
+                        Text(option.label).tag(option.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+            }
+        }
+    }
 
     private var engineSection: some View {
         section(Strings.Settings.engine) {
