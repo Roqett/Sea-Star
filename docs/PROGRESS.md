@@ -100,8 +100,10 @@ No parallel agents active. Single-writer.
   Desktop / Cursor / TRAE" instructions, plus what to say to the agents), a technical
   `reference.md`, and `troubleshooting.md`.
 - Wired the repository `README.md` to the docs index with a Documentation section.
-- Confirmed live state: repo `Roqett/Sea-Star` on `main`, v0.1.0, Osaurus on 1337,
-  `doctor` Ready.
+- Confirmed live state: repo `Roqett/Sea-Star` on `main`, v0.1.0, `doctor` Ready.
+  *Correction (2026-11-09): the runtime on 1337 is oMLX, not Osaurus — oMLX
+  self-moved to 1337 during an update; the two-account setup (lono + ottoparts)
+  is deliberate and both oMLX instances are the founder's.*
 
 **Half-finished / open**
 
@@ -296,8 +298,8 @@ No parallel agents active. Single-writer.
   is live.
 - **Port sweep — done (the *real* cause of "Refresh missed my model").** The first-wins bug
   above was only half the story: `KNOWN_RUNTIMES` looks at oMLX on **8000**, but the founder
-  runs it on **8009** (confirmed via `lsof` + `~/.omlx/settings.json`), and the same account
-  runs a second copy on 8000 — harness ports are simply not fixed. `config.py` now has
+  runs it on **8009** (confirmed via `lsof` + `~/.omlx/settings.json`), and the
+  **ottoparts** account runs a second copy on 8000 — harness ports are simply not fixed. `config.py` now has
   `scan_ports()` (known-harness ports first, then `EXTRA_SCAN_PORTS` like 8009/5000/9000) and
   `probe_runtimes()` sweeps them all, naming each responder by its self-reported `owned_by`
   when specific (`omlx`), else the port's known harness, else `"local"`; generic owners
@@ -2776,3 +2778,146 @@ previously verified 107 Swift tests remain the latest macOS result.
 
 **Next step.** Founder reviews the gate evidence and commissions implementation separately.
 Draft PR #2 remains on hold and must be remembered at the next publishing decision.
+
+
+---
+
+## Session 2026-11-09 — PR #2 merge blocked by tests (Kimi Work)
+
+**Merge resolution.** Fetched GitHub `origin` and merged `origin/main` (`ae5e738`) into
+`feat/macapp-cockpit`. The reported five conflicts resolved to four conflict blocks in one
+file, `README.md`. Preserved main's newer public-facing copy and personal text, retained
+the feature branch's Omarchy roadmap entry and expanded documentation material, and did
+not apply the separately scheduled runtime-port rewrite. Removed only two trailing spaces
+to make `git diff --check` clean. All conflict markers are gone and `README.md` is staged.
+
+**Verification.** `uv run pytest`: **197 passed, 1 failed** —
+`test_doctor_json_fails_loud_with_one_object` expected exit 1 but exited 0 after resolving
+the global TOML vault. `uv run ruff check .`: **all checks passed**.
+`xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test`:
+**107 tests in 19 suites ran; 1 failed** —
+`ConfiguredProviderTests.identityMatchingDoesNotBorrow()` at `EntityGraphTests.swift:1216`
+expected node `harness:app:com.trae.app` to exist, but it was absent. No failing test was
+retried or edited, and no environment workaround was used.
+
+**Local state and next step.** The merge remains in progress and unpublished: no merge
+commit, handoff commit, or push was made. `docs/PROGRESS.md` contains this uncommitted
+handoff in addition to the staged README resolution. Founder direction is needed on the
+two failing tests before committing and pushing PR #2's feature branch.
+
+
+---
+
+## Session 2026-11-09 — publication and next-session handover (Kimi Work)
+
+**Published.** Pushed `34d86c9` (`Record observability design reconciliation`) directly to
+`origin/feat/macapp-cockpit`, updating the branch from `41a2270` to `34d86c9`. This folds
+the reconciliation into existing draft PR #2. `88df8aa` (`Record D-028: separate Sea-Star
+and Redline`) was already an ancestor of the published branch, so it was not a new push.
+No pull request was merged, `main` was not updated, and Codeberg was untouched.
+
+**Open local merge.** A merge of `origin/main` (`ae5e738`) into `feat/macapp-cockpit`
+remains in progress. Git presented four conflict blocks in `README.md`, not five separate
+files. All four are resolved and the README is staged: main's newer public-facing and
+personal wording was preserved, the Omarchy roadmap entry and expanded documentation
+material were retained, and only two trailing spaces were removed. The separately
+scheduled port corrections were deliberately not included in that conflict resolution.
+There is no merge commit. `docs/PROGRESS.md` is modified with the session handoffs.
+
+**Verification still blocks the merge commit.** `git diff --check` passed and no conflict
+markers remain. `uv run pytest` returned **197 passed, 1 failed**:
+`test_doctor_json_fails_loud_with_one_object` expected exit 1 but exited 0 after resolving
+the global TOML vault. `uv run ruff check .` passed. The macOS command
+`xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test`
+ran **107 tests in 19 suites; 1 failed**:
+`ConfiguredProviderTests.identityMatchingDoesNotBorrow()` at `EntityGraphTests.swift:1216`
+expected `harness:app:com.trae.app` to exist but received nil. No test was edited or
+retried, and no environment workaround was used.
+
+**Founder context for the failures and port evidence.** Nick had selected “take off the
+graph” for TRAE because he does not currently use it; this may explain its absence from
+the visible graph, but it does not by itself prove why the isolated Swift test failed.
+Investigate hiding versus identity retention rather than weakening the assertion. Both
+oMLX instances are Nick's deliberate two-account setup, with a harness on each account.
+oMLX moved itself to port 1337 during an update. The observed-but-unattributed socket
+state therefore remains in scope for other people's machines.
+
+**Approved README corrections.** In the next documentation session, apply the approved
+runtime-table rewrite: ports become hints, defaults are explicitly non-exclusive, and the
+Osaurus/1337 zero-download shortcut is rewritten so `doctor` confirmation establishes the
+actual runtime and port. Use the recorded live evidence and the two-account/update context
+above; do not turn one observed default into a universal claim.
+
+**Approved secrets decision record.** Draft a decision record whose contract is: `.env`
+and secret-named files are never opened; secret values inside otherwise readable configs
+may be parsed for operation but must never be emitted or logged; and tests must prove that
+no secret crosses the doctor/JSON bridge. Keep this as a decision-record drafting task
+unless implementation is separately commissioned. Reconcile it with the observability
+design's stricter secret-bearing-file language already flagged above.
+
+**Next step.** Start the new session by inspecting the open merge and this handoff, then
+apply the approved README corrections and draft the secrets record as separate,
+reviewable documentation changes. Do not commit or push the open main merge until its two
+failing tests have been explained and the full Python and macOS suites pass.
+
+
+---
+
+## Session 2026-11-09 (later) — PR #2 unblocked, approved docs landed (Kimi Work)
+
+**Merge committed and pushed.** The open merge of `origin/main` (`ae5e738`) into
+`feat/macapp-cockpit`, resolved in the earlier session, was committed as `b45c94a`
+once both suites passed, and pushed. PR #2 now reports **MERGEABLE / CLEAN** — the
+five reported conflicts are cleared. The earlier handoff's hold ("do not push until
+the two failing tests are explained") is superseded: both failures were explained
+and fixed as hermeticity defects, below.
+
+**The two failing tests, explained and fixed — both were the machine leaking into
+the tests, not product bugs.**
+
+1. `test_doctor_json_fails_loud_with_one_object` patched `detect_vault` to `None`
+   but `_find_config_file` also reads `~/.config/seastar/config.toml`; this
+   machine's real global TOML (written 2026-11-08) resolves a vault, so doctor
+   legitimately exited 0. Fix: the test now moves `HOME` aside. No assertion was
+   weakened — the test finally tests what it claims.
+2. `identityMatchingDoesNotBorrow` expected the fixture graph to contain Trae
+   (`harness:app:com.trae.app`), but `ServerController.init` reads the real
+   `SeaStar.latentHarnessesOff` preference, and this machine's set contains
+   `com.trae.app` (the founder took Trae off the graph — deliberate, and it must
+   stay hidden in the real app). Fix: `Fixture.controller()` clears the preference
+   around controller construction and restores it; verified the founder's five
+   hidden harnesses are intact afterwards. Hiding filtering is deliberate product
+   behaviour and was not touched.
+
+**Verification.** `uv run pytest`: **198 passed** (was 197 + 1 env-leak failure).
+`uv run ruff check .`: clean. `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar
+-destination 'platform=macOS' test`: **107 tests in 19 suites passed.**
+
+**Approved README corrections applied.** The runtime table now presents ports as
+hints ("where it's usually found — a hint, not a lease"), defaults are explicitly
+non-exclusive, with the oMLX-moved-to-1337 update as the worked example, and the
+zero-download shortcut is rewritten so `sea-star doctor` — not any port number —
+establishes which runtime actually answers where.
+
+**Secrets decision record drafted.** D-030 is appended to `DECISIONS.md` with the
+approved contract: `.env`/secret-named files are never opened; secret values inside
+readable configs may be parsed but never emitted or logged; tests must prove no
+secret crosses the doctor/JSON bridge. It reconciles the observability design's
+blanket "secret-bearing files are never read" into the file-level and value-level
+rules, resolving the `providers.py` flag from the D-029 reconciliation. Test debt is
+stated plainly in the record: the providers value-level test exists; the
+bridge-level and never-opened tests are commissioned with implementation.
+
+**Metal Toolchain: re-verified PRESENT.** The Nov 8 "missing" report is stale; the
+founder repaired Xcode on 2026-11-09 morning. Now: `xcrun metal` = Apple metal
+version 32023.922; `Shaders/Caustics.metal` compiles clean; the Debug bundle's
+`default.metallib` is from this morning; the full Swift suite passes. The October
+"installed (27A266a)" note is superseded by the current asset (27B47 family).
+
+**Two stale PROGRESS.md lines corrected.** The Sept 25 "Osaurus on 1337" live-state
+line now notes oMLX owns 1337 after self-moving at an update; the "same account runs
+a second copy on 8000" line now names the ottoparts account (both oMLX instances are
+the founder's deliberate two-account setup).
+
+**Next step.** Founder reviews PR #2 (now conflict-free) and the D-030 record;
+implementation of the secrets bridge tests, if commissioned, is separate work.

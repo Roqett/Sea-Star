@@ -967,3 +967,16 @@ Summary of Changes:
 - `DECISIONS.md` — accepted D-029: instrument #5 uses standalone hybrid context-truth preflight, full-request accounting, explicit output reserve, and independent status/evidence dimensions. Only proven overflow blocks; estimates warn and unknowns stay honest. No persistent events or private runtime dependency were added.
 - `docs/PROGRESS.md` — recorded D-028's push, D-029's adoption, and the successful cockpit verification after the founder repaired Xcode.
 - Verification: `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` succeeded; 107 Swift tests in 19 suites passed. The earlier Metal Toolchain blocker is resolved.
+
+
+Harness: Kimi Work
+
+Date: 2026-11-09 11:35 ACDT
+
+Summary of Changes:
+- `tests/test_cli.py` — `test_doctor_json_fails_loud_with_one_object` now moves HOME aside so the developer machine's real `~/.config/seastar/config.toml` cannot resolve a vault; the test was environment-leaky, the assertion is unchanged.
+- `macapp/SeaStarTests/EntityGraphTests.swift` — `Fixture.controller()` clears `SeaStar.latentHarnessesOff` around controller construction and restores it, so fixture graphs no longer inherit this machine's hidden-harness preferences (Trae off the graph deleted the node the tests count on).
+- `README.md` — runtime table ports reframed as hints with non-exclusive defaults (oMLX's self-move to 1337 as the worked example); the zero-download shortcut now establishes the runtime via `sea-star doctor` instead of assuming 1337.
+- `DECISIONS.md` — drafted D-030: secret-bearing files are never opened; secret values in readable configs may be parsed but never emitted or logged; tests must prove no secret crosses the doctor/JSON bridge. Reconciles the observability design's stricter blanket wording; bridge-level and never-opened tests are commissioned separately.
+- `docs/PROGRESS.md` — recorded this session; corrected two stale lines (Sept 25 "Osaurus on 1337" → oMLX owns 1337; "same account … on 8000" → the ottoparts account).
+- Verification: merge of `origin/main` into `feat/macapp-cockpit` committed as `b45c94a` and pushed; PR #2 is MERGEABLE/CLEAN. `uv run pytest`: 198 passed. `uv run ruff check .`: clean. `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test`: 107 tests in 19 suites passed. Metal Toolchain re-verified present (metal 32023.922; Caustics.metal compiles).
