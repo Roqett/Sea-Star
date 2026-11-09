@@ -980,3 +980,14 @@ Summary of Changes:
 - `DECISIONS.md` — drafted D-030: secret-bearing files are never opened; secret values in readable configs may be parsed but never emitted or logged; tests must prove no secret crosses the doctor/JSON bridge. Reconciles the observability design's stricter blanket wording; bridge-level and never-opened tests are commissioned separately.
 - `docs/PROGRESS.md` — recorded this session; corrected two stale lines (Sept 25 "Osaurus on 1337" → oMLX owns 1337; "same account … on 8000" → the ottoparts account).
 - Verification: merge of `origin/main` into `feat/macapp-cockpit` committed as `b45c94a` and pushed; PR #2 is MERGEABLE/CLEAN. `uv run pytest`: 198 passed. `uv run ruff check .`: clean. `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test`: 107 tests in 19 suites passed. Metal Toolchain re-verified present (metal 32023.922; Caustics.metal compiles).
+
+
+Harness: Kimi Work
+
+Date: 2026-11-09 12:20 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/Views/CockpitPopoverView.swift` — the header, logs and controls now claim their height with layoutPriority(1) before the middle ScrollView is proposed anything; the over-tall layout used to centre inside the height cap and clip the header (mode switch, detach, gear) off the top. The header falls back to two rows via ViewThatFits when one row does not fit. New `fillsHost` flag: in the detached window the reading fills the window (display cap off) instead of pinning a fixed panel size that fought resizing.
+- `macapp/SeaStar/App/AppDelegate.swift` — the cockpit window host passes `fillsHost: true`.
+- `macapp/SeaStar/Views/SettingsView.swift` + `Strings.swift` — new Cockpit section with the reading picker (graph/list), writing the same `SeaStar.cockpitMode` preference as the panel header toggle.
+- Verification: `xcodebuild … test` — 107 tests in 19 suites passed. Visual verification against the rebuilt running app: full header in list mode; graph mode with Pool/Deep toggle after switching preference. Detached-window resize not visually exercised (synthesised clicks cannot reach popover buttons; an Input Monitoring prompt was left for the founder).

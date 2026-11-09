@@ -2921,3 +2921,49 @@ the founder's deliberate two-account setup).
 
 **Next step.** Founder reviews PR #2 (now conflict-free) and the D-030 record;
 implementation of the secrets bridge tests, if commissioned, is separate work.
+
+
+---
+
+## Session 2026-11-09 (evening) — cockpit header and window fixes (Kimi Work)
+
+**Founder report.** Screenshot 11:40 am: the list reading's header was gone, the
+graph could not be selected from the panel or from Settings, and "no window
+resizing is happening". Reproduced live before touching code.
+
+**Diagnosis.** Two defects. (1) The middle `ScrollView` is greedy — it took the
+whole proposed height, the logs and controls overflowed the panel's height cap,
+and the frame's default *centre* alignment clipped the over-tall layout from both
+ends: header, mode switch and detach button went off the top. The founder was
+reading a clipped panel inside a popover he believed was a window. (2) The
+header's own content is wider than the popover/narrow window, so even unclipped it
+could lose its trailing controls; and the detached window's SwiftUI root asked for
+a fixed panel width, pinning the window's fitting size and fighting resize.
+Settings had no reading control at all.
+
+**Fix.** Header, logs and controls now claim their space with `layoutPriority(1)`
+before the `ScrollView` is proposed anything — only the middle scrolls, every
+control stays reachable, and the height-cap frame is explicitly top-anchored. The
+header falls back to two rows via `ViewThatFits` when one row does not fit. A new
+`fillsHost` flag (set only by the window host) makes the reading fill the window
+with the display cap off, so the resizable `NSPanel` resizes cleanly. Settings
+gains a Cockpit section with the reading picker, writing the same
+`SeaStar.cockpitMode` preference as the header toggle.
+
+**Verified.** `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination
+'platform=macOS' test`: **107 tests in 19 suites passed**. Visually against the
+rebuilt running app: the list reading shows its full header (title, state pill,
+mode toggle, Facts/Path, detach, gear); switching `SeaStar.cockpitMode` to graph
+and reopening shows the starfield with the Pool/Deep depth toggle — the graph is
+selectable again. The detached-window resize was NOT visually exercised:
+synthesised clicks do not reach the popover's buttons, and a system permission
+dialog (Input Monitoring, triggered by the click synthesis) was left for the
+founder to approve or dismiss — not granted by the agent. The window change is
+code-reviewed and test-built only.
+
+**Housekeeping.** Founder preferences restored (`cockpitMode` back to `list`),
+popover left closed. The relaunched app runs the new build. An orphaned
+open-file dialog (vault picker) from the pkilled previous instance was dismissed.
+
+**Next step.** Founder opens the panel, confirms the header is back, detaches the
+window, and tries resizing; then review PR #2, which now carries this fix.
