@@ -228,6 +228,27 @@ async def test_read_omlx_loaded_model_is_none_when_nothing_is_loaded(monkeypatch
     assert await read_omlx_loaded_model("http://127.0.0.1:8009/v1") is None
 
 
+async def test_read_omlx_loaded_model_is_none_when_only_a_virtual_helper_is_loaded(monkeypatch):
+    # An idle oMLX keeps its MarkItDown converter loaded; that helper is not the
+    # model the endpoint is serving, so nothing provable loaded means None —
+    # never the helper's name.
+    _serve_models(
+        monkeypatch,
+        {
+            "models": [
+                {"id": "Dirk-Qwen3.8", "loaded": False},
+                {
+                    "id": "MarkItDown",
+                    "loaded": True,
+                    "model_type": "markitdown",
+                    "virtual": True,
+                },
+            ]
+        },
+    )
+    assert await read_omlx_loaded_model("http://127.0.0.1:8009/v1") is None
+
+
 async def test_read_omlx_loaded_model_is_none_when_the_route_is_absent(monkeypatch):
     # A server that has no such route (Ollama, vLLM) must not become an error —
     # it is simply a runtime that cannot be asked.

@@ -22,6 +22,10 @@ enum Strings {
         /// is a separate window and stays — the founder asked for exactly that
         /// separation (2026-11-09), and this is the explicit control for it.
         static let closeCockpit = "Close Cockpit"
+        /// Opens the facts & path window: both readings of the four rows in one
+        /// resizable panel, independent of the graph window (founder, 2026-11-10).
+        static let factsPath = "Open Facts & Path"
+        static let factsPathTitle = "Sea-Star — Facts & Path"
         static let quit = "Quit Sea-Star"
         static func version(_ value: String) -> String { "Version \(value)" }
     }

@@ -273,7 +273,15 @@ async def read_omlx_loaded_model(
         return None
 
     loaded = [item for item in payload.get("models", ()) if item.get("loaded") is True]
-    named = [str(item["id"]) for item in loaded if item.get("id")]
+    # Helpers and virtual entries (an idle oMLX keeps its MarkItDown converter
+    # loaded, for instance) are never a fallback answer: naming one as the model
+    # an endpoint is serving is precisely the wrong claim this route exists to
+    # avoid.
+    named = [
+        str(item["id"])
+        for item in loaded
+        if item.get("id") and not item.get("is_helper") and not item.get("virtual")
+    ]
     for item in loaded:
         if item.get("model_type") == "llm" and item.get("id"):
             return str(item["id"])

@@ -1026,3 +1026,17 @@ Summary of Changes:
 - `macapp/SeaStar/App/AppDelegate.swift` — `panel.hidesOnDeactivate = false`: the detached cockpit no longer hides when Sea-Star resigns active (NSPanel's AppKit default hid it the moment the person clicked into another app, defeating the "external window as primary focus" purpose).
 - `docs/PROGRESS.md` — session record appended.
 - Verification: reproduced the hide-before/after on the rebuilt running app via the scripted sequence (panel open, Sea-Star frontmost, then Finder frontmost): panel left the screen before, stays on screen after (screenshot-verified). `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` — 121 tests in 21 suites passed.
+
+Harness: Kimi Work
+
+Date: 2026-11-10 10:15 ACDT
+
+Summary of Changes:
+- `src/sea_star/config.py` — `read_omlx_loaded_model` no longer falls back to a loaded helper or virtual entry: an idle oMLX (nothing but its MarkItDown converter loaded) reads as nothing provable instead of naming the converter as its serving model. This was the "wrong model in the facts box" the founder saw on the second-account oMLX instance.
+- `tests/test_config.py` — new pinning test: only-a-virtual-helper-loaded returns None.
+- `macapp/SeaStar/Views/CockpitPanel.swift` — new `combined` mode renders the facts and path readings one after the other; the header toggle and popover are unchanged.
+- `macapp/SeaStar/Views/FactsPathView.swift` — new: scrollable host for the combined panel.
+- `macapp/SeaStar/App/AppDelegate.swift` — `openFactsPathWindow()`: the facts & path reading in its own resizable panel (stays on deactivate, no Space resurrection, frame autosave), a sibling of the graph cockpit window — both can be open at once. New right-click item "Open Facts & Path". Third dev-only debug hook (`UpPeriscope.Sea-Star.factsPath`, removed before release).
+- `macapp/SeaStar/Support/Strings.swift` — `Menu.factsPath` / `Menu.factsPathTitle`.
+- `docs/PROGRESS.md` — session record appended.
+- Verification: `uv run pytest` — 199 passed; `uv run ruff check .` — clean; live `sea-star doctor --json` shows 1337 naming its loaded model and 8000 naming none. `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` — 121 tests in 21 suites passed. Live visual: graph window and facts & path window open simultaneously; combined layout renders facts rows above the path chain cards.

@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// The cockpit torn off into a window of its own — movable, resizable,
     /// and its frame autosaved, so it stays where the founder left it.
     private var cockpitPanel: NSPanel?
+    private var factsPathPanel: NSPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         configureStatusItem()
@@ -171,6 +172,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         NSApp.activate()
     }
 
+    /// The facts & path reading in its own window (founder, 2026-11-10): both
+    /// layouts of the four rows, one after the other, in a resizable panel. It
+    /// is a sibling of the graph cockpit window, not a replacement — the two
+    /// are meant to be open side by side, the shape of the machine in one and
+    /// the plain rows in the other. Same panel treatment as the cockpit
+    /// window: stays on screen when another app takes focus, frame autosave,
+    /// no Space resurrection.
+    private func openFactsPathWindow() {
+        if let factsPathPanel {
+            factsPathPanel.makeKeyAndOrderFront(nil)
+            NSApp.activate()
+            return
+        }
+        let panel = NSPanel(
+            contentRect: NSRect(x: 160, y: 160, width: 460, height: 720),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = Strings.Menu.factsPathTitle
+        panel.isReleasedWhenClosed = false
+        panel.hidesOnDeactivate = false
+        panel.isRestorable = false
+        panel.minSize = NSSize(width: 340, height: 420)
+        panel.backgroundColor = Palette.canvasNS
+        panel.contentViewController = NSHostingController(
+            rootView: FactsPathView(controller: controller)
+        )
+        panel.setFrameAutosaveName("SeaStarFactsPathWindow")
+        factsPathPanel = panel
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.activate()
+    }
+
     /// A development-only hook so a script can open and close the cockpit
     /// without assistive access. Listens for a distributed notification named
     /// `UpPeriscope.Sea-Star.toggle`; sending it flips the popover. This is not
@@ -190,6 +225,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             name: NSNotification.Name("UpPeriscope.Sea-Star.cockpitWindow"),
             object: nil
         )
+        DistributedNotificationCenter.default().addObserver(
+            self,
+            selector: #selector(handleDebugFactsPath(_:)),
+            name: NSNotification.Name("UpPeriscope.Sea-Star.factsPath"),
+            object: nil
+        )
     }
 
     @objc private func handleDebugToggle(_ notification: Notification) {
@@ -202,6 +243,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// dev-only, removed-before-release status as the toggle hook.
     @objc private func handleDebugCockpitWindow(_ notification: Notification) {
         openCockpitWindow()
+    }
+
+    /// Third of the debug hooks: opens (or focuses) the facts & path window.
+    /// Same dev-only, removed-before-release status as the other two.
+    @objc private func handleDebugFactsPath(_ notification: Notification) {
+        openFactsPathWindow()
     }
 
     // The SDK's NSPopoverDelegate takes a Notification (macOS 14+). The old
@@ -260,6 +307,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // cockpit window keeps running as the primary surface. Quit ends the
         // process and necessarily takes both (founder, 2026-11-09).
         menu.addItem(item(Strings.Menu.closeCockpit, #selector(closeCockpit), symbol: "xmark"))
+        menu.addItem(item(Strings.Menu.factsPath, #selector(openFactsPath), symbol: "rectangle.grid.1x2"))
 
         let version = NSMenuItem(
             title: Strings.Menu.version(AppInfo.versionLine),
@@ -309,6 +357,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// torn off into its own window is untouched.
     @objc private func closeCockpit() {
         popover?.performClose(nil)
+    }
+
+    /// The facts & path window, from the right-click menu. Sibling of the
+    /// graph cockpit window; either can be open with or without the other.
+    @objc private func openFactsPath() {
+        openFactsPathWindow()
     }
 
     /// The onboarding window: the machine's ledger, the register's questions,

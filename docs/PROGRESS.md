@@ -3049,3 +3049,21 @@ cockpit fixes.
 **Housekeeping.** Founder preferences verified intact (graph/flat). App running the new build; the detached panel was left open on screen.
 
 **Next step.** Founder re-runs his own scenario: cockpit open, click into Kimi or Finder, cockpit should now stay. Then the remaining unverified item from yesterday — clicking nodes to open their platforms — still needs his real click.
+
+---
+
+## Session 2026-11-10 (late morning) — wrong model in the facts box, and the facts & path window (Kimi Work)
+
+**Founder report.** (1) Click-to-open verified by hand: harnesses launch correctly, and models inside a server are rightly left alone. But *"it's showing the wrong model that oMLX is actually serving in the facts inference box."* (2) The Facts/Path split is right for the compact menu-bar panel, but in a resizable window he wants **both readings combined in one panel** — and that panel openable *alongside* the graph window, so the two can be compared. (3) On the two-ports question (the other oMLX belongs to a second macOS user account, active but idle): *"probably quite a rare case… Consider."*
+
+**Diagnosis (wrong model).** The idle port-8000 oMLX (the other account's instance) has no chat model loaded — only its `MarkItDown` conversion helper, flagged `virtual: true`. The engine's `read_omlx_loaded_model` had a last-resort fallback that returned the first *loaded* entry without excluding virtual helpers, so `MarkItDown` leaked into that endpoint's model list and read as its serving model in the facts box. The active 1337 instance (loaded model MiMo) was always correct.
+
+**Fix.** `named` in `read_omlx_loaded_model` now excludes helper and virtual entries, so an instance with nothing real loaded reads as "nothing provable" (None) rather than naming its converter. Live `sea-star doctor --json` after the fix: 1337 → MiMo (loaded, correct), 8000 → nothing claimed (offered list only). New pinning test: only-a-virtual-helper-loaded → None. Full engine suite 199 passed, ruff clean. The app shells out to the repo venv (editable install), so the running panel picked the fix up on its normal two-second poll — no rebuild needed for the engine half.
+
+**Facts & Path window.** `CockpitPanel` gains a `combined` mode rendering both readings one after the other (toggle untouched — the popover keeps its compact switch, founder: "having them divided for menu bar panel is good"). New `FactsPathView` hosts it in a scrollable panel; `AppDelegate.openFactsPathWindow()` gives it the full learned panel treatment (`hidesOnDeactivate = false`, `isRestorable = false`, frame autosave, own autosave name). It opens from the star's right-click menu ("Open Facts & Path") and is a sibling of the graph cockpit window — both open together, each closable independently; Quit still takes everything (founder-accepted). Verified live: both windows on screen simultaneously, combined layout rendering facts rows above the path chain cards. macapp suite 121/21 green.
+
+**Two-ports recommendation (given, one only).** Keep showing both endpoints — a loopback port that answers with a model list is a fact this machine can prove, and hiding the other account's instance would be guessing at intent. With the wrong-model fix, each node now states honestly what it serves. No toggle: choosing which endpoint drives Sea-Star is the Inference row's existing picker, and node-click model-switching was already retracted. The genuinely rare LAN/multi-person case can wait until it bites someone.
+
+**Housekeeping.** Founder prefs untouched (graph/flat). Dev scaffolding: third debug hook `UpPeriscope.Sea-Star.factsPath` (removed-before-release status, same as the other two). App running the new build; graph window and facts & path window both left open.
+
+**Next step.** Founder right-clicks the star → Open Facts & Path, sizes it beside the graph window; clicks the port-8000 node to see it no longer names MarkItDown. Then PR #2 review.

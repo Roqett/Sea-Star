@@ -64,14 +64,25 @@ struct CockpitPanel: View {
     /// Opens the vault folder picker. The panel owns the importer because the
     /// vault row is the one row that can adopt something the engine never found.
     var onChooseFolder: (() -> Void)?
+    /// The detached facts & path window renders *both* readings, one after the
+    /// other, instead of the toggle choosing one (founder, 2026-11-10): the
+    /// popover is compact enough that switching reads well, a resizable window
+    /// has the room to carry both side by side in time.
+    var combined: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            switch layout {
-            case .facts:
+            if combined {
                 factsLayout
-            case .path:
                 pathLayout
+                    .padding(.top, 6)
+            } else {
+                switch layout {
+                case .facts:
+                    factsLayout
+                case .path:
+                    pathLayout
+                }
             }
             WorkingNowBand(controller: controller)
         }
