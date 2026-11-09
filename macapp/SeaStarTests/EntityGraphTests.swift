@@ -870,7 +870,21 @@ enum Fixture {
         attached: Bool = true,
         extraJSON: String = ""
     ) -> ServerController {
+        // A fixture graph must not inherit the machine's hidden-harness
+        // preferences: the founder's real cockpit state (Trae taken off the
+        // graph, for one) would leak in and delete nodes tests count on. The
+        // controller reads the set once at init, so clearing the key around
+        // construction is enough — then the real preference goes straight back.
+        let defaults = UserDefaults.standard
+        let hiddenKey = "SeaStar.latentHarnessesOff"
+        let savedHidden = defaults.stringArray(forKey: hiddenKey)
+        defaults.set([String](), forKey: hiddenKey)
         let controller = ServerController(command: nil)
+        if let savedHidden {
+            defaults.set(savedHidden, forKey: hiddenKey)
+        } else {
+            defaults.removeObject(forKey: hiddenKey)
+        }
         controller.adopt(
             try! report(
                 ready: ready,

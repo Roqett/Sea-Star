@@ -371,6 +371,9 @@ def test_doctor_json_reports_no_agent_source_when_there_is_no_roster(tmp_path, m
 
 def test_doctor_json_fails_loud_with_one_object(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    # HOME moves aside the developer machine's real ~/.config/seastar/config.toml:
+    # a global TOML vault would resolve and doctor would legitimately exit 0.
+    monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setattr("sea_star.config.detect_vault", lambda home=None: None)
 
     result = runner.invoke(app, ["doctor", "--json"])
