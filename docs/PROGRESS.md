@@ -3033,3 +3033,19 @@ cockpit fixes.
 **Housekeeping.** Founder preferences verified intact (`cockpitMode` graph, `graphDepth` flat — his choices, unchanged). The temporary `SeaStar.debugPanel` UserDefaults diagnostic was removed (hook kept). Popover left closed, detached panel open on screen, app running the new build. Untracked PNGs in the repo root (`deep-reading-verified.png`, `pop-list.png`) not committed.
 
 **Next step.** Founder right-clicks the star → Close Cockpit with the detached window open (should survive), and clicks a few nodes (vault → Finder; oMLX/inference → the serving app; unattributed → nothing). Then review PR #2, which now carries all of today's cockpit work.
+
+---
+
+## Session 2026-11-10 (morning) — cockpit no longer hides when another app is clicked (Kimi Work)
+
+**Founder report.** Verifying Close Cockpit live: closing the menu-bar panel left the detached window standing (the previous fix, working as designed). But then *"it stayed open for a while, maybe 10-15 seconds and then shut, especially when I clicked on the Kimi window"* — clicking another app made the detached cockpit disappear.
+
+**Diagnosis.** Reproduced live against the running build: panel on the current desktop while Sea-Star was frontmost, gone within a second of another app becoming frontmost. The panel is an `NSPanel`, whose AppKit default is `hidesOnDeactivate = true` (the rule that makes small utility palettes vanish when their app resigns active). The founder's cockpit is meant to be his primary window while he works in other apps — the default is exactly wrong here. The window was never closed; it was hidden, and would have reappeared on reactivation.
+
+**Fix.** One line: `panel.hidesOnDeactivate = false` in `openCockpitWindow`, with a comment recording why.
+
+**Verified.** Before/after against the rebuilt running app, same scripted sequence both times (open panel, bring Sea-Star frontmost, then make Finder frontmost): before — panel left the current Space on deactivation; after — panel stayed on screen (screenshot-verified over the Finder desktop). `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform:macOS' test`: 121 tests in 21 suites passed. Committed and pushed to PR #2.
+
+**Housekeeping.** Founder preferences verified intact (graph/flat). App running the new build; the detached panel was left open on screen.
+
+**Next step.** Founder re-runs his own scenario: cockpit open, click into Kimi or Finder, cockpit should now stay. Then the remaining unverified item from yesterday — clicking nodes to open their platforms — still needs his real click.

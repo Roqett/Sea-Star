@@ -138,6 +138,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         )
         panel.title = Strings.MenuBar.label
         panel.isReleasedWhenClosed = false
+        // NSPanel defaults to hiding when its app resigns active — sensible
+        // for a one-shot utility palette, wrong for a cockpit meant to be the
+        // person's primary window while they work in something else.
+        panel.hidesOnDeactivate = false
         // Window restoration is off for the same reason the frame is on:
         // the frame is what the person chose, and it is all that should be
         // remembered. Restoration also resurrects which *Space* the window

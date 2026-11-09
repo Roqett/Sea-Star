@@ -1017,3 +1017,12 @@ Summary of Changes:
 - `macapp/SeaStarTests/EntityGraphTests.swift` — seven new tests in "A click opens the platform the node is about".
 - `docs/PROGRESS.md` — session record appended.
 - Verification: `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` — 121 tests in 21 suites passed. Window independence exercised live against the rebuilt running app: popover toggled closed with the detached panel open, panel persisted (screenshot-verified). Synthesised clicks still do not reach popover buttons; the new menu item and click-to-open need the founder's real click.
+
+Harness: Kimi Work
+
+Date: 2026-11-10 09:45 ACDT
+
+Summary of Changes:
+- `macapp/SeaStar/App/AppDelegate.swift` — `panel.hidesOnDeactivate = false`: the detached cockpit no longer hides when Sea-Star resigns active (NSPanel's AppKit default hid it the moment the person clicked into another app, defeating the "external window as primary focus" purpose).
+- `docs/PROGRESS.md` — session record appended.
+- Verification: reproduced the hide-before/after on the rebuilt running app via the scripted sequence (panel open, Sea-Star frontmost, then Finder frontmost): panel left the screen before, stays on screen after (screenshot-verified). `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` — 121 tests in 21 suites passed.
