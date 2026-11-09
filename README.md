@@ -106,18 +106,24 @@ The reasoning happens on **your** machine, against **your** model. The host is j
 
 Sea-Star talks to any **OpenAI-compatible** local inference endpoint. That means it works, unchanged, with:
 
-| Runtime                    | Default endpoint            |
-| -------------------------- | --------------------------- |
-| Osaurus                    | `http://localhost:1337/v1`  |
-| Ollama                     | `http://localhost:11434/v1` |
-| LM Studio                  | `http://localhost:1234/v1`  |
-| llama.cpp (`llama-server`) | `http://localhost:8080/v1`  |
-| MLX (`mlx_lm.server`)      | `http://localhost:8080/v1`  |
-| oMLX                       | `http://localhost:8000/v1`  |
-| vLLM                       | `http://localhost:8000/v1`  |
-| Unsloth Studio             | `http://localhost:8888/v1`  |
+| Runtime                    | Where it's usually found (a hint, not a lease) |
+| -------------------------- | ---------------------------------------------- |
+| Osaurus                    | `http://localhost:1337/v1`                     |
+| Ollama                     | `http://localhost:11434/v1`                    |
+| LM Studio                  | `http://localhost:1234/v1`                     |
+| llama.cpp (`llama-server`) | `http://localhost:8080/v1`                     |
+| MLX (`mlx_lm.server`)      | `http://localhost:8080/v1`                     |
+| oMLX                       | `http://localhost:8000/v1`                     |
+| vLLM                       | `http://localhost:8000/v1`                     |
+| Unsloth Studio             | `http://localhost:8888/v1`                     |
 
 Runtime-agnostic by contract. You never touch this layer again.
+
+A default port is where a runtime is *usually observed* listening — it is not
+exclusive, and it is not permanent. Two runtimes may ship the same default, and
+an app update can move one onto another's port (oMLX has claimed 1337 on at
+least one machine after a self-update). `sea-star doctor` probes the endpoints
+and names what is actually answering where — trust its report over any table.
 
 ## The focused setup: Osaurus + Unsloth Studio
 I built Sea-star after thinking it would be cool for an Osaurus (my fave harness that week ) agent.. just to hop over to Unsloth studio and do some fine tuning
@@ -160,8 +166,11 @@ is the third leg: it gives them a shared, private memory in your Obsidian vault.
 And if you'd rather use a different harness tomorrow — Buzz, Opencode
 Desktop, Deepseek Harness MacOS (omarchy soon .. ) — **nothing above changes.** That flexibility is the point.
 
-> **Zero-download shortcut (macOS 26+).** Osaurus ships AFM. Run `osaurus serve`, and you can skip Unsloth entirely: Sea-Star
-> autodetects Osaurus on `http://127.0.0.1:1337/v1` and uses `foundation` as the brain.
+> **Zero-download shortcut (macOS 26+).** Osaurus ships AFM. Run `osaurus serve`,
+> then `sea-star doctor`: doctor probes the OpenAI-compatible endpoints and reports
+> the runtime that is actually answering, on the port it actually took — for example
+> `Runtime: osaurus -> http://127.0.0.1:1337/v1`. Where another runtime got the port
+> first, doctor names that one instead; the port in any table is only a hint.
 > Two legs instead of three, and nothing to download.
 
 ## Install
