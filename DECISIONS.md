@@ -1799,3 +1799,75 @@ foundation §4 or authorise persistent JSONL; D-028's gate remains unchanged.
 
 A runtime exposes a stronger standard context contract, or exact preflight cannot be
 implemented without changing the locked inference or configuration boundaries.
+
+
+---
+
+## D-030 — Secret-bearing files are never opened; secret values never cross the bridge
+
+**Date:** 2026-11-09 · **Status:** Accepted · **Tier:** 1 (product values — privacy)
+
+**Affects:** config readers, the doctor/JSON bridge, logging, observability.
+
+**Founder input:** "`.env`/secret-named files never opened; secret values in configs
+may be parsed but never emitted or logged; tests proving no secret crosses the bridge."
+
+### The decision
+
+Three rules, in force together:
+
+1. **File-level: `.env` and secret-named files are never opened.** A file whose
+   purpose is secrets — `.env`, `*.pem`, files named for credentials, keys or
+   tokens — is never read by any Sea-Star reader, even by a reader that could
+   technically parse it. Readers open only their declared settings paths. Today
+   `providers.py` honours this by construction: it opens nothing outside its
+   hint table, and the hint table names only settings files. This rule is the
+   standing gate every future reader must pass — an agent's worth of convenience
+   is never a reason to open a secrets file.
+
+2. **Value-level: a secret inside an otherwise-readable config may be parsed for
+   operation but must never be emitted or logged.** Settings files legitimately
+   hold API keys next to the settings Sea-Star needs, so parsing the document is
+   permitted. What leaves the module is derived, non-secret fields only — the
+   D-021 triple of `(provider, base_url, model)` is the worked example. The raw
+   document never enters a result, a log line, or an exception message, and no
+   `*Key`/`*Token`-style value may be carried in any structure that crosses a
+   module boundary.
+
+3. **Proof: tests must show no secret crosses the doctor/JSON bridge.** The
+   bridge is the machine-readable contract a host app polls; anything in it is
+   effectively public to every host that ever connects. The value-level proof
+   exists — `test_a_config_full_of_secrets_yields_only_the_derived_triple`
+   plants three secrets in a readable config and asserts none appear in the
+   rendered claim. The bridge-level proof — a test that plants secret values in
+   readable configs and asserts the rendered `doctor --json` report contains
+   none of them — is commissioned with implementation and is not yet written,
+   and neither is a test that a `.env` or secret-named file is never opened.
+
+### Reconciliation with the observability design
+
+The harness-observability design states the stricter sentence — "secret-bearing
+files are never read" — as a blanket. This decision splits that blanket into the
+two rules above and is the approved reading of it. The flag raised during the
+D-029 reconciliation, that `providers.py` parses whole JSON config files before
+deriving safe fields, stands resolved under rule 2: the parse is permitted
+because rule 1 already excludes files that exist only to hold secrets, and rule
+2 constrains what the parse may let back out.
+
+### Consequences
+
+- No reader opens `.env` or secret-named files; a new reader declares its paths
+  and is reviewed against this record.
+- Logs, errors and JSON reports carry derived fields only; the raw document
+  dies inside the module that parsed it.
+- Test debt is explicit: the providers value-level test exists; the
+  bridge-level test and the never-opened test are to be written when the
+  corresponding implementation is commissioned.
+- This records the boundary; it does not widen what Sea-Star reads and does not
+  amend foundation §4.
+
+### Revisit when
+
+A harness is found whose settings live in a file that cannot be parsed without
+handling live secrets, or a future instrument genuinely needs content this
+record says may not leave the module.
