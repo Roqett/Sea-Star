@@ -1,9 +1,11 @@
 """Bridge external MCP servers into SeaStar's tool registry.
 
 Contract:
-- Each configured server is spawned over stdio, its tools are listed, and every
-  tool is re-exposed under a namespaced name (``<server>__<tool>``) so two
-  servers cannot collide.
+- Each configured server is spawned over stdio, its tools are listed, and the
+  ones the operator allows are re-exposed under a namespaced name
+  (``<server>__<tool>``) so two servers cannot collide. The ``include`` and
+  ``exclude`` lists on the server entry decide which of its tools survive, which
+  keeps the agent's tool menu small enough for it to choose well.
 - Sessions are short-lived: SeaStar opens one to discover tools and one per call.
   This is deliberately simple for 0.1; a pooled session can replace it later
   without changing the tool surface.
@@ -59,6 +61,8 @@ async def list_external_tools(specs: tuple[MCPServerSpec, ...]) -> tuple[Tool, .
             raise MCPClientError(f"MCP server {spec.name!r} failed: {error}") from error
 
         for remote in listed.tools:
+            if not spec.allows(remote.name):
+                continue
             tools.append(
                 Tool(
                     name=f"{spec.name}{TOOL_NAME_SEPARATOR}{remote.name}",
