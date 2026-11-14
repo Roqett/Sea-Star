@@ -1,0 +1,718 @@
+import SwiftUI
+
+/// The two ways to read the same rows (DECISIONS.md D-001), named by what they
+/// communicate rather than how they are laid out (founder, 2026-10-07).
+///
+/// They are deliberately two *readings* and not two products: every row, every
+/// value and every picker is identical between them, so switching one for the
+/// other changes how the cockpit reads and nothing about what it says. That is
+/// what makes them both worth keeping.
+///
+/// The raw value is what persists as the preference. It deliberately keeps the
+/// old `stack` / `chain` spellings so a stored preference from before the
+/// rename still resolves — the case names are the truth now, the raw values are
+/// a migration.
+enum PanelLayout: String, CaseIterable, Identifiable, Sendable {
+    /// Facts — four rows, one under the next. A column you can scan down, every
+    /// value on the same baseline.
+    case facts = "stack"
+    /// Path — four connected cards reading top to bottom. Each card hands off to
+    /// the next, so the journey a request actually travels is visible as a shape.
+    case path = "chain"
+
+    var id: String { rawValue }
+
+    /// Standard Apple symbols, so the toggle matches the header's other icons.
+    var symbol: String {
+        switch self {
+        case .facts: return "rectangle.grid.1x2"
+        case .path: return "arrow.triangle.branch"
+        }
+    }
+
+    var label: String { Strings.PanelVariant.label(self) }
+    var help: String { Strings.PanelVariant.help(self) }
+
+    /// The stored preference, or the opening default. Facts leads because it is
+    /// the reading this panel has always been, and a new reading should not
+    /// arrive as a surprise.
+    static func resolved(from raw: String) -> PanelLayout {
+        PanelLayout(rawValue: raw) ?? .facts
+    }
+}
+
+/// The cockpit's four rows and the `Working now` band beneath them.
+///
+/// The ontology is the point (DECISIONS.md D-001):
+///
+/// ```
+/// Vault      → the knowledge source being read
+/// Harness    → the app that answers            (picker kept — it is a real action)
+/// Agent      → the persona inside it            (additive)
+/// Inference  → the endpoint *and* the model     (where the URL moved to)
+/// ```
+///
+/// The server URL used to be fused into the Harness row, which made an endpoint
+/// look like an identity. It lives in `Inference` now, where it is a property
+/// of a call rather than of an app.
+struct CockpitPanel: View {
+    let controller: ServerController
+    /// Which reading to draw. A binding rather than the panel's own storage so
+    /// the header toggle and the panel can never disagree about what is on
+    /// screen — there is one source of truth, and it is the header's.
+    @Binding var layout: PanelLayout
+    /// Opens the vault folder picker. The panel owns the importer because the
+    /// vault row is the one row that can adopt something the engine never found.
+    var onChooseFolder: (() -> Void)?
+    /// The detached facts & path window renders *both* readings, one after the
+    /// other, instead of the toggle choosing one (founder, 2026-11-10): the
+    /// popover is compact enough that switching reads well, a resizable window
+    /// has the room to carry both side by side in time.
+    var combined: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if combined {
+                factsLayout
+                pathLayout
+                    .padding(.top, 6)
+            } else {
+                switch layout {
+                case .facts:
+                    factsLayout
+                case .path:
+                    pathLayout
+                }
+            }
+            WorkingNowBand(controller: controller)
+        }
+    }
+
+    // MARK: - Facts
+
+    /// Five rows on one baseline, then the band. Nothing is enclosed, so the
+    /// eye reads a list and can compare values down the column without the
+    /// boxes getting in the way.
+    private var factsLayout: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            row(.vault)
+            row(.harness)
+            row(.agent)
+            row(.inference)
+            row(.workspace)
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ kind: PanelRowKind) -> some View {
+        switch kind {
+        case .vault:
+            PickerRow(
+                label: Strings.Rows.vault,
+                value: vaultValue,
+                accent: Palette.vaultGlow,
+                options: controller.vaultOptions,
+                selection: Binding(
+                    get: { controller.report?.vault.path ?? "" },
+                    set: { controller.selectVault($0) }
+                ),
+                display: Self.vaultName,
+                onChooseFolder: onChooseFolder
+            )
+            .help(Strings.Rows.vaultHelp)
+
+        case .harness:
+            // The Harness row is the app driving Sea-Star, and nothing else. The
+            // endpoint selector that used to live here was never a harness — it
+            // is where models come from — so it moved to Inference, where the
+            // ontology puts it. What the row *is* now is the roster: every harness
+            // app this machine knows, with the one that is actually attached
+            // choosable and the rest greyed with the rung that explains them
+            // (D-018). Choosing the live one points the engine at the servers
+            // that app owns, which is the part of "use this app" the cockpit can
+            // honour — it still cannot make a dormant app attach itself.
+            DialRow(
+                label: Strings.Rows.harness,
+                value: harnessValue,
+                accent: Palette.harnessGlow,
+                options: controller.harnessDial,
+                onSelect: { controller.selectHarness($0) }
+            )
+            .help(Strings.Rows.harnessHelp)
+
+        case .agent:
+            agentRow
+
+        case .inference:
+            inferenceRow
+
+        case .workspace:
+            workspaceRow
+                .help(Strings.Rows.workspaceHelp)
+        }
+    }
+
+    /// The Agent row, which is additive by design. It has four honest states
+    /// and they are not interchangeable:
+    ///
+    /// - a roster, labelled with **whose** roster it is;
+    /// - a roster found and empty;
+    /// - no roster found at all;
+    /// - an engine too old to say, where the app refuses to guess.
+    ///
+    /// Showing "no agent" for all four would be a small lie each time, and it
+    /// is the lie the foundation exists to prevent.
+    @ViewBuilder
+    private var agentRow: some View {
+        let state = controller.agentState
+        switch state {
+        case .roster(let options):
+            // A dial, not a list (D-018). The personas whose model nothing is
+            // serving are shown switched off with that as the reason, and the
+            // ones that *are* served take the endpoint and the model with them
+            // when chosen — which is what makes this a control rather than a
+            // label that moves nothing.
+            DialRow(
+                label: Strings.Rows.agent,
+                value: agentValue(options),
+                accent: Palette.agentGlow,
+                options: controller.agentDial,
+                onSelect: { controller.selectAgent($0) }
+            )
+            .help(Strings.Rows.agentHelp + " " + agentScopeSuffix(state))
+
+        case .empty, .notFound, .unconfirmed:
+            StatusRow(
+                label: Strings.Rows.agent,
+                value: agentStateValue(state),
+                accent: Palette.agentGlow
+            )
+            .help(Strings.Rows.agentHelp + " " + agentScopeSuffix(state))
+        }
+    }
+
+    /// The Inference row: where the call goes, and on what. Both live together
+    /// because they are both properties of the call — the endpoint chose the
+    /// model, so splitting them across rows would hide the relationship. The
+    /// endpoint picker belongs here rather than under Harness: an endpoint is
+    /// not an app, it is where the models are coming from.
+    private var inferenceRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            PickerRow(
+                label: Strings.Rows.inference,
+                value: endpointLabel(controller.report?.baseURL ?? ""),
+                accent: Palette.inferenceGlow,
+                options: controller.inferenceOptions.map(\.baseURL),
+                selection: Binding(
+                    get: { controller.report?.baseURL ?? "" },
+                    set: { controller.selectInference($0) }
+                ),
+                display: endpointLabel
+            )
+            .help(Strings.Rows.inferenceHelp)
+
+            PickerRow(
+                label: "",
+                value: inferenceValue,
+                accent: Palette.modelGlow,
+                options: controller.modelOptions,
+                selection: Binding(
+                    get: { controller.report?.model ?? "" },
+                    set: { controller.selectModel($0) }
+                ),
+                display: { $0 }
+            )
+            .help(Strings.Rows.modelHelp)
+
+            // The cascade's last hop, spoken (D-013): pick the agent above and
+            // this line says where that agent actually is — model first, then
+            // the endpoint that serves it, and the honest version of each.
+            if let agent = controller.selectedAgent {
+                Text(controller.placement(of: agent))
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Palette.inkMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.leading, 73)
+            }
+        }
+    }
+
+    // MARK: - Path
+
+    /// The same five facts as connected cards. Each card is a link in the path
+    /// a request travels — vault to harness to persona to endpoint to workspace — so the
+    /// shape itself carries the order that a facts column leaves to be inferred.
+    private var pathLayout: some View {
+        VStack(spacing: 0) {
+            chainCard(.vault)
+            ChainLink()
+            chainCard(.harness)
+            ChainLink()
+            chainCard(.agent)
+            ChainLink()
+            chainCard(.inference)
+            ChainLink()
+            chainCard(.workspace)
+        }
+    }
+
+    /// Each path card, built from the same four facts the facts rows use. Not a
+    /// `@ViewBuilder`: the switch below picks *values*, and only the one card at
+    /// the end is a view.
+    private func chainCard(_ kind: PanelRowKind) -> some View {
+        let accent: Color
+        let title: String
+        let value: String
+        let detail: String
+
+        switch kind {
+        case .vault:
+            accent = Palette.vaultGlow
+            title = Strings.Rows.vault
+            value = Self.vaultName(controller.report?.vault.path ?? Strings.States.unknown)
+            // The count, not the word "Notes": the detail line is where the fact
+            // of how much is in the vault belongs, and a label is not a fact.
+            detail = controller.report.map { Strings.Rows.noteCount($0.vault.noteCount) }
+                ?? Strings.States.unknown
+        case .harness:
+            accent = Palette.harnessGlow
+            title = Strings.Rows.harness
+            value = harnessValue
+            // A rung is a fact about some app; "nothing is attached" is a fact
+            // about no app at all. The two must not share one line.
+            detail = controller.attachedHarnesses.isEmpty
+                ? Strings.Detail.nobodyAttached
+                : HarnessRung.connected.label
+        case .agent:
+            accent = Palette.agentGlow
+            title = Strings.Rows.agent
+            value = agentValue(controller.agentOptions)
+            detail = agentDetail
+        case .inference:
+            accent = Palette.modelGlow
+            title = Strings.Rows.inference
+            value = controller.report?.model ?? Strings.States.unknown
+            detail = endpointValue
+        case .workspace:
+            accent = Palette.vaultGlow
+            title = Strings.Rows.workspace
+            let markers = controller.report?.detectedWorkspaceMarkers ?? []
+            value = markers.isEmpty ? Strings.States.noneDetected : markers.joined(separator: ", ")
+            // No detail line needed for workspace - the value shows the markers directly
+            detail = ""
+        }
+
+        return ChainCard(accent: accent, title: title, value: value, detail: detail)
+    }
+
+    /// The one line of detail under a chain card. Each names the fact the card
+    /// is *about*, so a card is readable on its own without the row below it.
+    private var agentDetail: String {
+        switch controller.agentState {
+        case .roster: return Strings.Rows.agentCount(controller.agentOptions.count)
+        case .empty: return Strings.Rows.agentRosterEmpty
+        case .notFound: return Strings.Rows.agentNoneFound
+        case .unconfirmed: return Strings.Rows.agentScopeUnknown
+        }
+    }
+
+    /// The Workspace row: shows agent artefacts found in the current directory.
+    /// This is the only evidence family that proves *use* rather than installation.
+    @ViewBuilder
+    private var workspaceRow: some View {
+        let markers = controller.report?.detectedWorkspaceMarkers ?? []
+        if markers.isEmpty {
+            StatusRow(
+                label: Strings.Rows.workspace,
+                value: Strings.States.noneDetected,
+                accent: Palette.vaultGlow
+            )
+        } else {
+            StatusRow(
+                label: Strings.Rows.workspace,
+                value: markers.joined(separator: ", "),
+                accent: Palette.vaultGlow
+            )
+        }
+    }
+
+    // MARK: - Values
+
+    private static func vaultName(_ path: String) -> String {
+        (path as NSString).lastPathComponent
+    }
+
+    private var vaultValue: String {
+        controller.report?.vault.path ?? Strings.States.unknown
+    }
+
+    /// The Harness row shows the app driving Sea-Star and how far it got. It is
+    /// a reading, not a control: only the app itself can decide to attach, so a
+    /// row that looked switchable would be a lie about what the cockpit can do.
+    private var harnessValue: String {
+        let attached = controller.attachedHarnesses
+        guard !attached.isEmpty else { return Strings.States.noHarness }
+        return attached.map(\.name).joined(separator: ", ")
+    }
+
+    /// An endpoint, as the person named it, falling back to its URL when the
+    /// engine has no name for it — and always with its port, because one app can
+    /// serve models from more than one (Atomic Chat does, here), so the name
+    /// alone would offer two identical entries in the menu.
+    private func endpointLabel(_ baseURL: String) -> String {
+        let name = controller.inferenceOptions.first { $0.baseURL == baseURL }?.name ?? baseURL
+        guard name != baseURL, let port = URL(string: baseURL)?.port else { return name }
+        return "\(name) · \(port)"
+    }
+
+    private var endpointValue: String {
+        controller.report?.baseURL ?? Strings.States.unknown
+    }
+
+    /// The Inference row reads as one sentence: the model, then where it runs.
+    private var inferenceValue: String {
+        let model = controller.report?.model ?? Strings.States.unknown
+        let endpoint = controller.report?.baseURL ?? Strings.States.unknown
+        return "\(model) · \(endpoint)"
+    }
+
+    private func agentValue(_ options: [AgentOption]) -> String {
+        guard !options.isEmpty else { return agentStateValue(controller.agentState) }
+        let selected = controller.selectedAgentName ?? options[0].name
+        return selected
+    }
+
+    /// The exact words for each non-roster agent state. Kept as one place so
+    /// the stack and the chain cannot drift into saying different things.
+    private func agentStateValue(_ state: AgentState) -> String {
+        switch state {
+        case .roster: return Strings.Rows.agentRosterFrom(controller.agentScopeLabel)
+        case .empty: return Strings.Rows.agentRosterEmpty
+        case .notFound: return Strings.Rows.agentNoneFound
+        case .unconfirmed: return Strings.Rows.agentScopeUnknown
+        }
+    }
+
+    /// A sentence naming whose roster this is, so a persona list is never
+    /// presented as though it belonged to the whole machine.
+    private func agentScopeSuffix(_ state: AgentState) -> String {
+        switch state {
+        case .roster:
+            return Strings.Rows.agentRosterFrom(controller.agentScopeLabel)
+        case .empty:
+            return Strings.Rows.agentRosterFrom(controller.agentScopeLabel)
+        case .notFound:
+            return Strings.Advice.agentScopeHint
+        case .unconfirmed:
+            return Strings.Advice.agentScopeUnconfirmed
+        }
+    }
+}
+
+/// The rows, named once so both layouts cannot disagree about the order.
+enum PanelRowKind: CaseIterable, Sendable {
+    case vault, harness, agent, inference, workspace
+}
+
+/// One labelled fact. The accent bar carries the palette colour so the same
+/// idea always glows the same (spec §7). Not private: the chain cards and the
+/// stack rows are two drawings of the same four facts, and one definition is
+/// what stops the two readings drifting apart.
+struct StatusRow: View {
+    let label: String
+    let value: String
+    let accent: Color
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            AccentBar(color: accent)
+
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Palette.inkMuted)
+                .frame(width: 60, alignment: .leading)
+
+            Text(value)
+                .font(.caption)
+                .foregroundStyle(Palette.ink)
+                .lineLimit(2)
+                .truncationMode(.middle)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// A labelled fact whose value is a dial over **everything that exists**,
+/// including the entries that cannot be chosen (D-018).
+///
+/// This is `PickerRow` plus the honesty the founder asked for. A menu that only
+/// lists what it can do answers "can I use this?" with silence; the row's job is
+/// to say what is on this machine and why it is not in play, so the entries that
+/// cannot be honoured are shown switched off with their reason beside them. The
+/// reason rides in the menu item because a menu has nowhere else to put it.
+///
+/// The entry currently in use carries a tick, so the menu reads as a choice
+/// rather than as a list of names.
+struct DialRow: View {
+    let label: String
+    let value: String
+    let accent: Color
+    let options: [DialOption]
+    /// Called with the chosen option's id, and only ever for an enabled one —
+    /// a disabled item cannot be clicked, so nothing has to refuse it.
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            AccentBar(color: accent)
+
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Palette.inkMuted)
+                .frame(width: 60, alignment: .leading)
+
+            Menu {
+                ForEach(options) { option in
+                    Button {
+                        onSelect(option.id)
+                    } label: {
+                        Text(optionText(option))
+                    }
+                    .disabled(!option.isEnabled)
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(value)
+                        .font(.caption)
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(Palette.inkMuted)
+                }
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            // Nothing to open: the row is then a plain fact again, which is what
+            // a machine with one app and no other options should read as.
+            .disabled(options.isEmpty)
+
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func optionText(_ option: DialOption) -> String {
+        let body = option.isEnabled
+            ? option.label
+            : Strings.Rows.stillOff(option.label, option.reason ?? "")
+        return option.id == currentID ? "\(body)  ✓" : body
+    }
+
+    /// Which option the row is standing on, so the tick lands on it. Matched on
+    /// the label for a harness (its id is a bundle id, and the app is named by
+    /// its name) and on the id for a persona, which is named by the id — either
+    /// way it is the same string the row is already showing.
+    private var currentID: String {
+        options.first { $0.label == value }?.id ?? value
+    }
+}
+
+/// A labelled fact whose value is a picker (spec §8.1, §8.3). The row shows the
+/// full current choice; the menu lists the alternatives. Disabled when there is
+/// nothing to switch to, so a single-vault or single-model machine stays quiet.
+///
+/// Unlike ``DialRow`` this one only ever lists things that *can* be chosen, which
+/// is right for a list of vaults or models — everything in it is equally usable.
+/// A row whose entries are not equally usable wants `DialRow`.
+struct PickerRow: View {
+    let label: String
+    let value: String
+    let accent: Color
+    let options: [String]
+    let selection: Binding<String>
+    let display: (String) -> String
+    /// Optional extra menu entry — the vault row uses it to adopt any folder.
+    var onChooseFolder: (() -> Void)?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            AccentBar(color: accent)
+
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Palette.inkMuted)
+                .frame(width: 60, alignment: .leading)
+
+            Menu {
+                Picker(label, selection: selection) {
+                    ForEach(options, id: \.self) { option in
+                        Text(display(option)).tag(option)
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+
+                if let onChooseFolder {
+                    Divider()
+                    Button(Strings.Actions.openFolder, action: onChooseFolder)
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(value)
+                        .font(.caption)
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(Palette.inkMuted)
+                }
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .disabled(options.count <= 1 && onChooseFolder == nil)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// The connector drawn between two chain cards. It is a short vertical rule
+/// with a nudibranch gradient, so the link reads as the same material as the
+/// bars rather than as a UI affordance bolted on.
+///
+/// This is wiring, not liveness, so it wears blue-white like every other rule
+/// in the cockpit. The orange-to-green art is reserved for the graph, where it
+/// means an endpoint actually answered — spending it here would spend the
+/// distinction before the graph had a chance to make it.
+private struct ChainLink: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(Palette.ink.opacity(0.18))
+                .frame(width: 1, height: 10)
+            NudiStrip(style: .blueWhite, height: 2, expands: false)
+                .frame(width: 18)
+            Rectangle()
+                .fill(Palette.ink.opacity(0.18))
+                .frame(width: 1, height: 10)
+        }
+        .frame(height: 22)
+        .accessibilityHidden(true)
+    }
+}
+
+/// One card in the chain reading: accent, title, value, and the detail line
+/// that makes the card self-sufficient.
+private struct ChainCard: View {
+    let accent: Color
+    let title: String
+    let value: String
+    let detail: String
+
+    @State private var hovering = false
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            AccentBar(color: accent)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Palette.inkMuted)
+                Text(value)
+                    .font(.caption)
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+
+            Spacer(minLength: 8)
+
+            Text(detail)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Palette.inkMuted)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            Palette.ink.opacity(hovering ? 0.07 : 0.04),
+            in: RoundedRectangle(cornerRadius: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(accent.opacity(hovering ? 0.35 : 0.18), lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+        .onHover { hovering = $0 }
+        .help("\(title) — \(detail)")
+    }
+}
+
+/// The `Working now` band: one honest sentence about what is answering right
+/// now, and nothing else.
+///
+/// It was, for a long time, the most incoherent thing in the cockpit: two
+/// liveness bars, a row that changed its own label depending on whether the
+/// server was up, a host row that duplicated the Harness row above it, and an
+/// evidence line that read as two paragraphs of self-justification. All of that
+/// is gone. What is left is the cascade's live hop, said once: which endpoint
+/// is answering, and the model it is serving.
+private struct WorkingNowBand: View {
+    let controller: ServerController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(Strings.WorkingNow.title)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Palette.inkMuted)
+
+                Spacer(minLength: 0)
+
+                // A word, not a bar: the founder asked for the bars off the
+                // graph, and this band had two more of them. Liveness is one
+                // word now — Live, Running, or Idle — the same three states the
+                // sentence underneath says at length.
+                Text(statusText)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(statusColour)
+            }
+
+            Text(sentence)
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundStyle(Palette.ink)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.ink.opacity(0.04), in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
+    }
+
+    private var status: (text: String, colour: Color) {
+        if controller.isReady { return (Strings.WorkingNow.live, Palette.neonGreen) }
+        if controller.isServerRunning { return (Strings.WorkingNow.running, Palette.working) }
+        return (Strings.WorkingNow.idle, Palette.inkMuted)
+    }
+
+    private var statusText: String { status.text }
+    private var statusColour: Color { status.colour }
+
+    /// The one sentence, chosen from the three states that are actually distinct.
+    private var sentence: String {
+        guard let report = controller.report else { return Strings.WorkingNow.nothing }
+        if controller.isReady, !report.model.isEmpty {
+            return Strings.WorkingNow.answering(report.runtime, report.model)
+        }
+        if controller.isServerRunning {
+            return Strings.WorkingNow.serverOnly
+        }
+        return Strings.WorkingNow.nothing
+    }
+}

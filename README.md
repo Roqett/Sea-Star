@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="assets/sea-star.png" alt="The Sea Star — the octopus with the martini glass" width="300">
+<img src="assets/sea-star.png" alt="Sea-Star" width="280">
 
 # ⭐ Sea-Star
 
-**A private, local-first AI agent that lives in your Obsidian vault.**
+**A private, local-first AI agent  with a MacOS menubar cockpit that lives in your Obsidian vault.**
 One-click's ease. Nothing leaves your house.
 
 [![Version](https://img.shields.io/badge/version-0.1.0-blue)](CHANGELOG.md)
@@ -15,26 +15,68 @@ One-click's ease. Nothing leaves your house.
 
 ***
 
-> *"Your own adventure to fair winds and following seas."*
-> — The Sea Star, 2289 3rd Street, Dogpatch, San Francisco
-> This cute snack also thanks Tom's dry dock around the corner. As it was.
+
+> — The Sea Star, 20th n 3rd, Dogpatch, SF, Ca,  USA
+> This cute snack also thanks Tom's drydock around the corner. As it was.
 
 A sea star holds on tight to its rock and doesn't let go.
 Sea-Star does the same with your notes — and helps you find the right one.
+
+<!--
+  SCREENSHOT PLACEHOLDERS
+  The repo has no app screenshots yet, and no claim is made here that has not been
+  measured. When they are captured, drop them in below with alt text that says what
+  the image actually shows. Capture guide:
+
+    ./script/build_and_run.sh run          # build + launch the cockpit
+    screencapture -x -C /tmp/shot.png     # -C includes the cursor
+    click the menu-bar star to open the popover
+
+  Three worth having, in this order:
+    1. Graph mode  — the starfield, Sea-Star at the centre, lit wires  (~626x786)
+    2. Facts mode  — the four rows + Working now                        (~340 wide)
+    3. Path mode   — the same facts as connected cards
+-->
+
+***
+
+## At a glance
+
+- 🏠 **Local by default** — the reasoning runs on your machine, against your model.
+  No cloud, no telemetry, no account.
+- 🗂️ **Your vault *is* the memory** — it reads Obsidian notes directly and answers
+  **with citations** back to them.
+- 🔌 **MCP both ways** — it's a server *and* a client, so it drops into Osaurus,
+  Claude Desktop, Cursor or TRAE, and can borrow other MCP servers as its own tools.
+- ⚙️ **Runtime-agnostic** — any OpenAI-compatible endpoint works unchanged: Osaurus,
+  Ollama, LM Studio, llama.cpp, MLX, vLLM, Unsloth Studio.
+- 🖱️ **Two front doors** — a terminal-first CLI, and a native macOS menu-bar app that
+  wraps the same engine. Anything you can click, you can also type.
 
 ***
 
 ## Documentation
 
-Four pages, one for wherever you're starting from. Start at the
+# 🚧 SeaStar (Work in Progress)
+
+> **Note:** SeaStar is currently under active pre-alpha development. It is not yet ready for production use, and code architecture is subject to rapid change.
+
+One page for wherever you're starting from. Start at the
 **[docs index](docs/README.md)** if you're unsure.
 
 | I want to…                                                   | Read                                               |
 | ------------------------------------------------------------ | -------------------------------------------------- |
 | Understand what this is, in plain English (no jargon)        | [docs/start-here.md](docs/start-here.md)           |
+| Run it day to day — by clicking or by typing                 | [docs/use-the-app.md](docs/use-the-app.md)         |
 | Connect Sea-Star to Osaurus / Claude Desktop / Cursor / TRAE | [docs/connect.md](docs/connect.md)                 |
 | See every command, tool, setting and runtime                 | [docs/reference.md](docs/reference.md)             |
+| Know how it actually works — architecture, the capability ladder, privacy | [docs/TECHNICAL.md](docs/TECHNICAL.md) |
 | Fix something that's broken                                  | [docs/troubleshooting.md](docs/troubleshooting.md) |
+| Know the rules the code must keep                            | [docs/foundation.md](docs/foundation.md)           |
+
+The landing page is a single static file — [`site/index.html`](site/index.html), open
+it in a browser. The palette, the type and the voice rules live in
+**[docs/brand.md](docs/brand.md)**.
 
 ***
 
@@ -42,13 +84,13 @@ Four pages, one for wherever you're starting from. Start at the
 
 Right now you get to pick two of three:
 
-- **Powerful local agents** (Goose, Aider, custom stacks) — but configuring them is a weekend of YAML and silent failures.
+- **Powerful local Harnesses** (Opencode, Buzz, custom stacks) — but configuring them is a weekend of YAML and silent failures.
 
 - **One-click agents** (the frontier products) — but they're cloud, proprietary, and they read your notes.
 
 - **Your Obsidian vault as the brain** — but wiring Obsidian + a local model + an agent loop together is left as an exercise for the reader.
 
-**Sea-Star is the missing third option:** the zero-config, fully-local agent that treats your Obsidian vault as first-class memory, runs on whatever local model you already have, and plugs into whatever MCP host you already use.
+**Sea-Star is an AI Cockpit and the missing third option:** the zero-config, fully-local agent that treats your Obsidian vault as first-class memory, runs on whatever local model you already have, and plugs into whatever MCP host you already use.
 
 ## What it is
 
@@ -64,22 +106,28 @@ The reasoning happens on **your** machine, against **your** model. The host is j
 
 Sea-Star talks to any **OpenAI-compatible** local inference endpoint. That means it works, unchanged, with:
 
-| Runtime                    | Default endpoint            |
-| -------------------------- | --------------------------- |
-| Osaurus                    | `http://localhost:1337/v1`  |
-| Ollama                     | `http://localhost:11434/v1` |
-| LM Studio                  | `http://localhost:1234/v1`  |
-| llama.cpp (`llama-server`) | `http://localhost:8080/v1`  |
-| MLX (`mlx_lm.server`)      | `http://localhost:8080/v1`  |
-| oMLX                       | `http://localhost:8000/v1`  |
-| vLLM                       | `http://localhost:8000/v1`  |
-| Unsloth Studio             | `http://localhost:8888/v1`  |
+| Runtime                    | Where it's usually found (a hint, not a lease) |
+| -------------------------- | ---------------------------------------------- |
+| Osaurus                    | `http://localhost:1337/v1`                     |
+| Ollama                     | `http://localhost:11434/v1`                    |
+| LM Studio                  | `http://localhost:1234/v1`                     |
+| llama.cpp (`llama-server`) | `http://localhost:8080/v1`                     |
+| MLX (`mlx_lm.server`)      | `http://localhost:8080/v1`                     |
+| oMLX                       | `http://localhost:8000/v1`                     |
+| vLLM                       | `http://localhost:8000/v1`                     |
+| Unsloth Studio             | `http://localhost:8888/v1`                     |
 
 Runtime-agnostic by contract. You never touch this layer again.
 
-## The focused setup: Osaurus + Unsloth Studio
+A default port is where a runtime is *usually observed* listening — it is not
+exclusive, and it is not permanent. Two runtimes may ship the same default, and
+an app update can move one onto another's port (oMLX has claimed 1337 on at
+least one machine after a self-update). `sea-star doctor` probes the endpoints
+and names what is actually answering where — trust its report over any table.
 
-Sea-Star is runtime-agnostic on purpose — but if you want the *specific* pairing that
+## The focused setup: Osaurus + Unsloth Studio
+I built Sea-star after thinking it would be cool for an Osaurus (my fave harness that week ) agent.. just to hop over to Unsloth studio and do some fine tuning
+It is runtime-agnostic on purpose — but if you want the *specific* pairing that
 inspired it, this is the one: **Osaurus for the agent layer, Unsloth Studio for the
 model-and-skills layer, Sea-Star for the memory.**
 
@@ -115,15 +163,21 @@ is the third leg: it gives them a shared, private memory in your Obsidian vault.
 > Unsloth serves an OpenAI-compatible endpoint, Sea-Star consumes it, Osaurus calls Sea-Star.
 > If either app exposes a compatible endpoint, this works unchanged.
 
-And if you'd rather use a different harness tomorrow — LM Studio, Ollama, Claude
-Desktop — **nothing above changes.** That flexibility is the point.
+And if you'd rather use a different harness tomorrow — Buzz, Opencode
+Desktop, Deepseek Harness MacOS (omarchy soon .. ) — **nothing above changes.** That flexibility is the point.
 
-> **Zero-download shortcut (macOS 26+).** Osaurus ships an Apple on-device model called
-> `foundation`. Run `osaurus serve`, and you can skip Unsloth entirely: Sea-Star
-> autodetects Osaurus on `http://127.0.0.1:1337/v1` and uses `foundation` as the brain.
+> **Zero-download shortcut (macOS 26+).** Osaurus ships AFM. Run `osaurus serve`,
+> then `sea-star doctor`: doctor probes the OpenAI-compatible endpoints and reports
+> the runtime that is actually answering, on the port it actually took — for example
+> `Runtime: osaurus -> http://127.0.0.1:1337/v1`. Where another runtime got the port
+> first, doctor names that one instead; the port in any table is only a hint.
 > Two legs instead of three, and nothing to download.
 
 ## Install
+
+Two ways in. Pick whichever suits you — neither one is the "advanced" one.
+
+### Terminal (available now)
 
 ```bash
 # Zero-install from source, if you have uv (recommended):
@@ -138,6 +192,33 @@ uv run sea-star serve
 
 > `pip install seastar-mcp` lands with the first PyPI release. Until then, the
 > `uvx --from git+...` form above is the one-liner to use.
+
+### App (built, still being refined)
+
+A native macOS menu-bar app — no terminal at all — wraps this same engine, so nothing
+you set up here changes when you use it. It shows what is actually running on your
+machine, in two readings of the same four facts, and it never claims more than it can
+prove. The terminal track above stays exactly as useful as it is today.
+
+**This is 0.1.0 and it is not released yet.** The repository is currently private.
+
+## Two ways to run it
+
+The same engine, two front doors. **The app** is the everyday reading; **the terminal**
+does everything the app does, and is how you debug it. Every action maps both ways:
+
+| What you want to do            | App                          | Terminal                              |
+| ------------------------------ | ---------------------------- | ------------------------------------- |
+| Detect vault / runtime / model | Detects on launch            | `uv run sea-star doctor`              |
+| Machine-readable status        | Feeds the cockpit            | `uv run sea-star doctor --json`       |
+| Start the MCP server           | Start / Refresh in the panel | `uv run sea-star serve`               |
+| Create `seastar.toml`          | Choose folder in-app         | `uv run sea-star init`                |
+| Ask the vault a question       | Ask your agent               | `uv run sea-star ask "…"`             |
+| Switch vault / harness / model | The rows, in Facts or Path   | `SEASTAR_*` env or `seastar.toml`     |
+| Read the logs                  | The Logs panel               | `~/Library/Logs/Sea-Star/sea-star.log` |
+| Keep the engine green          | —                            | `uv run ruff check . && uv run pytest` |
+
+The app never hides a capability: anything you can click, you can also type.
 
 ## Quickstart
 
@@ -239,7 +320,7 @@ This is the "Osaurus gets your memory" move. Register Sea-Star as an MCP server:
 - **Osaurus** — Settings › Tools › Connections › add the block above. Osaurus then
   exposes one tool, `ask_seastar`, to its agents.
 
-- **Claude Desktop / Cursor / TRAE** — the same block, in the app's `mcpServers` config.
+- **Opencode Desktop / Cursor / TRAE work** — the same block, in the app's `mcpServers` config.
 
 Now any agent in the host can ask *"what do I already know about X?"* and get your
 vault's answer, locally.
@@ -260,7 +341,9 @@ args = ["-y", "obsidian-mcp", "/Users/you/Documents/MyVault"]
 ```
 
 Restart, and Sea-Star's agent loop can call `obsidian__*` tools alongside its own vault
-tools. That's how you give the agent more to work with.
+tools. That's how you give the agent more to work with. If a server offers dozens of
+tools, trim the menu with `include` / `exclude` (see Configuration) — the agent chooses
+better from a short list.
 
 ### Which do I start with?
 
@@ -295,6 +378,11 @@ temperature = 0.2
 name = "obsidian"
 command = "npx"
 args = ["-y", "obsidian-mcp", "/Users/you/Documents/MyVault"]
+# Optional tool allowlist. Empty (or absent) means "every tool the server offers".
+# Set it and only these tools reach the agent.
+include = ["search_notes", "read_note"]
+# Optional denylist. Always wins, even over `include`.
+exclude = ["delete_note"]
 ```
 
 > **Heads up:** a `seastar.toml` can hold a real `api_key`. If your vault is under
@@ -328,19 +416,37 @@ args = ["-y", "obsidian-mcp", "/Users/you/Documents/MyVault"]
 
 ```
 src/sea_star/
-  cli.py         # `sea-star init | doctor | serve | ask`
-  config.py      # config + runtime/vault autodetection
-  inference.py   # runtime-agnostic OpenAI-compatible adapter
-  vault.py       # Obsidian vault index, search, read/write, citation
-  tools.py       # built-in tools (vault search/read/write/list)
-  agent.py       # the agent loop (plan → tool call → answer)
-  mcp_server.py  # exposes the agent over MCP
-  mcp_client.py  # consumes other MCP servers as tools
+  cli.py           # `sea-star init | doctor | serve | ask`
+  config.py        # config + runtime probing + vault autodetection
+  inference.py     # the one path to a model; OpenAI-compatible
+  vault.py         # the only module that touches vault files
+  tools.py         # tool registry + built-in vault tools
+  agent.py         # the bounded agent loop (plan -> tool -> answer)
+  mcp_server.py    # exposes ask_seastar, vault_*, machine_report
+  mcp_client.py    # consumes other MCP servers as its own tools
+  recon.py         # one-shot reads of this machine's process/socket tables
+  harnesses.py     # harness discovery + the rung each one reached
+  connections.py   # records which process spawned serve (stdio attachment)
+  providers.py     # what a harness *declares* it gets models from
+  register.py      # the ask-once store at ~/.seastar/register.json
+  agents.py        # agent roster reading
+macapp/            # the native macOS menu-bar cockpit (AppKit + SwiftUI)
+  SeaStar/
+    App/           # the AppKit shell: status item, popover, app menu
+    Views/         # cockpit, graph, panel, settings, onboarding
+    Models/        # the decoded bridge report
+    Services/      # engine invocation, server lifecycle, logs, updates
+    Support/       # palette, strings, links
+    Shaders/       # the caustic shimmer
 ```
+
+**[docs/TECHNICAL.md](docs/TECHNICAL.md)** explains the architecture, the capability
+ladder that decides what Sea-Star is allowed to claim, and the known debt.
 
 ## Roadmap
 
 - [x] Runtime-agnostic inference adapter
+- [x] Native macOS menu-bar cockpit
 
 - [x] Vault search / read / write with citations
 
@@ -352,14 +458,17 @@ src/sea_star/
 
 - [ ] "Which local models actually work with MCP" conformance table
 
+- [ ] **Omarchy port** — run on Arch Linux + Hyprland. The Python engine should carry
+  over unchanged; the GUI is a rewrite (the SwiftUI cockpit becomes a Linux-native shell).
+
 ## The name
 
-There's a bar called **The Sea Star** at 2289 3rd Street, in the Dogpatch
-district of San Francisco. Its sign was an orange octopus.
-In its own words: *"House Octopus overseeing the antics? We've got one of those too!"*
+There's a bar called **The Sea Star** at 20th n 3rd, in the Dogpatch
+district of San Francisco. I stone's throw from the birthplace of GPT some 30 years later. The Builder spent some time there ( with a qwirky Grey timberwolf)..a long time ago.
+The Sea-stars in South Australia 's Spencer Gulf are just as colourful and EVERY single one : TOTALLY unique
 
-That's the spirit. A sea star holds on tight to its rock and doesn't let go. Sea-Star
-does the same with your notes. The octopus is the house mascot.
+That's the spirit. A sea star holds on tight to its rock and doesn't let go. Those arms (or legs ) are independent, but connected :  Sea-Star
+does the same with your notes and lets you know the big picture.
 
 ## Contributing
 
@@ -372,8 +481,8 @@ MIT © Roqett / Up Periscope
 
 ***
 
-*Built by an Oz winemaker who bought an M4 Pro 64GB, got curious, and started a small
-software factory called* ***Up Periscope*** *to bump up diverse projects. Learned in public.*
+*Built by an Oz winemaker who as a lad bought a Sinclair Spectrum 16K (but only got as far as trying to copy "blue Monday ' in BASIC )..timewarp to pulling the pin after vintage 2025, upgraded to a M4pro Mini 64GB, and relearnt to build. an Indy-dev build is a lot like a mini vintage.
+ Learnt in public.*
 
 *On the advice of the late Hunter S. Thompson — who said he hated recommending drugs, alcohol,
 or insanity to anyone... but admitted they'd always worked for him — we took the

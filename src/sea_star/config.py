@@ -13,11 +13,14 @@ Contract:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import tomllib
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -25,6 +28,25 @@ CONFIG_FILENAME = "seastar.toml"
 LOCAL_STATE_DIRNAME = ".seastar"
 
 DEFAULT_API_KEY = "seastar-local"
+
+LOCAL_HOST = "127.0.0.1"
+
+#: The one runtime Sea-Star treats specially. Osaurus hides the model it is
+#: actually bound to behind a placeholder over its API (``/v1/models`` answers
+#: only ``foundation``), so its real model has to be read from Osaurus's own
+#: config rather than believed from the endpoint — see
+#: :func:`read_osaurus_default_model`.
+OSAURUS_RUNTIME_NAME = "osaurus"
+OSAURUS_HOME_DIRNAME = ".osaurus"
+OSAURUS_DEFAULT_AGENT = ("config", "default-agent.json")
+
+#: The second runtime Sea-Star treats specially, for the opposite reason. oMLX
+#: answers ``/v1/models`` with everything it *offers* and no field for which one
+#: is loaded, so its first entry is a guess — on this machine it named a model
+#: oMLX was not running. oMLX's own admin route carries the truth
+#: (``"loaded": true``), which is what :func:`read_omlx_loaded_model` reads.
+OMLX_RUNTIME_NAME = "omlx"
+OMLX_MODELS_ROUTE = "/admin/api/models"
 
 KNOWN_RUNTIMES: tuple[tuple[str, str], ...] = (
     ("osaurus", "http://127.0.0.1:1337/v1"),
@@ -36,9 +58,72 @@ KNOWN_RUNTIMES: tuple[tuple[str, str], ...] = (
     ("vllm", "http://127.0.0.1:8000/v1"),
 )
 
+EXTRA_SCAN_PORTS: tuple[int, ...] = (
+    8009, 8000, 11434, 1234, 1337, 8080, 8888, 5000, 5001, 7860, 4000,
+    8081, 8082, 8088, 8090, 9000, 9001, 10000, 3000, 12345,
+)
+
+GENERIC_OWNERS: frozenset[str] = frozenset(
+    {"library", "user", "system", "openai", "organization_owner"}
+)
+
+# Owners that name a *place* rather than a product. Atomic Chat's inbuilt server
+# answers with ``owned_by: "remote"`` while sitting on this machine and holding
+# 1337, which the cockpit then read as though the cloud were involved — the
+# founder's own words were "I'm not exactly sure what remote reflects to". A
+# vague owner is therefore treated as no owner at all, and the app that actually
+# holds the socket wins instead.
+#
+# Deliberately *not* merged into ``GENERIC_OWNERS``: dropping these outright would
+# send the name to the port table, and 1337's known port belongs to Osaurus — so
+# Atomic Chat would be mislabelled as a different product (D-015).
+VAGUE_OWNERS: frozenset[str] = frozenset({"remote", "local", "localhost", "host", "server", "api"})
+
+
+def _port_of(base_url: str) -> int:
+    return urlsplit(base_url).port or 0
+
+
+NAMED_PORTS: dict[int, str] = {
+    _port_of(base_url): name for name, base_url in reversed(KNOWN_RUNTIMES)
+}
+
+
+def scan_ports() -> tuple[int, ...]:
+    """Every localhost port worth sweeping for an OpenAI-compatible server.
+
+    Harness ports are not fixed — oMLX's documented default is 8000, but the same
+    person often runs a second copy on 8009, and other machines pick other ports.
+    So we sweep a standard set rather than trusting one address per harness.
+    Known-harness ports come first (in :data:`KNOWN_RUNTIMES` order), then the
+    extras. ``SEASTAR_SCAN_PORTS`` (comma-separated) replaces the set wholesale.
+    """
+
+    override = os.environ.get("SEASTAR_SCAN_PORTS")
+    if override:
+        ports: list[int] = []
+        for chunk in override.split(","):
+            chunk = chunk.strip()
+            if chunk.isdigit() and 0 < int(chunk) < 65536 and int(chunk) not in ports:
+                ports.append(int(chunk))
+        return tuple(ports)
+    ports: list[int] = []
+    for _name, base_url in KNOWN_RUNTIMES:
+        port = _port_of(base_url)
+        if port and port not in ports:
+            ports.append(port)
+    for port in EXTRA_SCAN_PORTS:
+        if port not in ports:
+            ports.append(port)
+    return tuple(ports)
+
 OBSIDIAN_CONFIG_NAME = "obsidian.json"
 
 PROBE_TIMEOUT_SECONDS = 1.5
+
+VAULT_SOURCE_ENV = "env"
+VAULT_SOURCE_CONFIG = "toml"
+VAULT_SOURCE_OBSIDIAN = "obsidian"
 
 
 class ConfigError(RuntimeError):
@@ -53,9 +138,23 @@ class MCPServerSpec:
     command: str
     args: tuple[str, ...] = ()
     env: tuple[tuple[str, str], ...] = ()
+    include: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ()
 
     def env_dict(self) -> dict[str, str]:
         return dict(self.env)
+
+    def allows(self, tool_name: str) -> bool:
+        """Whether this server's ``tool_name`` should be exposed to the agent.
+
+        An empty ``include`` means "everything not excluded"; a non-empty one is
+        an allowlist. ``exclude`` always wins. Curating here — at connect time —
+        is what keeps the agent's tool menu small enough to choose well.
+        """
+
+        if self.include and tool_name not in self.include:
+            return False
+        return tool_name not in self.exclude
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,16 +202,23 @@ def _parse_servers(raw: object) -> tuple[MCPServerSpec, ...]:
                 command=str(entry["command"]),
                 args=tuple(str(a) for a in entry.get("args", ())),
                 env=tuple((str(k), str(v)) for k, v in entry.get("env", {}).items()),
+                include=tuple(str(t) for t in entry.get("include", ())),
+                exclude=tuple(str(t) for t in entry.get("exclude", ())),
             )
         )
     return tuple(specs)
 
 
-async def probe_base_url(base_url: str, *, timeout: float = PROBE_TIMEOUT_SECONDS) -> list[str] | None:
-    """Return the model ids advertised at ``base_url``, or ``None`` if unreachable.
+async def probe_endpoint(
+    base_url: str, *, timeout: float = PROBE_TIMEOUT_SECONDS
+) -> tuple[list[str], str | None] | None:
+    """Return ``(model_ids, owner)`` at ``base_url``, or ``None`` if unreachable.
 
-    Never raises for connectivity problems — an unreachable endpoint is a signal,
-    not an error, so autodetection can move on to the next candidate.
+    ``owner`` is the server's self-reported ``owned_by`` — oMLX says ``"omlx"``,
+    vLLM says ``"vllm"`` — so a server found on an unexpected port can still name
+    itself. Generic values (``library``, ``user`` …) are dropped so we fall back
+    to the port's known name instead. Never raises for connectivity problems — an
+    unreachable endpoint is a signal, not an error, so a sweep can move on.
     """
 
     try:
@@ -122,26 +228,181 @@ async def probe_base_url(base_url: str, *, timeout: float = PROBE_TIMEOUT_SECOND
             payload = response.json()
     except (httpx.HTTPError, ValueError):
         return None
-    models = [str(item["id"]) for item in payload.get("data", ()) if item.get("id")]
-    return models or None
+    data = payload.get("data", ())
+    models = [str(item["id"]) for item in data if item.get("id")]
+    if not models:
+        return None
+    owner = next((str(item["owned_by"]) for item in data if item.get("owned_by")), None)
+    if owner in GENERIC_OWNERS:
+        owner = None
+    return models, owner
 
 
-async def detect_runtime() -> tuple[str, str, str]:
-    """Probe known local runtimes and return ``(name, base_url, model)``.
+async def probe_base_url(base_url: str, *, timeout: float = PROBE_TIMEOUT_SECONDS) -> list[str] | None:
+    """Return the model ids advertised at ``base_url``, or ``None`` if unreachable."""
 
-    Raises :class:`ConfigError` when nothing answers — an unconfigured machine
-    should be told to start a runtime, not handed a silent fallback.
+    answer = await probe_endpoint(base_url, timeout=timeout)
+    return answer[0] if answer else None
+
+
+async def read_omlx_loaded_model(
+    base_url: str, *, timeout: float = PROBE_TIMEOUT_SECONDS
+) -> str | None:
+    """The model oMLX is *actually* serving, or ``None`` when it cannot be read.
+
+    OpenAI's ``/v1/models`` lists what an endpoint offers; it has no field for
+    which model is loaded, so believing its first entry is a guess. oMLX says on
+    its own admin route, where each model carries ``loaded`` — and its built-in
+    helpers carry ``model_type: "markitdown"`` and share that flag, so the chat
+    model is the loaded entry that is a real ``llm``.
+
+    Best-effort by contract: an absent route, a timeout or an unparseable body
+    returns ``None`` so the caller keeps its previous behaviour rather than
+    inventing a model.
     """
 
-    for name, base_url in KNOWN_RUNTIMES:
-        models = await probe_base_url(base_url)
-        if models:
-            return name, base_url, models[0]
-    probed = ", ".join(url for _, url in KNOWN_RUNTIMES)
+    origin = urlsplit(base_url)
+    if not origin.scheme or not origin.netloc:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(f"{origin.scheme}://{origin.netloc}{OMLX_MODELS_ROUTE}")
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError):
+        return None
+
+    loaded = [item for item in payload.get("models", ()) if item.get("loaded") is True]
+    # Helpers and virtual entries (an idle oMLX keeps its MarkItDown converter
+    # loaded, for instance) are never a fallback answer: naming one as the model
+    # an endpoint is serving is precisely the wrong claim this route exists to
+    # avoid.
+    named = [
+        str(item["id"])
+        for item in loaded
+        if item.get("id") and not item.get("is_helper") and not item.get("virtual")
+    ]
+    for item in loaded:
+        if item.get("model_type") == "llm" and item.get("id"):
+            return str(item["id"])
+    for item in loaded:
+        if item.get("id") and not item.get("is_helper") and not item.get("virtual"):
+            return str(item["id"])
+    return named[0] if named else None
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeProbe:
+    """One local inference server that answered, with the models it advertises."""
+
+    name: str
+    base_url: str
+    models: tuple[str, ...]
+
+    @property
+    def model(self) -> str:
+        return self.models[0]
+
+
+async def probe_runtimes(
+    *,
+    timeout: float = PROBE_TIMEOUT_SECONDS,
+    extra_ports: Iterable[int] = (),
+    owners: Mapping[int, str] | None = None,
+) -> tuple[RuntimeProbe, ...]:
+    """Every local runtime answering *right now*, in :func:`scan_ports` order.
+
+    People run more than one harness at once — Osaurus *and* oMLX, say — and each
+    picks its own port (oMLX on 8000 here, 8009 there), so this sweeps the whole
+    standard port set rather than trusting one address per harness. Probes run
+    concurrently to keep the survey inside a single timeout. A responder is named
+    by its self-reported ``owned_by`` when that is specific, else by the port's
+    known harness, else ``"local"``.
+
+    ``extra_ports`` are ports somebody else has *observed* listening — the
+    reconnaissance table, in practice. A harness that ships its own model server
+    puts it wherever it likes (Atomic Chat's Apple foundation server answers on
+    3355), so a fixed sweep can miss a live endpoint that is already known to be
+    there. Threaded in by the caller rather than discovered here, because this
+    module's job is to *ask* a port, not to survey the machine.
+
+    ``owners`` is the same reconnaissance table read the other way: port → the
+    app whose process holds it. It is used **only** where the server named a place
+    rather than a product, which is the one case its own answer cannot settle —
+    1337 answers as ``"remote"`` and belongs to Atomic Chat. A server that names
+    itself properly (``omlx``, ``apple``) keeps its own name, because a product
+    name is a better label than the bundle that happens to ship it. Threaded in
+    for the same reason as ``extra_ports``: asking a port is this module's job,
+    surveying the machine is not.
+    """
+
+    ports = scan_ports()
+    ports = ports + tuple(port for port in extra_ports if port not in ports)
+    answers = await asyncio.gather(
+        *(
+            probe_endpoint(f"http://{LOCAL_HOST}:{port}/v1", timeout=timeout)
+            for port in ports
+        )
+    )
+    observed_owners = owners or {}
+    probes: list[RuntimeProbe] = []
+    for port, answer in zip(ports, answers):
+        if answer is None:
+            continue
+        models, owner = answer
+        named_by_itself = owner is not None and owner.casefold() not in VAGUE_OWNERS
+        if named_by_itself:
+            name = owner
+        else:
+            name = observed_owners.get(port) or owner or NAMED_PORTS.get(port) or "local"
+        if name == OSAURUS_RUNTIME_NAME:
+            # Osaurus advertises only the placeholder ``foundation``; the model it
+            # is really bound to lives in its own config. Trust that over the
+            # endpoint, or the cockpit would name a model nobody can select.
+            configured = read_osaurus_default_model()
+            if configured:
+                models = [configured]
+        elif name == OMLX_RUNTIME_NAME:
+            # oMLX lists what it offers but never which one it is running, so its
+            # first entry is a guess. Its admin route says, so put the loaded
+            # model first — where ``RuntimeProbe.model`` is read from — rather
+            # than claiming a model this machine is not serving.
+            loaded = await read_omlx_loaded_model(
+                f"http://{LOCAL_HOST}:{port}/v1", timeout=timeout
+            )
+            if loaded and loaded in models:
+                models = [loaded] + [model for model in models if model != loaded]
+        probes.append(
+            RuntimeProbe(
+                name=name,
+                base_url=f"http://{LOCAL_HOST}:{port}/v1",
+                models=tuple(models),
+            )
+        )
+    return tuple(probes)
+
+
+async def detect_runtime(*, probes: tuple[RuntimeProbe, ...] | None = None) -> tuple[str, str, str]:
+    """Probe local runtimes and return ``(name, base_url, model)``.
+
+    Adopts the first runtime that answers, in :func:`scan_ports` order, so a
+    single-runtime machine behaves exactly as before. Pass ``probes`` (from
+    :func:`probe_runtimes`) to reuse an existing survey instead of probing the
+    network again. Raises :class:`ConfigError` when nothing answers — an
+    unconfigured machine should be told to start a runtime, not handed a silent
+    fallback.
+    """
+
+    if probes is None:
+        probes = await probe_runtimes()
+    if probes:
+        first = probes[0]
+        return first.name, first.base_url, first.model
+    probed = ", ".join(str(port) for port in scan_ports())
     raise ConfigError(
         "No local inference server answered. Start Osaurus (osaurus serve), "
         "Ollama, LM Studio, llama.cpp, MLX (oMLX), vLLM or Unsloth Studio, or set "
-        f"[inference].base_url in {CONFIG_FILENAME}. Probed: {probed}"
+        f"[inference].base_url in {CONFIG_FILENAME}. Swept localhost ports: {probed}"
     )
 
 
@@ -158,15 +419,18 @@ def _obsidian_config_paths(home: Path) -> tuple[Path, ...]:
     return tuple(paths)
 
 
-def detect_vault(home: Path | None = None) -> Path | None:
-    """Find the user's Obsidian vault from Obsidian's own config, or ``None``.
+def detect_vault_candidates(home: Path | None = None) -> tuple[Path, ...]:
+    """Every Obsidian-known vault that still exists, best candidate first.
 
-    Obsidian records every vault it knows in ``obsidian.json``; the entry flagged
-    ``open`` is the one the user last used. Reading it means SeaStar can be truly
-    zero-config for anyone who already has Obsidian installed.
+    Obsidian records each vault it knows in ``obsidian.json``; the entry flagged
+    ``open`` is the one the user last used, and the rest follow most-recently-used
+    first. This is the pick-list the app offers; ``detect_vault`` takes its head.
+    Reading it means SeaStar can be truly zero-config for anyone who already has
+    Obsidian installed.
     """
 
     base = (home or Path.home()).expanduser()
+    entries: list[dict] = []
     for candidate in _obsidian_config_paths(base):
         try:
             data = json.loads(candidate.read_text(encoding="utf-8"))
@@ -175,44 +439,109 @@ def detect_vault(home: Path | None = None) -> Path | None:
         vaults = data.get("vaults")
         if not isinstance(vaults, dict):
             continue
-        entries = [
+        entries.extend(
             entry
             for entry in vaults.values()
             if isinstance(entry, dict) and entry.get("path")
-        ]
-        if not entries:
-            continue
-        opened = [entry for entry in entries if entry.get("open")]
-        entries = opened or entries
-        entries.sort(key=lambda entry: entry.get("ts", 0), reverse=True)
-        path = Path(str(entries[0]["path"])).expanduser()
+        )
+    entries.sort(key=lambda entry: (bool(entry.get("open")), entry.get("ts", 0)), reverse=True)
+    candidates: list[Path] = []
+    for entry in entries:
+        path = Path(str(entry["path"])).expanduser()
         if path.is_dir():
-            return path.resolve()
+            resolved = path.resolve()
+            if resolved not in candidates:
+                candidates.append(resolved)
+    return tuple(candidates)
+
+
+def detect_vault(home: Path | None = None) -> Path | None:
+    """The user's best Obsidian vault, or ``None`` when Obsidian is absent."""
+
+    candidates = detect_vault_candidates(home)
+    return candidates[0] if candidates else None
+
+
+def read_osaurus_default_model(home: Path | None = None) -> str | None:
+    """The model Osaurus is actually bound to, read from Osaurus's own config.
+
+    Osaurus never names that model over its API — ``/v1/models`` answers only the
+    placeholder ``foundation`` — so when the person has pointed Osaurus at a real
+    provider (oMLX, say) the binding is visible only in
+    ``~/.osaurus/config/default-agent.json``. Returns ``None`` when that file is
+    absent, unreadable or nameless, so a caller can fall back to the probe.
+    """
+
+    path = (
+        (home or Path.home())
+        .expanduser()
+        .joinpath(OSAURUS_HOME_DIRNAME, *OSAURUS_DEFAULT_AGENT)
+    )
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    model = data.get("defaultModel") or data.get("default_model") or data.get("model")
+    if isinstance(model, str) and model.strip():
+        return model.strip()
     return None
 
 
-async def load_config(path: Path | None = None, *, autodetect: bool = True) -> Config:
-    """Resolve a complete :class:`Config`, failing loud on anything missing."""
+def read_config_file(path: Path | None = None) -> dict:
+    """Read and parse the active ``seastar.toml``, or ``{}`` when none exists."""
 
-    data: dict = {}
     config_file = _find_config_file(path)
-    if config_file is not None:
-        with config_file.open("rb") as handle:
-            data = tomllib.load(handle)
+    if config_file is None:
+        return {}
+    with config_file.open("rb") as handle:
+        return tomllib.load(handle)
 
-    vault_raw = os.environ.get("SEASTAR_VAULT") or data.get("vault")
-    if vault_raw:
-        vault_path = Path(str(vault_raw)).expanduser().resolve()
+
+def resolve_vault(
+    data: dict, *, autodetect: bool = True, home: Path | None = None
+) -> tuple[Path, str]:
+    """Resolve the vault path and how it was chosen.
+
+    Order is explicit ``SEASTAR_VAULT`` > ``[vault]`` in the config file > Obsidian
+    autodetection > fail loud. Returns ``(path, source)`` with ``source`` one of
+    ``env`` / ``toml`` / ``obsidian``, so a caller can explain the choice.
+    """
+
+    env_vault = os.environ.get("SEASTAR_VAULT")
+    toml_vault = data.get("vault")
+    if env_vault:
+        vault_path = Path(env_vault).expanduser().resolve()
+        source = VAULT_SOURCE_ENV
+    elif toml_vault:
+        vault_path = Path(str(toml_vault)).expanduser().resolve()
+        source = VAULT_SOURCE_CONFIG
     else:
-        detected_vault = detect_vault() if autodetect else None
+        detected_vault = detect_vault(home) if autodetect else None
         if detected_vault is None:
             raise ConfigError(
                 f"No vault configured and no Obsidian vault found. Run "
                 f"`sea-star init --vault <path>` or set [vault] in {CONFIG_FILENAME}."
             )
         vault_path = detected_vault
+        source = VAULT_SOURCE_OBSIDIAN
     if not vault_path.is_dir():
         raise ConfigError(f"Vault path is not a directory: {vault_path}")
+    return vault_path, source
+
+
+async def load_config(
+    path: Path | None = None,
+    *,
+    autodetect: bool = True,
+    probes: tuple[RuntimeProbe, ...] | None = None,
+) -> Config:
+    """Resolve a complete :class:`Config`, failing loud on anything missing."""
+
+    data = read_config_file(path)
+
+    vault_path, _vault_source = resolve_vault(data, autodetect=autodetect)
 
     inference = data.get("inference", {})
     if not isinstance(inference, dict):
@@ -226,7 +555,7 @@ async def load_config(path: Path | None = None, *, autodetect: bool = True) -> C
     if not base_url:
         if not autodetect:
             raise ConfigError("No inference endpoint configured and autodetection is disabled.")
-        runtime_name, base_url, detected_model = await detect_runtime()
+        runtime_name, base_url, detected_model = await detect_runtime(probes=probes)
         model = model or detected_model
 
     if not model:
@@ -275,6 +604,8 @@ def write_default_config(vault_path: Path, *, model: str = "", base_url: str = "
         '# name = "obsidian"',
         '# command = "npx"',
         '# args = ["-y", "obsidian-mcp", "/absolute/path/to/your/vault"]',
+        '# include = ["search_notes"]  # optional allowlist; empty = every tool',
+        '# exclude = []                 # optional denylist; always wins',
         "",
     ]
     destination = vault_path / CONFIG_FILENAME
