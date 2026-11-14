@@ -46,3 +46,10 @@ macapp/SeaStar/Support/Info.plist
 # Personal recovery runbook — contains live credentials in plaintext.
 # Never commit: a filename pattern that ends up in public git history.
 macapp/ROQSTOR-RECOVERY-RUNBOOK.md
+AGENTS.md
+
+# Agent instructions and the session chronicle are local-only (founder, 2026-11-15)
+docs/PROGRESS.md
+docs/HANDOVER-*.md
+docs/NEXT-SESSION.md
+docs/WORKSPACE-IMPLEMENTATION.md

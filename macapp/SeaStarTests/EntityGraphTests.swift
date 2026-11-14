@@ -889,10 +889,10 @@ enum Fixture {
           "ready": \(ready),
           "version": "0.1.0",
           "vault": {
-            "path": "/Users/lono/Vaults/main",
+            "path": "/Users/example/Vaults/main",
             "source": "obsidian",
             "note_count": 12,
-            "candidates": ["/Users/lono/Vaults/main", "/Users/lono/Vaults/demo"]
+            "candidates": ["/Users/example/Vaults/main", "/Users/example/Vaults/demo"]
           },
           "runtime": "osaurus",
           "base_url": "http://127.0.0.1:1337/v1",
@@ -1445,7 +1445,7 @@ struct GraphOpenTargetTests {
 
     @Test("the vault opens its folder")
     func vaultOpensFolder() {
-        #expect(graph().openTarget(for: "vault") == .folder(path: "/Users/lono/Vaults/main"))
+        #expect(graph().openTarget(for: "vault") == .folder(path: "/Users/example/Vaults/main"))
     }
 
     @Test("an app harness opens by path, a cli harness by nothing")

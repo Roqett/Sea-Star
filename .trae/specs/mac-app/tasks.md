@@ -1,6 +1,6 @@
 # Tasks — Sea-Star macOS menu-bar app
 
-Ordered task list for [spec.md](file:///Users/lono/Random_MCP/theSeaStar/.trae/specs/mac-app/spec.md).
+Ordered task list for [spec.md](.trae/specs/mac-app/spec.md).
 Status auto-updates as work proceeds. `[ ]` = pending, `[~]` = in progress, `[x]` = done.
 
 ## Phase 0 — Decide & align
@@ -13,17 +13,17 @@ Status auto-updates as work proceeds. `[ ]` = pending, `[~]` = in progress, `[x]
 
 ## Phase 1 — Bridge (engine, keep tests green)
 
-- [x] **T1.1** Add `--json` to `doctor` in [cli.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/cli.py#L65-L127); keep human output the default.
+- [x] **T1.1** Add `--json` to `doctor` in [cli.py](src/sea_star/cli.py#L65-L127); keep human output the default.
 - [x] **T1.2** Emit the §6 object. The final shape is live: `schema_version`, `ready`,
       `version`, nested `vault {path, source, note_count, candidates}`, `runtime`,
       `base_url`, `model`, `models`, `server.state`, `servers`. Tested (T1.5).
-- [x] **T1.3** Map fill-in logic to existing internals: vault order in [load_config()](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/config.py#L219-L231), `detect_vault()` in [config.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/config.py#L177-L207), `KNOWN_RUNTIMES`.
+- [x] **T1.3** Map fill-in logic to existing internals: vault order in [load_config()](src/sea_star/config.py#L219-L231), `detect_vault()` in [config.py](src/sea_star/config.py#L177-L207), `KNOWN_RUNTIMES`.
 - [x] **T1.4** Fail loud: non-zero exit + populated `error` when no vault/runtime.
 - [x] **T1.5** Add tests for the JSON surface; run `uv run ruff check . && uv run pytest`. → `tests/test_cli.py`; 40 tests green.
 - [x] **T1.6** Extend the bridge with the GUI fields (§6): `vault.candidates`, `vault.source`,
       `server.state`, `schema_version`; reshape `vault` into an object.
 - [x] **T1.7** Scoped tool surface (D8): `include`/`exclude` on `[[mcp.servers]]`, enforced at
-      connect time in `list_external_tools()` ([mcp_client.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/mcp_client.py)); surfaced by `doctor --json`.
+      connect time in `list_external_tools()` ([mcp_client.py](src/sea_star/mcp_client.py)); surfaced by `doctor --json`.
 - [x] **T1.8** Add tests for tool scoping (`allows()`: allowlist, denylist, precedence).
 
 ## Phase 2 — Scaffold the cockpit
@@ -80,7 +80,7 @@ Status auto-updates as work proceeds. `[ ]` = pending, `[~]` = in progress, `[x]
 
 - [ ] **T5.1** Local build for the founder (`xcodebuild`), no signing.
 - [ ] **T5.2** Later: Developer ID `codesign` → `notarytool submit --wait` → `stapler staple`.
-- [ ] **T5.3** Update [PROGRESS.md](file:///Users/lono/Random_MCP/theSeaStar/docs/PROGRESS.md) and append a handoff note.
+- [ ] **T5.3** Update [PROGRESS.md](docs/PROGRESS.md) and append a handoff note.
 
 ## Phase 6 — Operator instructions (dual track)
 

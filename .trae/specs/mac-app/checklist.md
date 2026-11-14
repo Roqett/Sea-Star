@@ -1,6 +1,6 @@
 # Acceptance checklist — Sea-Star macOS menu-bar app
 
-Verification for [spec.md](file:///Users/lono/Random_MCP/theSeaStar/.trae/specs/mac-app/spec.md).
+Verification for [spec.md](.trae/specs/mac-app/spec.md).
 `[ ]` = unmet, `[x]` = met.
 
 ## North star
@@ -69,5 +69,5 @@ Verification for [spec.md](file:///Users/lono/Random_MCP/theSeaStar/.trae/specs/
 
 ## Docs
 
-- [x] [PROGRESS.md](file:///Users/lono/Random_MCP/theSeaStar/docs/PROGRESS.md) updated; handoff note appended.
+- [x] [PROGRESS.md](docs/PROGRESS.md) updated; handoff note appended.
 - [ ] No third-party reference photos committed to a public push.

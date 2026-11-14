@@ -18,10 +18,10 @@ struct DoctorReportTests {
               "ready": true,
               "version": "0.1.0",
               "vault": {
-                "path": "/Users/lono/Vaults/main",
+                "path": "/Users/example/Vaults/main",
                 "source": "obsidian",
                 "note_count": 1234,
-                "candidates": ["/Users/lono/Vaults/main", "/Users/lono/Vaults/demo"]
+                "candidates": ["/Users/example/Vaults/main", "/Users/example/Vaults/demo"]
               },
               "runtime": "osaurus",
               "base_url": "http://127.0.0.1:1337/v1",
@@ -42,7 +42,7 @@ struct DoctorReportTests {
 
         #expect(report.schemaVersion == 1)
         #expect(report.ready)
-        #expect(report.vault.path == "/Users/lono/Vaults/main")
+        #expect(report.vault.path == "/Users/example/Vaults/main")
         #expect(report.vault.source == "obsidian")
         #expect(report.vault.noteCount == 1234)
         #expect(report.vault.candidates.count == 2)

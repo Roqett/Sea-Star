@@ -16,8 +16,8 @@
 > It is a **design constraint on every change**, not a slogan: nothing ships if it works but
 > feels ordinary. Held together with the first rule — it must **work exceptionally well** at
 > what it is for; charm never excuses a broken core (see §2, Goal 7).
-> Source of truth for the workstream: [HANDOVER-mac-app.md](file:///Users/lono/Random_MCP/theSeaStar/docs/HANDOVER-mac-app.md).
-> Live build state: [PROGRESS.md](file:///Users/lono/Random_MCP/theSeaStar/docs/PROGRESS.md).
+> Source of truth for the workstream: [HANDOVER-mac-app.md](docs/HANDOVER-mac-app.md).
+> Live build state: [PROGRESS.md](docs/PROGRESS.md).
 
 ## 1. Summary
 
@@ -84,9 +84,9 @@ Engine internals the app leans on:
 
 - **Vault resolution order** — `SEASTAR_VAULT` env > `seastar.toml [vault]` > Obsidian
   autodetect > fail loud — in
-  [load_config()](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/config.py#L219-L231),
+  [load_config()](src/sea_star/config.py#L219-L231),
   with the Obsidian reader in
-  [detect_vault()](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/config.py#L177-L207).
+  [detect_vault()](src/sea_star/config.py#L177-L207).
   The app surfaces the *chosen* vault and offers other known vaults as a pick-list.
 - **Runtime autodetect** — `KNOWN_RUNTIMES` in `config.py` names the known harnesses
   (osaurus 1337, ollama 11434, lmstudio 1234, unsloth 8888, llamacpp 8080, **omlx 8000**,
@@ -95,12 +95,12 @@ Engine internals the app leans on:
   is named by its `owned_by` (oMLX says `"omlx"`) → known port → `"local"`. `SEASTAR_SCAN_PORTS`
   overrides the set.
 - **Bridge** — `doctor --json` emits a machine-readable status object; human output stays
-  the default ([cli.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/cli.py#L65-L127)).
+  the default ([cli.py](src/sea_star/cli.py#L65-L127)).
   The contract is §6.
 - **Tool scoping** — each `[[mcp.servers]]` entry may carry `include`/`exclude`, and
-  [MCPServerSpec.allows()](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/config.py#L62-L72)
+  [MCPServerSpec.allows()](src/sea_star/config.py#L62-L72)
   filters the bridged tool list at connect time inside `list_external_tools()`
-  ([mcp_client.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/mcp_client.py)).
+  ([mcp_client.py](src/sea_star/mcp_client.py)).
   This is D8; the app surfaces it read-only for now.
 
 ## 5. Decisions
@@ -138,13 +138,13 @@ outstanding.**
 **Command:** `sea-star doctor --json`.
 
 **Implemented shape** (as of this revision, from
-[cli.py](file:///Users/lono/Random_MCP/theSeaStar/src/sea_star/cli.py#L65-L127)):
+[cli.py](src/sea_star/cli.py#L65-L127)):
 
 ```json
 {
   "ready": true,
   "version": "0.1.0",
-  "vault": "/Users/lono/Vaults/main",
+  "vault": "/Users/example/Vaults/main",
   "notes": 1234,
   "runtime": "osaurus",
   "base_url": "http://127.0.0.1:1337/v1",
@@ -540,7 +540,7 @@ The same engine, driven directly. Full parity with the GUI:
 
 ## 11. Acceptance
 
-See [checklist.md](file:///Users/lono/Random_MCP/theSeaStar/.trae/specs/mac-app/checklist.md).
+See [checklist.md](.trae/specs/mac-app/checklist.md).
 Top-level: the founder can complete detect → choose → start → stop without ever opening a
 terminal, a terminal-comfortable user can do the same entirely from the CLI (§10), and the
 engine's 51 tests stay green.

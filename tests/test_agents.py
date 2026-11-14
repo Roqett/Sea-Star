@@ -383,7 +383,7 @@ def test_a_cli_beside_an_app_is_its_own_agent(tmp_path):
 
     table = _table(
         (100, 1, "/Applications/OpenCode.app/Contents/MacOS/OpenCode"),
-        (200, 1, "/Users/lono/.opencode/bin/opencode-cli"),
+        (200, 1, "/Users/example/.opencode/bin/opencode-cli"),
     )
     found = detect_agent_instances(table=table, agent_pids=(100, 200))
 
