@@ -3067,3 +3067,57 @@ cockpit fixes.
 **Housekeeping.** Founder prefs untouched (graph/flat). Dev scaffolding: third debug hook `UpPeriscope.Sea-Star.factsPath` (removed-before-release status, same as the other two). App running the new build; graph window and facts & path window both left open.
 
 **Next step.** Founder right-clicks the star → Open Facts & Path, sizes it beside the graph window; clicks the port-8000 node to see it no longer names MarkItDown. Then PR #2 review.
+
+---
+
+## Session 2026-11-10 (afternoon) — DeepSeek Harness wired as an MCP host (Kimi Work)
+
+**Founder report.** DeepSeek Harness was visible as an installed app but never showed as active/connected, and he asked whether connecting Sea-Star as an MCP is a manual step every time or once-and-done.
+
+**Diagnosis.** Neither — it is configured once, and connects itself. An MCP host attaches by spawning `sea-star serve` over stdio; the serve side records its parent app in `~/.seastar/clients/` on start and removes the record on exit, and `doctor` prunes records whose process died. So the cockpit shows a harness as connected *exactly while it holds the server open*. DeepSeek Harness (dsh) had two MCP servers configured (rea, codebase_memory) but no Sea-Star entry — so there was nothing to connect, and "running but not answering yet" was the honest reading.
+
+**Change.** One block added to `~/.dsh/profiles/desktop/cordis.patch.yml` (same `@deepseek-ai/dsh-mcp-client` shape as the existing two): `serverName: sea_star`, stdio transport, `command: /Users/lono/Random_MCP/theSeaStar/.venv/bin/sea-star`, `args: [serve]`, `failOnStartupError: false` (useful, not load-bearing — same reasoning as the codebase-memory entry). No Sea-Star code changed.
+
+**Verified.** Serve side smoke-tested: a spawned `sea-star serve` wrote its live client record; after the process exited, the next `doctor` read pruned it (`mcp_clients` empty again). YAML re-parses with the new block. Not yet verified end-to-end: dsh must re-read its plugin config (harness restart or new session — the founder's call, he was working in it), and the first real spawn is his to watch. If dsh logs a startup error it fails visibly there by design.
+
+**Next step.** Founder restarts DeepSeek Harness (or starts a new session), watches the cockpit flip DeepSeek Harness to connected while a session is open, and confirms it drops when the session closes.
+
+**Follow-up same day — first config shape was wrong.** After the founder restarted dsh and nothing connected, the evidence trail showed why: the working entry (`rea-mcp`, spawned and running) is wrapped in `- insert:` at the user-level `~/.dsh/cordis.patch.yml`, while my entry and the founder's `mcp-codebase-memory` were bare `- id:` entries in the profile patch. The profile patch's own header defines the format as "id-targeted config overrides, disables, and insert lists", and the base `cordis.yml` contains no MCP entries at all — so a bare `- id:` there overrides an id that exists nowhere and the loader silently ignores it. `codebase_memory` has been silently dead on load for the same reason (its October usage predates the rewrite). Fix: rewrote the Sea-Star entry as an `- insert:` list; YAML validates with `insert ids: ['sea-star']`. Not yet verified end-to-end — needs one more dsh restart (founder's move; he was working in it). Bonus finding reported, not changed (out of scope): codebase_memory needs the same `- insert:` wrap to load again.
+
+---
+
+## Handover — 2026-11-14 (Kimi Work)
+
+The founder is taking a third-party model's overview into a fresh session; this note is that session's starting point.
+
+### Where things stand
+
+**Branch `feat/macapp-cockpit`, head `8a2d109`, pushed. PR #2 OPEN, MERGEABLE / CLEAN** — all conflicts with main long resolved. Carries the entire cockpit arc: header/layout fix, deep-reading readability (sparse captions + per-anchor orbits), Close Cockpit + window independence (`hidesOnDeactivate` fix, `isRestorable` off), click-to-open-platform with proof rules, the wrong-model engine fix, and the Facts & Path window. The Nov 9 approved items also landed earlier on this branch (Metal re-verified, stale PROGRESS lines fixed, D-030 secrets decision record, README corrections).
+
+**DeepSeek Harness (dsh) is wired as an MCP host.** Live records in `~/.seastar/clients/` confirm `sea-star serve` is being spawned by dsh. The shape lesson is recorded in the config comment: in `~/.dsh/profiles/desktop/cordis.patch.yml` only `- insert:` entries register new plugins; bare `- id:` entries are overrides and are silently ignored when the id exists nowhere (the base `cordis.yml` has no MCP entries).
+
+**Half-finished, in this state:**
+- dsh telemetry: records exist, founder said "going well", but the explicit end-to-end check (cockpit shows DeepSeek Harness connected while a dsh session is open, drops when it closes) was never formally ticked off.
+- `mcp-codebase-memory` in the same dsh config is still dead (same bare-id shape). Fix offered 2026-11-10; founder hasn't said go.
+- `docs/PROGRESS.md` changes from 2026-11-10 were uncommitted until this handover commit.
+- Untracked in repo root, deliberately: `deep-reading-verified.png` (verification artefact), `Meridiastra_calcar_info_realSeastar.txt` (founder's), older stray `pop-list.png`.
+
+### To-do list
+
+1. **Founder reviews and merges PR #2** — it is clean and carries everything below.
+2. **Go through the third-party overview in the new session** — the immediate reason for this handover.
+3. **Graph "Deep" reading** — the big parked item. First step is scoping, not code: agree what a 3D look at one element should actually do. The flat pool and the 2D graph are the reference for what "readable" means.
+4. **Confirm dsh telemetry end-to-end** — open a dsh session, watch the cockpit flip DeepSeek Harness to connected; close it, watch it drop.
+5. **codebase-memory dsh entry** — wrap in `- insert:` on the founder's word.
+6. **Pre-release pass** — remove the three dev-only debug notification hooks (`UpPeriscope.Sea-Star.toggle` / `.cockpitWindow` / `.factsPath`) and the `script/shot.sh` dependency on them.
+
+### Working context for the next agent
+
+- Build/run: `export USER=lono LOGNAME=lono; script/build_and_run.sh run` from repo root. App tests: `cd macapp && xcodegen generate && xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` (121 tests / 21 suites at handover). Engine: `uv run pytest` (199), `uv run ruff check .`.
+- Synthetic clicks cannot reach popover SwiftUI buttons (proven repeatedly) — menu items and click-to-open need the founder's real click; window survival, panel rendering, and scripted window opens are verifiable via `screencapture` + the debug hooks.
+- Founder prefs: `SeaStar.cockpitMode=graph`, `SeaStar.graphDepth=flat` — his choices, do not change.
+- oMLX serves on 1337 (this account) and 8000 (second macOS user `ottoparts`, idle); cross-account visibility is loopback-only by design.
+
+### Single next step
+
+New session walks the third-party overview against this list; anything it promotes goes to the top, otherwise item 1 (PR #2 review) leads.
