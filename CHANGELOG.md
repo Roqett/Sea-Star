@@ -1040,3 +1040,13 @@ Summary of Changes:
 - `macapp/SeaStar/Support/Strings.swift` — `Menu.factsPath` / `Menu.factsPathTitle`.
 - `docs/PROGRESS.md` — session record appended.
 - Verification: `uv run pytest` — 199 passed; `uv run ruff check .` — clean; live `sea-star doctor --json` shows 1337 naming its loaded model and 8000 naming none. `xcodebuild -project SeaStar.xcodeproj -scheme SeaStar -destination 'platform=macOS' test` — 121 tests in 21 suites passed. Live visual: graph window and facts & path window open simultaneously; combined layout renders facts rows above the path chain cards.
+
+Harness: Kimi Work
+
+Date: 2026-11-15 19:35 ACST
+
+Summary of Changes:
+- `.github/workflows/ci.yml` — add CI for both halves: ruff + pytest on Ubuntu, and the
+  Sea-Star Swift suite (xcodegen + xcodebuild test, Metal compilation included) on a
+  macOS 26 runner. Docs/asset-only pushes and PRs are skipped. Neither open PR had any
+  checks before this; every push to main and every PR now runs both.

@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    # Docs/asset-only changes carry no code; skip both jobs for them.
+    paths-ignore: &docs-only
+      - "docs/**"
+      - "*.md"
+      - "assets/**"
+      - "site/**"
+  pull_request:
+    branches: [main]
+    paths-ignore: *docs-only
+
+jobs:
+  engine:
+    name: Engine (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Sync environment
+        run: uv sync --extra dev
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Tests
+        run: uv run pytest
+
+  cockpit:
+    name: Cockpit (macOS / Swift)
+    # macos-26: the app targets macOS 26.0, so the runner must carry the
+    # Xcode 26 SDK. (Intel-era labels like macos-15 top out at Xcode 16.)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate the Xcode project
+        run: brew install xcodegen && xcodegen generate
+        working-directory: macapp
+
+      # Note: this Xcode rejects '-destination macOS'; the accepted form is
+      # '-destination platform=macOS' (recorded trap from the dev machine).
+      - name: Build and test
+        run: >-
+          xcodebuild
+          -project SeaStar.xcodeproj
+          -scheme SeaStar
+          -destination 'platform=macOS'
+          test
+        working-directory: macapp
