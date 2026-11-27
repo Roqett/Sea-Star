@@ -59,7 +59,7 @@ One page for wherever you're starting from. Start at the
 | ------------------------------------------------------------ | -------------------------------------------------- |
 | Understand what this is, in plain English (no jargon)        | [docs/start-here.md](docs/start-here.md)           |
 | Run it day to day — by clicking or by typing                 | [docs/use-the-app.md](docs/use-the-app.md)         |
-| Connect Sea-Star to Osaurus / Claude Desktop / Cursor / TRAE | [docs/connect.md](docs/connect.md)                 |
+| Connect Sea-Star to whatever harness                         | [docs/connect.md](docs/connect.md)                 |
 | See every command, tool, setting and runtime                 | [docs/reference.md](docs/reference.md)             |
 | Know how it actually works — architecture, the capability ladder, privacy | [docs/TECHNICAL.md](docs/TECHNICAL.md) |
 | Fix something that's broken                                  | [docs/troubleshooting.md](docs/troubleshooting.md) |
@@ -75,7 +75,7 @@ it in a browser. The palette, the type and the voice rules live in
 
 Right now you get to pick two of three:
 
-- **Powerful local harnesses** (Opencode, Buzz, custom stacks) — but configuring them is a weekend of YAML and silent failures.
+- **Powerful local harnesses**  — but configuring them is a weekend of YAML and silent failures.
 
 - **One-click agents** (the frontier products) — but they're cloud, proprietary, and they read your notes.
 
@@ -95,7 +95,7 @@ The reasoning happens on **your** machine, against **your** model. The host is o
 
 ## Why it stays sovereign
 
-Sea-Star talks to any **OpenAI-compatible** local inference endpoint. That means it works, unchanged, with:
+Sea-Star talks to any **OpenAI-compatible** local inference endpoint. That means it works, unchanged, with for example , but not only :
 
 | Runtime                    | Where it's usually found (a hint, not a lease) |
 | -------------------------- | ---------------------------------------------- |
@@ -117,7 +117,7 @@ least one machine after a self-update). `sea-star doctor` probes the endpoints
 and names what is actually answering where — trust its report over any table.
 
 ## The focused setup: Osaurus + Unsloth Studio
-I built Sea-Star because I wanted an Osaurus agent to hop over to Unsloth Studio and do some fine-tuning.
+I built Sea-Star because at the time I wanted an Osaurus agent to hop over to Unsloth Studio and do some fine-tuning.
 It is runtime-agnostic on purpose — but if you want the *specific* pairing that
 inspired it, this is the one: **Osaurus for the agent layer, Unsloth Studio for the
 model-and-skills layer, Sea-Star for the memory.**
@@ -127,7 +127,7 @@ agents, loads skills, and speaks MCP both ways. Unsloth Studio is a model workbe
 it runs and fine-tunes models and exposes an **OpenAI-compatible API**. Neither one
 knows about your notes. Sea-Star is the third leg: it gives them a shared, private
 memory in your Obsidian vault.
-
+So again, this is example only here. In terms of harnesses,: 
 ```
 ┌────────────────────┐   MCP    ┌──────────────┐   OpenAI-compatible   ┌──────────────────┐
 │  Osaurus (agents)  │ ───────▶ │   Sea-Star   │ ────────────────────▶ │ Unsloth Studio   │
@@ -155,7 +155,7 @@ memory in your Obsidian vault.
 > If either app exposes a compatible endpoint, this works unchanged.
 
 And if you would rather use a different harness tomorrow — Buzz, Opencode
-Desktop, DeepSeek Harness macOS, or Omarchy on Linux — nothing above changes.
+Desktop, DeepSeek Harness macOS, or ,soon to port : Omarchy on Linux — nothing above changes.
 
 > **Zero-download shortcut (macOS 26+).** Osaurus ships AFM. Run `osaurus serve`,
 > then `sea-star doctor`: doctor probes the OpenAI-compatible endpoints and reports
