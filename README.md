@@ -43,10 +43,8 @@ One-click setup, entirely on your machine.
   No cloud, no telemetry, no account, nothing leaving your house.
 - 🗂️ **Your vault is the memory** — it reads Obsidian notes directly and answers
   **with citations** back to them.
-- 🔌 **MCP both ways** — it is a server and a client, so it drops into Osaurus,
-  Claude Desktop, Cursor or TRAE, and can borrow other MCP servers as its own tools.
-- ⚙️ **Runtime-agnostic** — any OpenAI-compatible endpoint works unchanged: Osaurus,
-  Ollama, LM Studio, llama.cpp, MLX, vLLM, Unsloth Studio.
+- 🔌 **MCP both ways** — it is a server and a client, so it drops into any harness, and can borrow other MCP servers as its own tools.
+- ⚙️ **Runtime-agnostic** — any OpenAI-compatible endpoint works unchanged.
 - 🖱️ **Two front doors** — a terminal-first CLI, and a native macOS menu-bar app that
   wraps the same engine. Anything you can click, you can also type.
 
